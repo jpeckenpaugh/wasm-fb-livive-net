@@ -13,7 +13,7 @@ decisions; the source is authoritative.
 
 | Where | Format | When |
 |---|---|---|
-| Hero, centred | `HH:MM:SS` over `OCT 29, 2026 - THU` | only while image 1 is selected (the default at boot) |
+| Hero, centred | `HH:MM:SS` over `OCT 29, 2026 - THU` | only while the clock tile is selected |
 | Tile 1, centred | `HH:MM` | always |
 
 Both are drawn in the guest, on top of the image, in `ui_draw()`:

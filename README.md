@@ -36,16 +36,17 @@ move between them.
 
 ## Mini apps
 
-| Screen | What it shows |
-|---|---|
-| image 1 | photo + `HH:MM:SS` over `OCT 29, 2026 - THU`, and `HH:MM` on its tile |
-| images 2-5 | photo, `HH:MM` on thumbnail 1 |
-| calculator (tile 2) | clickable keypad, integer and decimal entry with thousands separators, value previewed on its tile |
-| calendar (tile 3) | month grid with today highlighted; browse months/years; tile previews `NOV 29` |
-| files (tile 4) | `/` with `Wallpapers` (5 images), `demo` (8 source samples) and `ABOUT.md`; scrolls when the list is long |
-| preview (tile 5) | full-bleed image with a caption, rendered `ABOUT.md`, or a syntax-highlighted source file |
+Tiles run left to right: **calendar, clock, files, preview, calculator**.
 
-Both live in the same guest and are reached with the existing
+| Tile | What it shows |
+|---|---|
+| calendar | month grid, today highlighted; browse months/years; previews `OCT 29` |
+| clock | photo + `HH:MM:SS` over `OCT 29, 2026 - THU`; `HH:MM` on its tile |
+| files | `/` with `Wallpapers` (5 images), `demo` (8 source samples) and `ABOUT.md` |
+| preview | full-bleed image, rendered `ABOUT.md`, or highlighted source code |
+| calculator | keypad, integer and decimal entry with thousands separators |
+
+All five live in the same guest and are reached with the existing
 `app_click()`/`app_key()` path — no per-app exports. The clock repaints about
 once a second while seconds are visible and once a minute otherwise; the
 calculator repaints only on input.

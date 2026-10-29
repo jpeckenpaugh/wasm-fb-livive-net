@@ -123,6 +123,14 @@ EMSCRIPTEN_KEEPALIVE
 int app_key(int key) {
     if (!g_ready || g_test_pattern) return 0;
 
+    /* In the code viewer the arrows scroll the text; at the edge they fall
+     * through to slot navigation so the tiles stay reachable. */
+    if (media_is_preview(&g_media) && (key == KEY_LEFT || key == KEY_RIGHT) &&
+        preview_scroll(&g_preview, key)) {
+        draw();
+        return 1;
+    }
+
     /* Slot navigation works from every screen: it is the same path that has
      * always swapped images, just with the calculator appended as a slot. */
     if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_NEXT) {
@@ -212,14 +220,43 @@ void app_set_date(int year, int month, int day, int weekday) {
 EMSCRIPTEN_KEEPALIVE
 int app_tick(void) {
     if (!g_ready || g_test_pattern) return 0;
-    if (!clock_advance(&g_clock, g_media.selected == 0)) return 0;
+    if (!clock_advance(&g_clock, media_is_clock(&g_media))) return 0;
     draw();
     return 1;
 }
 
+/* Drag-to-pan for the code viewer, in lines and columns. */
+EMSCRIPTEN_KEEPALIVE
+int app_scroll_by(int lines, int cols) {
+    if (!g_ready || !media_is_preview(&g_media)) return 0;
+    if (g_preview.kind != PREVIEW_CODE) return 0;
+
+    int changed = 0;
+    if (lines != 0) {
+        int v = g_preview.line_off + lines;
+        if (v < 0) v = 0;
+        if (v > g_preview.max_line) v = g_preview.max_line;
+        if (v != g_preview.line_off) {
+            g_preview.line_off = v;
+            changed = 1;
+        }
+    }
+    if (cols != 0) {
+        int v = g_preview.col_off + cols;
+        if (v < 0) v = 0;
+        if (v > g_preview.max_col) v = g_preview.max_col;
+        if (v != g_preview.col_off) {
+            g_preview.col_off = v;
+            changed = 1;
+        }
+    }
+    if (changed) draw();
+    return changed;
+}
+
 EMSCRIPTEN_KEEPALIVE
 unsigned int app_next_timeout_ms(void) {
-    return clock_next_timeout_ms(&g_clock, g_media.selected == 0);
+    return clock_next_timeout_ms(&g_clock, media_is_clock(&g_media));
 }
 
 EMSCRIPTEN_KEEPALIVE

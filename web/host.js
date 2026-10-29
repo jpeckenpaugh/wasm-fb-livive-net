@@ -36,10 +36,12 @@ const KEY_CODES = {
 
 /* Slot 1 is the calculator (see MEDIA_CALC_SLOT in src/media.h); the rest map
  * one-to-one to images. */
-const CALC_SLOT = 1;
-const CAL_SLOT = 2;
-const FM_SLOT = 3;
-const PREVIEW_SLOT = 4;
+/* Tile order: calendar, clock, files, preview, calculator (see src/media.h). */
+const CAL_SLOT = 0;
+const CLOCK_SLOT = 1;
+const FM_SLOT = 2;
+const PREVIEW_SLOT = 3;
+const CALC_SLOT = 4;
 
 const selectionLabel = (guest) => {
   if (guest.selected === CALC_SLOT) return 'calculator';
@@ -408,6 +410,32 @@ async function createGuest() {
       vm.canvas.focus({ preventScroll: true });
       clickLogical(x, y);
     });
+
+    /* Drag to pan the code view. Only the guest knows the scroll limits, so
+     * every move is a request and the guest clamps. */
+    let drag = null;
+    vm.canvas.addEventListener('pointerdown', (event) => {
+      drag = { x: event.clientX, y: event.clientY, id: event.pointerId };
+      try { vm.canvas.setPointerCapture(event.pointerId); } catch (error) { /* ignore */ }
+    });
+    vm.canvas.addEventListener('pointermove', (event) => {
+      if (!drag || event.pointerId !== drag.id || !vm.module) return;
+      const rect = vm.canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const sx = 1280 / rect.width;
+      const sy = 720 / rect.height;
+      const lines = Math.trunc((drag.y - event.clientY) * sy / 36);
+      const cols = Math.trunc((drag.x - event.clientX) * sx / 24);
+      if (!lines && !cols) return;
+
+      drag.x -= (-cols * 24) / sx;
+      drag.y -= (-lines * 36) / sy;
+      if (vm.module._app_scroll_by(lines, cols)) render();
+    });
+    const endDrag = () => { drag = null; };
+    vm.canvas.addEventListener('pointerup', endDrag);
+    vm.canvas.addEventListener('pointercancel', endDrag);
 
     /* Wheel scrolls the code view: vertical by default, horizontal with Shift. */
     let wheelAcc = 0;

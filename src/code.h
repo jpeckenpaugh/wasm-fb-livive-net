@@ -59,6 +59,7 @@ int code_line_count(const char *text);
 /* Draw the file with a gutter and scrollbars. Updates line_off/col_off to
  * clamped values so the caller can keep scroll state across frames. */
 void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
-               int cell, code_lang_t lang, int *line_off, int *col_off);
+               int cell, code_lang_t lang, int *line_off, int *col_off,
+               int *max_line_off, int *max_col_off);
 
 #endif /* CODE_H */

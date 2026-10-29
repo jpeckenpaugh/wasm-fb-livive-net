@@ -23,6 +23,8 @@ typedef struct {
     const demo_file_t *file; /* for PREVIEW_CODE */
     int line_off;     /* code scroll, in lines */
     int col_off;      /* code scroll, in columns */
+    int max_line;     /* scroll limits, refreshed by code_draw */
+    int max_col;
 } preview_state_t;
 
 void preview_init(preview_state_t *p);

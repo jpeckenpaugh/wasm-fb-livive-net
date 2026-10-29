@@ -19,6 +19,7 @@ void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui) {
     const int on_cal = media_is_cal(m) && cal;
     const int on_fm = media_is_fm(m) && fm;
     const int on_preview = media_is_preview(m) && preview;
+    const int on_clock = media_is_clock(m);
 
     if (on_calc) {
         /* The calculator is merged into its strip slot, so the slot's image is
@@ -61,7 +62,7 @@ void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui) {
 
     /* Hero clock: HH:MM:SS stacked over the date line, centred in the space
      * above the floating tiles. Drawn before the tiles so they sit on top. */
-    if (clock && clock->valid && m->selected == 0) {
+    if (clock && clock->valid && on_clock) {
         const int time_h = 304;
         const int date_h = 112;
         const int gap = 24;
@@ -129,7 +130,7 @@ void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui) {
 
     /* Compact HH:MM on the clock's tile, over its thumbnail. */
     if (clock && clock->valid) {
-        clock_draw(fb, clock, ui_thumb_x(0), UI_TH_Y, UI_TH_W, UI_TH_H,
+        clock_draw(fb, clock, ui_thumb_x(MEDIA_CLOCK_SLOT), UI_TH_Y, UI_TH_W, UI_TH_H,
                    4, COL_CLOCK, COL_CLOCK_EDGE);
     }
 

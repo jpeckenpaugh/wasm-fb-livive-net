@@ -48,6 +48,8 @@ void preview_set_code(preview_state_t *p, const demo_file_t *file) {
     p->file = file;
     p->line_off = 0;
     p->col_off = 0;
+    p->max_line = 0;
+    p->max_col = 0;
 }
 
 static void draw_caption(fb_t *fb, const char *title, const char *meta_text,
@@ -56,19 +58,31 @@ static void draw_caption(fb_t *fb, const char *title, const char *meta_text,
 int preview_scroll(preview_state_t *p, int key) {
     if (!p || p->kind != PREVIEW_CODE) return 0;
 
+    int line = p->line_off;
+    int col = p->col_off;
+
     switch (key) {
-        case 50: /* up */    p->line_off -= 1; break;
-        case 51: /* down */  p->line_off += 1; break;
-        case 60: /* pgup */  p->line_off -= 14; break;
-        case 61: /* pgdn */  p->line_off += 14; break;
-        case 40: /* [ */     p->col_off -= 4; break;
-        case 41: /* ] */     p->col_off += 4; break;
-        case 62: /* home */  p->line_off = 0; break;
-        case 63: /* end */   p->line_off = 1 << 20; break;
+        case 1:  /* left  */ col -= 4; break;
+        case 2:  /* right */ col += 4; break;
+        case 40: /* [     */ col -= 4; break;
+        case 41: /* ]     */ col += 4; break;
+        case 50: /* up    */ line -= 1; break;
+        case 51: /* down  */ line += 1; break;
+        case 60: /* pgup  */ line -= 13; break;
+        case 61: /* pgdn  */ line += 13; break;
+        case 62: /* home  */ line = 0; break;
+        case 63: /* end   */ line = p->max_line; break;
         default: return 0;
     }
-    if (p->line_off < 0) p->line_off = 0;
-    if (p->col_off < 0) p->col_off = 0;
+
+    if (line < 0) line = 0;
+    if (line > p->max_line) line = p->max_line;
+    if (col < 0) col = 0;
+    if (col > p->max_col) col = p->max_col;
+
+    if (line == p->line_off && col == p->col_off) return 0; /* at the edge */
+    p->line_off = line;
+    p->col_off = col;
     return 1;
 }
 
@@ -85,7 +99,7 @@ static void draw_code(fb_t *fb, preview_state_t *p) {
     const code_lang_t lang = code_lang_for(p->file->name);
     code_draw(fb, p->file->text, margin + 6, top + 6,
               fb->w - 2 * margin - 12, panel_h - 12, 4, lang,
-              &p->line_off, &p->col_off);
+              &p->line_off, &p->col_off, &p->max_line, &p->max_col);
 
     char meta[64];
     snprintf(meta, sizeof(meta), "%s  %d lines", code_lang_name(lang),

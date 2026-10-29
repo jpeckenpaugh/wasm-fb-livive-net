@@ -160,14 +160,18 @@ static void test_media(void) {
     media_next(&m, -1);
     CHECK(m.selected == 4);
 
-    /* Slot 2 is the calculator, not an image. */
+    /* The last slot is the calculator; it wraps to the calendar. */
     media_select(&m, MEDIA_CALC_SLOT);
     CHECK(media_is_calc(&m) == 1);
     media_next(&m, 1);
-    CHECK(m.selected == MEDIA_CALC_SLOT + 1);
-    CHECK(media_is_calc(&m) == 0);
+    CHECK(m.selected == 0);
+    CHECK(media_is_cal(&m) == 1);
     media_next(&m, -1);
     CHECK(media_is_calc(&m) == 1);
+
+    /* Tile order: calendar, clock, files, preview, calculator. */
+    CHECK(MEDIA_CAL_SLOT == 0 && MEDIA_CLOCK_SLOT == 1 && MEDIA_FM_SLOT == 2 &&
+          MEDIA_PREVIEW_SLOT == 3 && MEDIA_CALC_SLOT == 4);
 
     /* The asset pipeline and the layout must agree: this is the contract that
      * makes the hero blit 1:1 and lets hit testing assume thumbnail size.

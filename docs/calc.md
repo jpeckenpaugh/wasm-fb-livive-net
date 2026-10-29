@@ -11,7 +11,7 @@ Source: `src/calc.{h,c}` (state + paint), `src/lcd.c` (`lcd_draw_symbol`),
 
 ## Entry and exit
 
-`MEDIA_CALC_SLOT` is slot **1** — the second tile, immediately after the clock.
+`MEDIA_CALC_SLOT` is slot **4** — the last tile.
 The strip keeps five tiles: slot 0 is image 1 with the clock overlay, slot 1 is
 the calculator, slots 2-4 are the remaining images. Clicking the tile or one
 arrow step from the clock enters it; clicking any other tile leaves it.

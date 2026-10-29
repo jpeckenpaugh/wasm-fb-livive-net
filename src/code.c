@@ -393,7 +393,8 @@ int code_line_count(const char *text) {
 }
 
 void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
-               int cell, code_lang_t lang, int *line_off, int *col_off) {
+               int cell, code_lang_t lang, int *line_off, int *col_off,
+               int *max_line_off, int *max_col_off) {
     if (!fb || !fb->px || !text || cell <= 0) return;
 
     const int line_h = 7 * cell + 8;
@@ -433,6 +434,11 @@ void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
     }
     const int loff = line_off ? *line_off : 0;
     const int coff = col_off ? *col_off : 0;
+
+    /* Report the limits so the caller can decide whether a key should scroll
+     * the text or fall through to something else (e.g. tile navigation). */
+    if (max_line_off) *max_line_off = lines - visible > 0 ? lines - visible : 0;
+    if (max_col_off) *max_col_off = widest - max_cols > 0 ? widest - max_cols : 0;
 
     /* Gutter divider. */
     fb_fill(fb, x + pad + gutter - 10, y + pad, 1, h - 2 * pad, COL_LINE);

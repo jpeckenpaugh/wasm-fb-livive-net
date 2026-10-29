@@ -9,10 +9,12 @@
 
 #include "assets_gen.h"
 
-#define MEDIA_CALC_SLOT 1 /* second tile, right after the clock */
-#define MEDIA_CAL_SLOT 2  /* third tile: month calendar */
-#define MEDIA_FM_SLOT 3   /* fourth tile: file manager */
-#define MEDIA_PREVIEW_SLOT 4 /* fifth tile: image preview */
+/* Tile order: calendar, clock, files, preview, calculator. */
+#define MEDIA_CAL_SLOT 0
+#define MEDIA_CLOCK_SLOT 1
+#define MEDIA_FM_SLOT 2
+#define MEDIA_PREVIEW_SLOT 3
+#define MEDIA_CALC_SLOT 4
 
 typedef struct {
     const image_t *images;
@@ -31,6 +33,10 @@ int media_hit(const media_t *m, int x, int y);
 
 static inline int media_is_calc(const media_t *m) {
     return m->selected == MEDIA_CALC_SLOT;
+}
+
+static inline int media_is_clock(const media_t *m) {
+    return m->selected == MEDIA_CLOCK_SLOT;
 }
 
 static inline int media_is_cal(const media_t *m) {
