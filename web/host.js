@@ -437,20 +437,32 @@ async function createGuest() {
     vm.canvas.addEventListener('pointerup', endDrag);
     vm.canvas.addEventListener('pointercancel', endDrag);
 
-    /* Wheel scrolls the code view: vertical by default, horizontal with Shift. */
-    let wheelAcc = 0;
+    /* Wheel/trackpad scrolls the code view. Browsers report a sideways swipe
+     * as deltaX with shiftKey false, so both axes are honoured independently. */
+    let wheelX = 0;
+    let wheelY = 0;
     vm.canvas.addEventListener('wheel', (event) => {
       if (!vm.module) return;
       event.preventDefault();
-      const horizontal = event.shiftKey;
-      wheelAcc += horizontal ? (event.deltaX || event.deltaY) : event.deltaY;
+
+      const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+      let dx = event.deltaX * scale;
+      let dy = event.deltaY * scale;
+      if (event.shiftKey && Math.abs(dx) < 1) { dx = dy; dy = 0; }
+
+      wheelX += dx;
+      wheelY += dy;
 
       let moved = false;
-      while (Math.abs(wheelAcc) >= 24) {
-        const step = wheelAcc > 0 ? 1 : -1;
-        const code = horizontal ? (step > 0 ? 41 : 40) : (step > 0 ? 51 : 50);
-        if (vm.module._app_key(code)) moved = true;
-        wheelAcc -= step * 24;
+      while (Math.abs(wheelY) >= 24) {
+        const step = wheelY > 0 ? 1 : -1;
+        if (vm.module._app_key(step > 0 ? 51 : 50)) moved = true;
+        wheelY -= step * 24;
+      }
+      while (Math.abs(wheelX) >= 24) {
+        const step = wheelX > 0 ? 1 : -1;
+        if (vm.module._app_key(step > 0 ? 41 : 40)) moved = true;
+        wheelX -= step * 24;
       }
       if (moved) render();
     }, { passive: false });

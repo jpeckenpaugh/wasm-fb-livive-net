@@ -84,7 +84,8 @@ int main(void) {
     fb_clear(&fb, SENTINEL);
 
     int lo = 0, co = 0, maxlo = 0, maxco = 0;
-    code_draw(&fb, c, 40, 40, 600, 200, 4, LANG_C, &lo, &co, &maxlo, &maxco);
+    code_bars_t bars;
+    code_draw(&fb, c, 40, 40, 600, 200, 4, LANG_C, &lo, &co, &maxlo, &maxco, &bars);
     assert(maxlo == 0 && maxco == 0); /* one short line: nothing to scroll */
     size_t changed = 0;
     for (int y = 40; y < 240; y++)

@@ -394,7 +394,7 @@ int code_line_count(const char *text) {
 
 void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
                int cell, code_lang_t lang, int *line_off, int *col_off,
-               int *max_line_off, int *max_col_off) {
+               int *max_line_off, int *max_col_off, code_bars_t *bars) {
     if (!fb || !fb->px || !text || cell <= 0) return;
 
     const int line_h = 7 * cell + 8;
@@ -496,6 +496,10 @@ void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
 
     /* Scrollbars: only when there is something to scroll to. */
     const int bar = 7;
+    if (bars) {
+        bars->vx = bars->vy = bars->vh = 0;
+        bars->hx = bars->hy = bars->hw = 0;
+    }
     if (lines > visible) {
         const int track_x = x + w - bar;
         const int track_h = h - 2 * pad - (widest > max_cols ? bar + 4 : 0);
@@ -507,6 +511,11 @@ void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
             (max_line > 0 ? (track_h - thumb_h) * loff / max_line : 0);
         fb_fill(fb, track_x, y + pad, bar, track_h, COL_TRACK);
         fb_fill(fb, track_x, thumb_y, bar, thumb_h, COL_THUMB);
+        if (bars) {
+            bars->vx = track_x;
+            bars->vy = y + pad;
+            bars->vh = track_h;
+        }
     }
     if (widest > max_cols) {
         const int track_y = y + h - bar;
@@ -520,5 +529,10 @@ void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
             (max_col > 0 ? (track_w - thumb_w) * coff / max_col : 0);
         fb_fill(fb, track_x, track_y, track_w, bar, COL_TRACK);
         fb_fill(fb, thumb_x, track_y, thumb_w, bar, COL_THUMB);
+        if (bars) {
+            bars->hx = track_x;
+            bars->hy = track_y;
+            bars->hw = track_w;
+        }
     }
 }

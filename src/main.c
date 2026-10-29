@@ -99,6 +99,11 @@ int app_click(int x, int y) {
         return 1;
     }
 
+    if (media_is_preview(&g_media) && preview_click(&g_preview, x, y)) {
+        draw();
+        return 1;
+    }
+
     if (media_is_fm(&g_media)) {
         const fm_action_t a = fm_click(&g_fm, g_media.count, x, y);
         if (a.kind == FM_ACT_NONE) return 0;

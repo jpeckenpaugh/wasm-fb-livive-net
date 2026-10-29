@@ -53,6 +53,13 @@ const char *code_lang_name(code_lang_t lang);
 int code_tokenize(code_lang_t lang, const char *line, int len,
                   code_token_t *out, int max);
 
+/* Scrollbar geometry from the last draw, so the caller can hit-test clicks on
+ * the bars. A zero height/width means that bar was not drawn. */
+typedef struct {
+    int vx, vy, vh; /* vertical bar: x, top, height */
+    int hx, hy, hw; /* horizontal bar: left, y, width */
+} code_bars_t;
+
 /* Number of lines in the text (1 for an empty string). */
 int code_line_count(const char *text);
 
@@ -60,6 +67,6 @@ int code_line_count(const char *text);
  * clamped values so the caller can keep scroll state across frames. */
 void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
                int cell, code_lang_t lang, int *line_off, int *col_off,
-               int *max_line_off, int *max_col_off);
+               int *max_line_off, int *max_col_off, code_bars_t *bars);
 
 #endif /* CODE_H */

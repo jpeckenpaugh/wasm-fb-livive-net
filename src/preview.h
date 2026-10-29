@@ -7,6 +7,7 @@
 #define PREVIEW_H
 
 #include "assets_gen.h"
+#include "code.h"
 #include "demo_gen.h"
 #include "framebuffer.h"
 
@@ -25,6 +26,7 @@ typedef struct {
     int col_off;      /* code scroll, in columns */
     int max_line;     /* scroll limits, refreshed by code_draw */
     int max_col;
+    code_bars_t bars; /* scrollbar geometry, for click-to-jump */
 } preview_state_t;
 
 void preview_init(preview_state_t *p);
@@ -35,5 +37,8 @@ void preview_draw(fb_t *fb, preview_state_t *p, const image_t *images, int count
 
 /* Scroll the code view. Returns 1 when the offset changed. */
 int preview_scroll(preview_state_t *p, int key);
+
+/* Jump to the clicked position on a scrollbar. Returns 1 when it moved. */
+int preview_click(preview_state_t *p, int x, int y);
 
 #endif /* PREVIEW_H */

@@ -12,12 +12,18 @@ because wrapped code loses its shape.
 
 | Input | Action |
 |---|---|
-| wheel | scroll lines |
-| `Shift` + wheel | scroll columns |
+| two-finger swipe / wheel | vertical; a sideways swipe scrolls columns |
+| `Shift` + wheel | forces horizontal |
+| drag the code | pans both axes |
+| click a scrollbar | jumps to that position |
+| `←` / `→` | scroll columns (falls through to tile switching at the edge) |
 | `↑` / `↓` | scroll a line |
 | `PageUp` / `PageDown` | scroll a screenful |
 | `Home` / `End` | jump to the first/last line |
 | `[` / `]` | scroll four columns |
+
+A sideways swipe arrives as `deltaX` with `shiftKey` false, so both axes are
+accumulated independently in the host; `deltaMode` is normalised to pixels.
 
 Scrollbars appear on the right and bottom edges whenever the content is larger
 than the panel, so the extent is visible without trying to scroll first. The

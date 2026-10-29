@@ -55,6 +55,34 @@ void preview_set_code(preview_state_t *p, const demo_file_t *file) {
 static void draw_caption(fb_t *fb, const char *title, const char *meta_text,
                          int pad, uint32_t edge);
 
+int preview_click(preview_state_t *p, int x, int y) {
+    if (!p || p->kind != PREVIEW_CODE) return 0;
+
+    const code_bars_t *b = &p->bars;
+    /* The bars are only 7px wide; be generous with the hit area. */
+    if (b->vh > 0 && x >= b->vx - 12 && x < b->vx + 20 &&
+        y >= b->vy - 4 && y < b->vy + b->vh + 4) {
+        const int span = b->vh > 1 ? b->vh - 1 : 1;
+        int line = (int)((long)(y - b->vy) * p->max_line / span);
+        if (line < 0) line = 0;
+        if (line > p->max_line) line = p->max_line;
+        if (line == p->line_off) return 0;
+        p->line_off = line;
+        return 1;
+    }
+    if (b->hw > 0 && y >= b->hy - 12 && y < b->hy + 20 &&
+        x >= b->hx - 4 && x < b->hx + b->hw + 4) {
+        const int span = b->hw > 1 ? b->hw - 1 : 1;
+        int col = (int)((long)(x - b->hx) * p->max_col / span);
+        if (col < 0) col = 0;
+        if (col > p->max_col) col = p->max_col;
+        if (col == p->col_off) return 0;
+        p->col_off = col;
+        return 1;
+    }
+    return 0;
+}
+
 int preview_scroll(preview_state_t *p, int key) {
     if (!p || p->kind != PREVIEW_CODE) return 0;
 
@@ -99,7 +127,7 @@ static void draw_code(fb_t *fb, preview_state_t *p) {
     const code_lang_t lang = code_lang_for(p->file->name);
     code_draw(fb, p->file->text, margin + 6, top + 6,
               fb->w - 2 * margin - 12, panel_h - 12, 4, lang,
-              &p->line_off, &p->col_off, &p->max_line, &p->max_col);
+              &p->line_off, &p->col_off, &p->max_line, &p->max_col, &p->bars);
 
     char meta[64];
     snprintf(meta, sizeof(meta), "%s  %d lines", code_lang_name(lang),
