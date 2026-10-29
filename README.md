@@ -29,6 +29,24 @@ The console boots the first guest automatically; **+ new guest** starts another.
 Each guest is a tab with its own state, framebuffer and telemetry row; the top
 bar shows host-level counters (module size, reserved memory, blits, uptime).
 
+The strip at the bottom is the screen picker: five images, then a calculator
+tile. Arrow keys or a click move between them.
+
+## Mini apps
+
+| Screen | What it shows |
+|---|---|
+| image 1 | photo + `HH:MM:SS` overlay, and `HH:MM` on its thumbnail |
+| images 2-5 | photo, `HH:MM` on thumbnail 1 |
+| calculator | clickable keypad, integer and decimal entry |
+
+Both live in the same guest and are reached with the existing
+`app_click()`/`app_key()` path — no per-app exports. The clock repaints about
+once a second while seconds are visible and once a minute otherwise; the
+calculator repaints only on input.
+
+See `docs/clock.md` and `docs/calc.md` for the design notes.
+
 ## Develop
 
 ```bash
@@ -91,11 +109,11 @@ an asset does not match the layout.
 |---|---|
 | `app_init(w, h)` | allocate the framebuffer, reset state, draw once |
 | `app_render()` | redraw the current state |
-| `app_click(x, y)` | logical coordinates; returns 1 if selection changed |
-| `app_key(k)` | 1 = left, 2 = right, 3 = next; returns 1 if changed |
+| `app_click(x, y)` | logical coordinates; returns 1 if the screen changed |
+| `app_key(k)` | 1 = left, 2 = right, 3 = next; calculator keys 10-27 (see `calc.h`); returns 1 if changed |
 | `app_framebuffer()` | pointer to RGBA8888 bytes (JS reads via `HEAPU8`) |
 | `app_width()` / `app_height()` | logical dimensions |
-| `app_selected()` | current index (telemetry) |
+| `app_selected()` | current slot, `0..count` where `count` is the calculator |
 | `app_count()` | number of bundled images |
 | `app_set_test_pattern(on)` | M1 colour/orientation pattern |
 | `app_destroy()` | free the buffer |
@@ -162,11 +180,13 @@ reserved linear memory), not a benchmark harness.
 | M3 — host-to-guest input | done, hit testing lives in C |
 | M4 — independent instances | done, shared wasm binary / separate memories |
 | M5 — cleanup and evaluation | console telemetry, `make test`, this README; module size printed at link |
+| Extras | clock overlay (`docs/clock.md`), calculator screen (`docs/calc.md`) |
 
 ### Known limitations
 
-- Tests are native pixel/logic tests only; there is no headless-browser
-  assertion of the Canvas output yet.
+- Tests are native pixel/logic tests only (`test_pixels`, `test_lcd`,
+  `test_clock`, `test_calc`); there is no headless-browser assertion of the
+  Canvas output yet.
 - No font rendering: the "UI" is frames, borders and an accent underline.
 - Raw RGBA assets: 5 × (480·360 + 96·72) × 4 ≈ 3.6 MB inside the wasm binary.
   gzip does not help much on raw pixels.

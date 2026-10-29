@@ -7,6 +7,7 @@
 #ifndef UI_H_INCLUDED
 #define UI_H_INCLUDED
 
+#include "calc.h"
 #include "clock.h"
 #include "framebuffer.h"
 #include "media.h"
@@ -23,7 +24,8 @@
 #define UI_TH_H 72
 #define UI_TH_GAP 10
 #define UI_TH_Y 396
-#define UI_TH_X0 ((UI_W - (ASSET_COUNT * UI_TH_W + (ASSET_COUNT - 1) * UI_TH_GAP)) / 2)
+#define UI_SLOTS (ASSET_COUNT + 1) /* images + calculator */
+#define UI_TH_X0 ((UI_W - (UI_SLOTS * UI_TH_W + (UI_SLOTS - 1) * UI_TH_GAP)) / 2)
 
 #define UI_BORDER 2
 
@@ -31,7 +33,8 @@ static inline int ui_thumb_x(int index) {
     return UI_TH_X0 + index * (UI_TH_W + UI_TH_GAP);
 }
 
-void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock);
+void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
+             const calc_state_t *calc);
 void ui_draw_test_pattern(fb_t *fb);
 
 #endif /* UI_H_INCLUDED */

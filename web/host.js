@@ -10,8 +10,23 @@ const W = 640;
 const H = 480;
 const FB_BYTES = W * H * 4;
 
-/* Keep in sync with KEY_* in src/main.c. */
-const KEY_CODES = { ArrowLeft: 1, ArrowRight: 2, ' ': 3, Enter: 3 };
+/* Keep in sync with KEY_* in src/main.c and CALC_KEY_* in src/calc.h. */
+const KEY_CODES = {
+  ArrowLeft: 1,
+  ArrowRight: 2,
+  ' ': 3,
+  '0': 10, '1': 11, '2': 12, '3': 13, '4': 14,
+  '5': 15, '6': 16, '7': 17, '8': 18, '9': 19,
+  '+': 20, '-': 21, '*': 22, 'x': 22, 'X': 22, '/': 23,
+  '=': 24, 'Enter': 24,
+  'Escape': 25, 'c': 25, 'C': 25,
+  'Backspace': 26,
+  '.': 27, ',': 27,
+};
+
+const selectionLabel = (guest) => (guest.selected < guest.count
+  ? `image ${guest.selected + 1} / ${guest.count}`
+  : 'calculator');
 
 const KiB = 1024;
 const MiB = 1024 * KiB;
@@ -203,8 +218,7 @@ function updateGuestStats(guest) {
   statNode(guest, 'blit').textContent = fmtMs(guest.last.blit);
   statNode(guest, 'present').textContent = fmtMs(guest.last.present);
   statNode(guest, 'blits').textContent = guest.frames;
-  statNode(guest, 'selected').textContent =
-    `${guest.selected + 1} / ${guest.count}`;
+  statNode(guest, 'selected').textContent = selectionLabel(guest);
   statNode(guest, 'mem').textContent = fmtBytes(guest.heapBytes);
 }
 
@@ -346,7 +360,7 @@ async function createGuest() {
       const changed = vm.module._app_click(x, y);
       if (changed) {
         render();
-        setStatus(`${vm.name} · image ${vm.selected + 1} / ${vm.count} selected`);
+        setStatus(`${vm.name} · ${selectionLabel(vm)}`);
         /* Selecting image 1 switches the hero clock from minute to second
          * granularity, so the pending timer is no longer the right one. */
         scheduleClock();
@@ -378,7 +392,7 @@ async function createGuest() {
       event.preventDefault();
       if (vm.module._app_key(code)) {
         render();
-        setStatus(`${vm.name} · image ${vm.selected + 1} / ${vm.count} selected`);
+        setStatus(`${vm.name} · ${selectionLabel(vm)}`);
         scheduleClock();
       }
     });

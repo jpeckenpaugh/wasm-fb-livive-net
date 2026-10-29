@@ -115,7 +115,9 @@ static void test_media(void) {
     media_t m;
     media_init(&m);
     CHECK(m.count == ASSET_COUNT);
+    CHECK(m.slots == ASSET_COUNT + 1); /* images + calculator */
     CHECK(m.selected == 0);
+    CHECK(media_is_calc(&m) == 0);
 
     CHECK(media_hit(&m, 5, 5) == -1);
     CHECK(media_hit(&m, 320, UI_TH_Y - 1) == -1);
@@ -126,14 +128,21 @@ static void test_media(void) {
     CHECK(media_hit(&m, tx + UI_TH_W - 1, UI_TH_Y + UI_TH_H - 1) == 2);
     CHECK(media_hit(&m, tx + UI_TH_W, UI_TH_Y + 5) == -1); /* gap */
 
+    int cx = ui_thumb_x(m.count);
+    CHECK(media_hit(&m, cx + 1, UI_TH_Y + 1) == m.count);
+
     media_select(&m, 4);
     CHECK(m.selected == 4);
     media_select(&m, 99);
     CHECK(m.selected == 4); /* out of range is ignored */
     media_next(&m, 1);
-    CHECK(m.selected == 0); /* wraps */
+    CHECK(m.selected == 5); /* the calculator slot */
+    CHECK(media_is_calc(&m) == 1);
+    media_next(&m, 1);
+    CHECK(m.selected == 0); /* wraps back to the first image */
     media_next(&m, -1);
-    CHECK(m.selected == 4);
+    CHECK(m.selected == 5);
+    CHECK(media_is_calc(&m) == 1);
 
     /* The asset pipeline and the layout must agree: this is the contract that
      * makes the hero blit 1:1 and lets hit testing assume thumbnail size.
@@ -155,7 +164,7 @@ static void test_ui_draw(void) {
     media_t m;
     media_init(&m);
 
-    ui_draw(&fb, &m, NULL);
+    ui_draw(&fb, &m, NULL, NULL);
 
     /* The hero image occupies its exact slot; compare every pixel against the
      * source. Stop at the first mismatch so a bad row is one failure, not 480. */
@@ -178,7 +187,7 @@ static void test_ui_draw(void) {
     }
 
     /* Every thumbnail placement must be inside the canvas. */
-    for (int i = 0; i < ASSET_COUNT; i++) {
+    for (int i = 0; i < UI_SLOTS; i++) {
         CHECK(ui_thumb_x(i) >= 0);
         CHECK(ui_thumb_x(i) + UI_TH_W <= UI_W);
     }

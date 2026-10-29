@@ -27,6 +27,23 @@
  * an image without painting a panel behind it. */
 #define LCD_OFF_NONE 0u
 
+/* Symbols that are not digits, drawn as a 7x7 dot matrix so they scale with
+ * the box. Used for calculator operators and labels. */
+typedef enum {
+    LCD_SYM_PLUS = 0,
+    LCD_SYM_MINUS,
+    LCD_SYM_MUL,
+    LCD_SYM_DIV,
+    LCD_SYM_EQ,
+    LCD_SYM_CLEAR,
+    LCD_SYM_BACK,
+    LCD_SYM_E,
+    LCD_SYM_COUNT
+} lcd_symbol_t;
+
+void lcd_draw_symbol(fb_t *fb, int x, int y, int w, int h, lcd_symbol_t symbol,
+                     uint32_t color);
+
 /* Draw one digit in the box (x, y, w, h). digit must be 0-9. */
 void lcd_draw_digit(fb_t *fb, int x, int y, int w, int h, int digit,
                     uint32_t on_color, uint32_t off_color);

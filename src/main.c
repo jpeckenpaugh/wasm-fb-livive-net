@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include "calc.h"
 #include "clock.h"
 #include "framebuffer.h"
 #include "media.h"
@@ -19,6 +20,7 @@
 static fb_t g_fb;
 static media_t g_media;
 static clock_state_t g_clock;
+static calc_state_t g_calc;
 static int g_ready = 0;
 static int g_test_pattern = 0;
 
@@ -27,7 +29,7 @@ static void draw(void) {
     if (g_test_pattern) {
         ui_draw_test_pattern(&g_fb);
     } else {
-        ui_draw(&g_fb, &g_media, &g_clock);
+        ui_draw(&g_fb, &g_media, &g_clock, &g_calc);
     }
 }
 
@@ -49,6 +51,7 @@ int app_init(int width, int height) {
 
     g_test_pattern = 0;
     clock_init(&g_clock);
+    calc_init(&g_calc);
     media_init(&g_media);
     g_ready = 1;
     draw();
@@ -60,36 +63,46 @@ void app_render(void) {
     draw();
 }
 
-/* Returns 1 when the click changed the selection. */
+/* Returns 1 when the click changed something on screen. */
 EMSCRIPTEN_KEEPALIVE
 int app_click(int x, int y) {
     if (!g_ready || g_test_pattern) return 0;
+
     int hit = media_hit(&g_media, x, y);
-    if (hit < 0 || hit == g_media.selected) return 0;
-    media_select(&g_media, hit);
-    draw();
-    return 1;
+    if (hit >= 0) {
+        if (hit == g_media.selected) return 0;
+        media_select(&g_media, hit);
+        draw();
+        return 1;
+    }
+
+    if (media_is_calc(&g_media) && calc_click(&g_calc, x, y)) {
+        draw();
+        return 1;
+    }
+    return 0;
 }
 
-/* Returns 1 when the key changed the selection. */
+/* Returns 1 when the key changed something on screen. */
 EMSCRIPTEN_KEEPALIVE
 int app_key(int key) {
     if (!g_ready || g_test_pattern) return 0;
-    int before = g_media.selected;
-    switch (key) {
-        case KEY_LEFT:
-            media_next(&g_media, -1);
-            break;
-        case KEY_RIGHT:
-        case KEY_NEXT:
-            media_next(&g_media, 1);
-            break;
-        default:
-            return 0;
+
+    /* Slot navigation works from every screen: it is the same path that has
+     * always swapped images, just with the calculator appended as a slot. */
+    if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_NEXT) {
+        int before = g_media.selected;
+        media_next(&g_media, key == KEY_LEFT ? -1 : 1);
+        if (g_media.selected == before) return 0;
+        draw();
+        return 1;
     }
-    if (g_media.selected == before) return 0;
-    draw();
-    return 1;
+
+    if (media_is_calc(&g_media) && calc_key(&g_calc, key)) {
+        draw();
+        return 1;
+    }
+    return 0;
 }
 
 EMSCRIPTEN_KEEPALIVE

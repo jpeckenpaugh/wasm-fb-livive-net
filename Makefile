@@ -9,7 +9,10 @@ OBJ   := $(BUILD)/obj
 EMCC ?= emcc
 CC   ?= cc
 
-SRC         := src/main.c src/framebuffer.c src/media.c src/ui.c src/lcd.c src/clock.c
+SRC         := src/main.c src/framebuffer.c src/media.c src/ui.c src/lcd.c \
+               src/clock.c src/calc.c
+
+LDLIBS      ?= -lm
 ASSET_UNITS := asset_0 asset_1 asset_2 asset_3 asset_4
 GEN_UNITS   := assets_gen $(ASSET_UNITS)
 
@@ -69,8 +72,9 @@ $(OBJ)/native/%.o: %.c $(GEN)/assets_gen.h
 $(BUILD)/test_pixels: $(OBJ)/native/tests/test_pixels.o \
                       $(OBJ)/native/src/media.o $(OBJ)/native/src/ui.o \
                       $(OBJ)/native/src/clock.o $(OBJ)/native/src/lcd.o \
+                      $(OBJ)/native/src/calc.o \
                       $(NATIVE_ASSETS) $(NATIVE_COMMON)
-	$(CC) $^ -o $@
+	$(CC) $^ -o $@ $(LDLIBS)
 
 $(BUILD)/test_lcd: $(OBJ)/native/tests/test_lcd.o \
                    $(OBJ)/native/src/lcd.o $(NATIVE_COMMON)
@@ -79,9 +83,13 @@ $(BUILD)/test_lcd: $(OBJ)/native/tests/test_lcd.o \
 $(BUILD)/test_clock: $(OBJ)/native/tests/test_clock.o \
                      $(OBJ)/native/src/clock.o $(OBJ)/native/src/lcd.o \
                      $(NATIVE_COMMON)
-	$(CC) $^ -o $@
+	$(CC) $^ -o $@ $(LDLIBS)
 
-test: $(BUILD)/test_pixels $(BUILD)/test_lcd $(BUILD)/test_clock
+$(BUILD)/test_calc: $(OBJ)/native/tests/test_calc.o $(OBJ)/native/src/calc.o \
+                    $(OBJ)/native/src/lcd.o $(NATIVE_COMMON)
+	$(CC) $^ -o $@ $(LDLIBS)
+
+test: $(BUILD)/test_pixels $(BUILD)/test_lcd $(BUILD)/test_clock $(BUILD)/test_calc
 	@for t in $^; do ./$$t; done
 
 # Force regeneration after editing assets/.
