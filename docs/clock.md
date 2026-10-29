@@ -73,7 +73,7 @@ int app_tick(void) {
 That asymmetry is the point: the clock costs ~1 blit/s when seconds are on
 screen and ~1 blit/minute otherwise. `clock_advance()` compares hour+minute
 always and seconds only when asked, so an invisible second change does not
-provoke a 1.17 MiB copy.
+provoke a 3.52 MiB copy.
 
 `clock_draw()` itself never touches dirty state; it is a pure renderer. That
 keeps `app_tick()` and the drawing path independent, and lets a future overlay
@@ -86,8 +86,8 @@ the glyph eight times at ±`t` before the bright pass. That keeps the clock
 readable on top of arbitrary imagery without a background plate, so the image
 stays visible inside the digit counters.
 
-Halo thickness is `digit_w / 24`, clamped to 1..3 px: 2 px on the 480x360 hero
-(digit 57x114) and 1 px on the 96x72 thumbnail (digit 18x36).
+Halo thickness is `digit_w / 24`, clamped to 1..3 px: 3 px on the 1280x576 hero
+(digit 152x304) and 1 px on the 144x108 thumbnail.
 
 Layout is proportional to the box, never to the canvas: `clock_layout(box_w,
 box_h, digits, &L)` is called with the hero rectangle and with the thumbnail
@@ -151,7 +151,7 @@ Observed on the reference machine:
 | gallery interaction | +1 per selection change |
 
 Per-blit cost: render ~0.4-0.7 ms, blit ~0.1 ms, present ~0.1-0.2 ms, on top of
-the existing 1.17 MiB copy. The clock repaints the whole gallery, not a dirty
+the existing 3.52 MiB copy. The clock repaints the whole gallery, not a dirty
 rectangle, because a blit copies the full framebuffer anyway; sub-region
 rendering would only matter if the guest exposed partial updates.
 

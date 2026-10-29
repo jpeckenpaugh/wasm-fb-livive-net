@@ -222,10 +222,10 @@ static void test_ui_draw(void) {
     ui_draw_test_pattern(&fb);
     /* Points chosen away from the diagonal and the corner markers. */
     check_pixel(&fb, 20, 20, 0, 0, 0, 255, "pattern origin marker");
-    check_pixel(&fb, 60, 60, 255, 0, 0, 255, "pattern red");
-    check_pixel(&fb, 400, 60, 0, 255, 0, 255, "pattern green");
-    check_pixel(&fb, 60, 300, 0, 0, 255, 255, "pattern blue");
-    check_pixel(&fb, 500, 400, 255, 255, 255, 255, "pattern white");
+    check_pixel(&fb, 200, 200, 255, 0, 0, 255, "pattern red");
+    check_pixel(&fb, 960, 200, 0, 255, 0, 255, "pattern green");
+    check_pixel(&fb, 200, 540, 0, 0, 255, 255, "pattern blue");
+    check_pixel(&fb, 1100, 650, 255, 255, 255, 255, "pattern white");
     check_pixel(&fb, UI_W - 24, UI_H - 24, 255, 0, 255, 255, "pattern magenta");
 
     free(fb.px);

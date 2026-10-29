@@ -17,23 +17,17 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
          * its wallpaper: scale it over the screen area and dim it so the keys
          * stay readable. */
         const image_t *backdrop = &m->images[MEDIA_CALC_SLOT];
-        fb_blit_scaled(fb, 0, 0, UI_W, CALC_SCREEN_H,
+        fb_blit_scaled(fb, 0, 0, UI_W, UI_MAIN_H,
                        backdrop->px, backdrop->w, backdrop->h);
-        fb_shade(fb, 0, 0, UI_W, CALC_SCREEN_H, 88);
+        fb_shade(fb, 0, 0, UI_W, UI_MAIN_H, 88);
         calc_draw(fb, calc);
     } else {
         fb_clear(fb, COL_BG);
 
-        /* Drop shadow + frame behind the main image. */
-        fb_fill(fb, UI_MAIN_X - 4, UI_MAIN_Y - 4, UI_MAIN_W + 8, UI_MAIN_H + 8, COL_SHADOW);
-        fb_fill(fb, UI_MAIN_X - UI_BORDER, UI_MAIN_Y - UI_BORDER,
-                UI_MAIN_W + 2 * UI_BORDER, UI_MAIN_H + 2 * UI_BORDER, COL_FRAME);
-
         if (m->count > 0) {
             const image_t *hero = &m->images[m->selected];
-            /* Blit 1:1 when the asset matches the layout; otherwise stretch into
-             * the slot. Assets are authored at the exact size, so this is only a
-             * fallback for a bad pipeline run. */
+            /* Assets are authored at the hero size, so this is a 1:1 blit with
+             * no scaling and no letterboxing. */
             if (hero->w == UI_MAIN_W && hero->h == UI_MAIN_H) {
                 fb_blit(fb, UI_MAIN_X, UI_MAIN_Y, hero->px, hero->w, hero->h);
             } else {
@@ -43,7 +37,7 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
         }
     }
 
-    fb_fill(fb, 0, UI_TH_Y - 12, UI_W, UI_TH_H + 24, COL_STRIP);
+    fb_fill(fb, 0, UI_MAIN_H, UI_W, UI_H - UI_MAIN_H, COL_STRIP);
 
     for (int i = 0; i < m->slots; i++) {
         int tx = ui_thumb_x(i);

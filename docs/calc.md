@@ -28,7 +28,7 @@ clock keeps updating at minute granularity.
 
 The slot's image doubles as the calculator's skin:
 
-- **Screen**: the image is scaled over the 640x384 screen area and dimmed with
+- **Screen**: the image is scaled over the 1280x576 screen area and dimmed with
   `fb_shade()` (88/255), so the button grid sits on a recognisable but quiet
   backdrop.
 - **Tile preview**: the thumbnail is drawn unchanged, then the current value is
@@ -84,7 +84,8 @@ two vocabularies cannot collide.
 The calculator paints `0..CALC_SCREEN_H` (384) and leaves the strip visible
 below it, so there is always a way back.
 
-Layout: readout panel at y 12..100, keypad of 18 buttons in a 4x5 grid below it
+Layout: readout panel at y 18..150, keypad of 18 buttons in a 900px-wide 4x5 grid
+below it
 (`0` spans two columns, the period key sits beside it, `=` spans two rows).
 Hit-testing uses the same button table that draws them, so the two cannot
 drift.

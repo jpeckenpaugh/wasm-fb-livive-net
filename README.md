@@ -100,7 +100,7 @@ tests/             native pixel/logic tests
 ```
 
 Geometry is chosen so no scaling ever happens for the hero image: assets are
-pre-cropped to 480×360 (hero) and 96×72 (thumbnails), the hero sits at (80,12)
+pre-cropped to 1280×576 (hero) and 144×108 (thumbnails), the hero is full-bleed at (0,0)
 and the thumbnails at y=396 with 10px gaps. Scaling exists but is only used if
 an asset does not match the layout.
 
@@ -121,13 +121,13 @@ an asset does not match the layout.
 
 ## Framebuffer contract
 
-- 640 × 480 logical pixels, RGBA8888, row-major, 1,228,800 bytes.
+- 1280 × 720 logical pixels (720p), RGBA8888, row-major, 3,686,400 bytes.
 - Memory order is R,G,B,A — on little-endian wasm a `uint32_t` word is
   `0xAABBGGRR`, which is what `RGBA(r,g,b,a)` builds. The test pattern is the
   tripwire for this: red must be top-left, green top-right, blue bottom-left.
 - `ALLOW_MEMORY_GROWTH=0` with `INITIAL_MEMORY=64MB`, so `HEAPU8` never goes
   stale. The host re-reads it anyway.
-- Canvas backing store is fixed at 640×480; CSS scales it. Pointer mapping uses
+- Canvas backing store is fixed at 1280×720; CSS scales it. Pointer mapping uses
   `getBoundingClientRect()` only — `devicePixelRatio` is intentionally not
   involved.
 
@@ -161,11 +161,11 @@ by GC.
 
 | Metric | Value |
 |---|---|
-| `media_browser.wasm` | 3,604,248 bytes (3.44 MiB, mostly the 3.4 MB of raw RGBA assets) |
+| `media_browser.wasm` | 15,098,588 bytes (14.4 MiB, mostly the 14.4 MB of raw RGBA assets) |
 | `media_browser.mjs` glue | small; ES module, no FS or Node shims |
 | instance init (`app_init` → first pixels) | 1–2.4 ms |
-| full redraw + `putImageData` copy | 0.2–0.3 ms per 640×480 frame |
-| per-frame copy | 1.17 MiB |
+| full redraw + `putImageData` copy | 0.6–1.0 ms per 1280×720 frame |
+| per-frame copy | 3.52 MiB |
 | reserved linear memory | 64 MiB (`ALLOW_MEMORY_GROWTH=0`) |
 | cold container build (cached toolchain layer) | ~2 s of actual compilation |
 
@@ -189,7 +189,9 @@ reserved linear memory), not a benchmark harness.
   `test_clock`, `test_calc`); there is no headless-browser assertion of the
   Canvas output yet.
 - No font rendering: the "UI" is frames, borders and an accent underline.
-- Raw RGBA assets: 5 × (480·360 + 96·72) × 4 ≈ 3.6 MB inside the wasm binary.
+- Raw RGBA assets: 5 × (1280·576 + 144·108) × 4 ≈ 14.4 MB inside the wasm binary.
+  That is the price of a 720p framebuffer with decode-free assets; a decoder or
+  compressed assets would cut it substantially.
   gzip does not help much on raw pixels.
 - Emscripten 6.0.13 is pinned by tag. Pin the image digest for byte-for-byte
   rebuilds.

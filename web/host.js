@@ -6,8 +6,8 @@
  */
 import createMediaBrowser from './build/media_browser.mjs';
 
-const W = 640;
-const H = 480;
+const W = 1280;
+const H = 720;
 const FB_BYTES = W * H * 4;
 
 /* Keep in sync with KEY_* in src/main.c and CALC_KEY_* in src/calc.h. */

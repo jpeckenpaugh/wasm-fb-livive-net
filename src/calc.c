@@ -7,20 +7,21 @@
 
 #include "lcd.h"
 
-#define CALC_W 640
+#define CALC_W 1280
 
-#define DISP_X 17
-#define DISP_Y 12
-#define DISP_W (CALC_W - 2 * DISP_X)
-#define DISP_H 88
-#define DISP_TEXT_H 56
-#define DISP_GAP 18
+/* Keypad is 900px wide and centred; the backdrop shows either side. */
+#define PAD 190
+#define BW 216
+#define BH 66
+#define GAP 12
+#define KEY_Y 174
 
-#define PAD 17
-#define BW 144
-#define BH 44
-#define GAP 8
-#define KEY_Y 116
+#define DISP_X PAD
+#define DISP_Y 18
+#define DISP_W (4 * BW + 3 * GAP)
+#define DISP_H 132
+#define DISP_TEXT_H 84
+#define DISP_GAP 30
 
 #define COL_PANEL RGB(0x0b, 0x10, 0x15)
 #define COL_LINE RGB(0x2a, 0x36, 0x44)
@@ -244,10 +245,16 @@ static void draw_text(fb_t *fb, const char *text, int right, int top, int h,
                       uint32_t color, uint32_t edge) {
     int x = right - text_width(text, h);
 
+    /* Halo thickness tracks the cap height, so the tile preview gets the same
+     * thin outline the clock digits have instead of a fat blob. */
+    int off = h / 36; /* matches the clock tile's thin halo at this size */
+    if (off < 1) off = 1;
+    if (off > 3) off = 3;
+
     for (const char *p = text; *p; p++) {
         if (edge != 0) {
-            for (int dy = -2; dy <= 2; dy += 2) {
-                for (int dx = -2; dx <= 2; dx += 2) {
+            for (int dy = -off; dy <= off; dy += off) {
+                for (int dx = -off; dx <= off; dx += off) {
                     if (dx == 0 && dy == 0) continue;
                     glyph(fb, *p, x + dx, top + dy, h, edge);
                 }
@@ -303,14 +310,14 @@ static void draw_label(fb_t *fb, const calc_button_t *b, int x, int y, int w, in
     const int key = b->key;
 
     if (key >= CALC_KEY_0 && key <= CALC_KEY_0 + 9) {
-        const int dw = 18, dh = 36;
+        const int dw = 27, dh = 54;
         lcd_draw_digit(fb, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh,
                        key - CALC_KEY_0, COL_ON, LCD_OFF_NONE);
         return;
     }
 
     if (key == CALC_KEY_DOT) {
-        const int s = 12;
+        const int s = 18;
         fb_fill(fb, x + (w - s) / 2, y + (h + s) / 2 - s, s, s, COL_ON);
         return;
     }
@@ -327,7 +334,7 @@ static void draw_label(fb_t *fb, const calc_button_t *b, int x, int y, int w, in
         default: return;
     }
 
-    const int s = 24;
+    const int s = 36;
     lcd_draw_symbol(fb, x + (w - s) / 2, y + (h - s) / 2, s, s, sym, COL_ON);
 }
 
@@ -340,7 +347,7 @@ void calc_draw(fb_t *fb, const calc_state_t *c) {
     fb_border(fb, DISP_X, DISP_Y, DISP_W, DISP_H, 2, COL_LINE);
 
     if (c->pending != 0 && !c->error) {
-        lcd_draw_symbol(fb, DISP_X + 16, DISP_Y + (DISP_H - 24) / 2, 24, 24,
+        lcd_draw_symbol(fb, DISP_X + 24, DISP_Y + (DISP_H - 36) / 2, 36, 36,
                         symbol_for(c->pending), COL_ACCENT);
     }
 
@@ -364,8 +371,8 @@ void calc_draw_tile(fb_t *fb, const calc_state_t *c, int x, int y, int w, int h)
     char text[16];
     calc_display(c, text, sizeof(text));
 
-    /* Fit the tile: start at a third of its height and shrink until it fits. */
-    int th = h / 3;
+    /* Fit the tile: half its height, shrinking until the value fits. */
+    int th = h / 2;
     if (th < 12) th = 12;
     while (th > 12 && text_width(text, th) > w - 10) th -= 2;
 

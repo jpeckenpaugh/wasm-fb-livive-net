@@ -130,32 +130,32 @@ static void test_keypad_hit_testing(void) {
 
     /* "7" sits in row 1, column 0. */
     calc_init(&c);
-    assert(calc_click(&c, 17 + 72, 116 + 52 + 22) == 1);
+    assert(calc_click(&c, 190 + 108, 174 + 78 + 33) == 1);
     assert(strcmp(display(&c), "7") == 0);
 
     /* "=" spans rows 3-4 in column 3. */
     press_text(&c, "+3");
-    assert(calc_click(&c, 17 + 3 * 152 + 72, 272 + 48) == 1);
+    assert(calc_click(&c, 190 + 3 * 228 + 108, 408 + 72) == 1);
     assert(strcmp(display(&c), "10") == 0);
 
     /* The period key is in row 4, column 2, next to the wide zero. */
     calc_init(&c);
-    assert(calc_click(&c, 17 + 72, 116 + 3 * 52 + 22) == 1);            /* 1 */
-    assert(calc_click(&c, 17 + 2 * 152 + 72, 116 + 4 * 52 + 22) == 1); /* . */
-    assert(calc_click(&c, 17 + 1 * 152 + 72, 116 + 2 * 52 + 22) == 1); /* 5 */
+    assert(calc_click(&c, 190 + 108, 174 + 3 * 78 + 33) == 1);            /* 1 */
+    assert(calc_click(&c, 190 + 2 * 228 + 108, 174 + 4 * 78 + 33) == 1);  /* . */
+    assert(calc_click(&c, 190 + 1 * 228 + 108, 174 + 2 * 78 + 33) == 1);  /* 5 */
     assert(strcmp(display(&c), "1.5") == 0);
 
     /* The display area and the gaps are not buttons. */
     calc_init(&c);
-    assert(calc_click(&c, 10, 40) == 0);
-    assert(calc_click(&c, 300, 110) == 0);
-    assert(calc_click(&c, 500, 430) == 0); /* thumbnail strip */
+    assert(calc_click(&c, 10, 400) == 0);  /* left of the keypad */
+    assert(calc_click(&c, 300, 110) == 0); /* readout panel */
+    assert(calc_click(&c, 640, 650) == 0); /* thumbnail strip */
 }
 
 static void test_draw(void) {
     fb_t fb;
-    fb.w = 640;
-    fb.h = 480;
+    fb.w = 1280;
+    fb.h = 720;
     fb.px = (uint32_t *)calloc((size_t)fb.w * fb.h, 4);
     assert(fb.px != NULL);
 
@@ -171,16 +171,16 @@ static void test_draw(void) {
     /* Pixels changed inside the calculator screen ... */
     size_t changed = 0;
     for (int y = 0; y < CALC_SCREEN_H; y++) {
-        for (int x = 0; x < 640; x++) {
-            if (fb.px[(size_t)y * 640 + x] != SENTINEL) changed++;
+        for (int x = 0; x < 1280; x++) {
+            if (fb.px[(size_t)y * 1280 + x] != SENTINEL) changed++;
         }
     }
     assert(changed > 10000);
 
     /* ... and nothing was painted over the thumbnail strip. */
-    for (int y = CALC_SCREEN_H; y < 480; y++) {
-        assert(fb.px[(size_t)y * 640 + 0] == SENTINEL);
-        assert(fb.px[(size_t)y * 640 + 639] == SENTINEL);
+    for (int y = CALC_SCREEN_H; y < 720; y++) {
+        assert(fb.px[(size_t)y * 1280 + 0] == SENTINEL);
+        assert(fb.px[(size_t)y * 1280 + 1279] == SENTINEL);
     }
 
     /* NULL tolerance. */
@@ -193,8 +193,8 @@ static void test_draw(void) {
 static void test_tile_preview(void) {
     const uint32_t SENTINEL = RGBA(0, 0, 0, 255);
     fb_t fb;
-    fb.w = 640;
-    fb.h = 480;
+    fb.w = 1280;
+    fb.h = 720;
     fb.px = (uint32_t *)calloc((size_t)fb.w * fb.h, 4);
     assert(fb.px != NULL);
 
@@ -203,17 +203,17 @@ static void test_tile_preview(void) {
     calc_state_t c;
     calc_init(&c);
     press_text(&c, "42/4=");           /* 10.5 */
-    calc_draw_tile(&fb, &c, 60, 396, 96, 72);
+    calc_draw_tile(&fb, &c, 244, 594, 144, 108);
 
     size_t inside = 0;
-    for (int y = 396; y < 468; y++) {
-        for (int x = 60; x < 156; x++) {
-            if (fb.px[(size_t)y * 640 + x] != SENTINEL) inside++;
+    for (int y = 594; y < 702; y++) {
+        for (int x = 244; x < 388; x++) {
+            if (fb.px[(size_t)y * 1280 + x] != SENTINEL) inside++;
         }
     }
     assert(inside > 100);
     assert(fb.px[0] == SENTINEL);
-    assert(fb.px[(size_t)200 * 640 + 200] == SENTINEL);
+    assert(fb.px[(size_t)300 * 1280 + 300] == SENTINEL);
 
     free(fb.px);
 }
