@@ -4,7 +4,11 @@
  * how to map a pointer into it, how to copy the framebuffer to a canvas, how
  * to create/destroy guests, and how to report the resulting telemetry.
  */
-import createMediaBrowser from './build/media_browser.mjs';
+/* Build outputs are served with GitHub Pages' 10-minute cache. Version the
+ * glue per page load and revalidate the wasm so a redeploy is picked up
+ * immediately instead of after the cache expires. */
+const ASSET_VERSION = Date.now();
+const createMediaBrowser = (await import(`./build/media_browser.mjs?v=${ASSET_VERSION}`)).default;
 
 const W = 1280;
 const H = 720;
@@ -83,7 +87,7 @@ let wasmModulePromise = null;
 function loadWasmModule() {
   if (!wasmModulePromise) {
     const url = new URL('./build/media_browser.wasm', import.meta.url);
-    wasmModulePromise = fetch(url)
+    wasmModulePromise = fetch(url, { cache: 'no-cache' })
       .then((response) => {
         if (!response.ok) throw new Error(`failed to fetch ${url}: HTTP ${response.status}`);
         return response.arrayBuffer();
