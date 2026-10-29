@@ -45,8 +45,12 @@ int calc_key(calc_state_t *c, int key);
 /* Hit-test the on-screen keypad and apply the matching key. */
 int calc_click(calc_state_t *c, int x, int y);
 
-/* Draw the whole calculator screen. */
+/* Draw the whole calculator screen over whatever is already there. */
 void calc_draw(fb_t *fb, const calc_state_t *c);
+
+/* Draw just the current value, scaled to fit a thumbnail-sized box, with a dark
+ * halo so it reads on top of the image. Used by the strip preview. */
+void calc_draw_tile(fb_t *fb, const calc_state_t *c, int x, int y, int w, int h);
 
 /* Current readout as text ("0", "-2", "3.75", "E"), for tests and telemetry. */
 void calc_display(const calc_state_t *c, char *out, size_t n);

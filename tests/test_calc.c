@@ -138,6 +138,13 @@ static void test_keypad_hit_testing(void) {
     assert(calc_click(&c, 17 + 3 * 152 + 72, 272 + 48) == 1);
     assert(strcmp(display(&c), "10") == 0);
 
+    /* The period key is in row 4, column 2, next to the wide zero. */
+    calc_init(&c);
+    assert(calc_click(&c, 17 + 72, 116 + 3 * 52 + 22) == 1);            /* 1 */
+    assert(calc_click(&c, 17 + 2 * 152 + 72, 116 + 4 * 52 + 22) == 1); /* . */
+    assert(calc_click(&c, 17 + 1 * 152 + 72, 116 + 2 * 52 + 22) == 1); /* 5 */
+    assert(strcmp(display(&c), "1.5") == 0);
+
     /* The display area and the gaps are not buttons. */
     calc_init(&c);
     assert(calc_click(&c, 10, 40) == 0);
@@ -183,6 +190,34 @@ static void test_draw(void) {
     free(fb.px);
 }
 
+static void test_tile_preview(void) {
+    const uint32_t SENTINEL = RGBA(0, 0, 0, 255);
+    fb_t fb;
+    fb.w = 640;
+    fb.h = 480;
+    fb.px = (uint32_t *)calloc((size_t)fb.w * fb.h, 4);
+    assert(fb.px != NULL);
+
+    fb_clear(&fb, SENTINEL);
+
+    calc_state_t c;
+    calc_init(&c);
+    press_text(&c, "42/4=");           /* 10.5 */
+    calc_draw_tile(&fb, &c, 60, 396, 96, 72);
+
+    size_t inside = 0;
+    for (int y = 396; y < 468; y++) {
+        for (int x = 60; x < 156; x++) {
+            if (fb.px[(size_t)y * 640 + x] != SENTINEL) inside++;
+        }
+    }
+    assert(inside > 100);
+    assert(fb.px[0] == SENTINEL);
+    assert(fb.px[(size_t)200 * 640 + 200] == SENTINEL);
+
+    free(fb.px);
+}
+
 int main(void) {
     test_arithmetic();
     test_chaining();
@@ -190,6 +225,7 @@ int main(void) {
     test_errors();
     test_keypad_hit_testing();
     test_draw();
+    test_tile_preview();
 
     if (failures) {
         fprintf(stderr, "%d check(s) failed\n", failures);

@@ -23,6 +23,10 @@ void fb_clear(fb_t *fb, uint32_t color);
 void fb_fill(fb_t *fb, int x, int y, int w, int h, uint32_t color);
 void fb_border(fb_t *fb, int x, int y, int w, int h, int thickness, uint32_t color);
 
+/* Multiply the RGB channels of a region by shade/255 (0..255). Used to dim a
+ * backdrop behind a UI that has to stay readable. Alpha is untouched. */
+void fb_shade(fb_t *fb, int x, int y, int w, int h, int shade);
+
 /* src is tightly packed RGBA8888, sw * sh pixels. Clipped to the framebuffer. */
 void fb_blit(fb_t *fb, int x, int y, const uint8_t *src, int sw, int sh);
 void fb_blit_scaled(fb_t *fb, int x, int y, int dw, int dh,

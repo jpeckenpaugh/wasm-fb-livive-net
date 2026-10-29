@@ -1,25 +1,38 @@
 # Calculator screen — as built
 
 The second mini app. It is **not** a separate guest kind and adds **no guest
-exports**: the calculator is the sixth slot in the existing thumbnail strip, so
-the same `app_click()` / `app_key()` path that swaps images also swaps screens.
+exports**: the calculator is merged into the **second** strip slot (right after
+the clock), so the same `app_click()` / `app_key()` path that swaps images also
+swaps screens. There are still five tiles; the calculator reuses that slot's
+artwork instead of displacing an image behind a sixth tile.
 
 Source: `src/calc.{h,c}` (state + paint), `src/lcd.c` (`lcd_draw_symbol`),
 `src/media.c` (slot model), `src/ui.c` (composition), `tests/test_calc.c`.
 
 ## Entry and exit
 
-The strip is now `ASSET_COUNT + 1` slots wide: five images, then the
-calculator. Clicking the last tile or pressing <kbd>→</kbd> past image 5 selects
-it; clicking any image or pressing <kbd>←</kbd> leaves it. `media_is_calc()`
-is the only test anyone needs.
+`MEDIA_CALC_SLOT` is slot **1** — the second tile, immediately after the clock.
+The strip keeps five tiles: slot 0 is image 1 with the clock overlay, slot 1 is
+the calculator, slots 2-4 are the remaining images. Clicking the tile or one
+arrow step from the clock enters it; clicking any other tile leaves it.
+`media_is_calc()` is the only test anyone needs.
 
-`app_selected()` now returns `0..5`, so the host's telemetry and status line
-print `calculator` when `selected >= count`.
+`app_selected()` returns `0..4`, and the host prints `calculator` when
+`selected == MEDIA_CALC_SLOT`.
 
 The clock keeps working across the switch: the hero overlay only draws when
 image 1 is selected *and* we are not on the calculator, while the thumbnail
 clock keeps updating at minute granularity.
+
+### Artwork reuse
+
+The slot's image doubles as the calculator's skin:
+
+- **Screen**: the image is scaled over the 640x384 screen area and dimmed with
+  `fb_shade()` (88/255), so the button grid sits on a recognisable but quiet
+  backdrop.
+- **Tile preview**: the thumbnail is drawn unchanged, then the current value is
+  rendered over it, exactly like the clock tile shows the time.
 
 ## Arithmetic model
 
@@ -31,7 +44,7 @@ typed, and backspace is a character delete.
 | Action | Behaviour |
 |---|---|
 | digit | append, max 10 characters |
-| `.` | once per entry; a leading `.` becomes `0.` |
+| `.` / keypad period | once per entry; a leading `.` becomes `0.` |
 | operator | fold the entry into the accumulator, keep the operator |
 | operator twice | replaces the pending operator (`6 + × 2 =` → `12`) |
 | `=` | fold and clear the operator; the result becomes the accumulator |
@@ -53,7 +66,7 @@ Both surfaces feed the same `calc_key()`:
 | Keyboard | Key code | Effect |
 |---|---|---|
 | `0`-`9` | `CALC_KEY_DIGIT()` | digit |
-| `.` or `,` | 27 | decimal point |
+| `.` or `,` | 27 | decimal point (also the keypad period key) |
 | `+ - * /` (`x` alias) | 20-23 | operator |
 | `Enter` or `=` | 24 | equals |
 | `Escape` or `c` | 25 | clear |
@@ -71,9 +84,10 @@ two vocabularies cannot collide.
 The calculator paints `0..CALC_SCREEN_H` (384) and leaves the strip visible
 below it, so there is always a way back.
 
-Layout: readout panel at y 12..100, keypad of 17 buttons in a 4x5 grid below it
-(`0` spans three columns, `=` spans two rows). Hit-testing uses the same button
-table that draws them, so the two cannot drift.
+Layout: readout panel at y 12..100, keypad of 18 buttons in a 4x5 grid below it
+(`0` spans two columns, the period key sits beside it, `=` spans two rows).
+Hit-testing uses the same button table that draws them, so the two cannot
+drift.
 
 `+ − × ÷ = C ⌫ E` are a 7x7 dot matrix (`lcd_draw_symbol`), because `×` needs
 diagonals and `fb_fill` only draws axis-aligned rectangles. Cells are solid, so
@@ -82,7 +96,10 @@ readout and keeps the door open for any future non-digit label.
 
 Readout characters are drawn by `calc.c`: digits via `lcd_draw_digit()` with
 `LCD_OFF_NONE` (so no ghost segments), `.` as a baseline block, `-` as a bar,
-`E` via the symbol font. Values are right-aligned from a precomputed width.
+`E` via the symbol font. Glyph width and the inter-digit gap scale with the cap
+height (`h/2` and `h/12`), so the same renderer serves the 56px readout, where
+digits need visible separation, and the ~20px tile preview. Values are
+right-aligned from a precomputed width.
 
 ## Tests
 

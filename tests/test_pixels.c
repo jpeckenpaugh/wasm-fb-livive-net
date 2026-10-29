@@ -80,6 +80,26 @@ static void test_clipping(void) {
     free(fb.px);
 }
 
+static void test_shade(void) {
+    fb_t fb = make_fb(4, 4);
+    fb_clear(&fb, RGB(200, 100, 50));
+
+    fb_shade(&fb, 0, 0, 4, 4, 128);
+    check_pixel(&fb, 0, 0, 100, 50, 25, 255, "shade");
+
+    /* shade 0 is black, 255 is a no-op, and the edges clip like fb_fill. */
+    fb_clear(&fb, RGB(200, 100, 50));
+    fb_shade(&fb, 1, 1, 2, 2, 0);
+    check_pixel(&fb, 1, 1, 0, 0, 0, 255, "shade zero");
+    check_pixel(&fb, 0, 0, 200, 100, 50, 255, "shade outside");
+
+    fb_clear(&fb, RGB(9, 8, 7));
+    fb_shade(&fb, -5, -5, 100, 100, 255);
+    check_pixel(&fb, 0, 0, 9, 8, 7, 255, "shade 255 is a no-op");
+
+    free(fb.px);
+}
+
 static void test_blit(void) {
     /* 2x2 source, distinct corners, blitted with an offset and clipped. */
     const uint8_t src[2 * 2 * 4] = {
@@ -115,7 +135,7 @@ static void test_media(void) {
     media_t m;
     media_init(&m);
     CHECK(m.count == ASSET_COUNT);
-    CHECK(m.slots == ASSET_COUNT + 1); /* images + calculator */
+    CHECK(m.slots == ASSET_COUNT); /* one slot per image */
     CHECK(m.selected == 0);
     CHECK(media_is_calc(&m) == 0);
 
@@ -128,20 +148,25 @@ static void test_media(void) {
     CHECK(media_hit(&m, tx + UI_TH_W - 1, UI_TH_Y + UI_TH_H - 1) == 2);
     CHECK(media_hit(&m, tx + UI_TH_W, UI_TH_Y + 5) == -1); /* gap */
 
-    int cx = ui_thumb_x(m.count);
-    CHECK(media_hit(&m, cx + 1, UI_TH_Y + 1) == m.count);
+    int cx = ui_thumb_x(MEDIA_CALC_SLOT);
+    CHECK(media_hit(&m, cx + 1, UI_TH_Y + 1) == MEDIA_CALC_SLOT);
 
     media_select(&m, 4);
     CHECK(m.selected == 4);
     media_select(&m, 99);
     CHECK(m.selected == 4); /* out of range is ignored */
     media_next(&m, 1);
-    CHECK(m.selected == 5); /* the calculator slot */
+    CHECK(m.selected == 0); /* wraps */
+    media_next(&m, -1);
+    CHECK(m.selected == 4);
+
+    /* Slot 2 is the calculator, not an image. */
+    media_select(&m, MEDIA_CALC_SLOT);
     CHECK(media_is_calc(&m) == 1);
     media_next(&m, 1);
-    CHECK(m.selected == 0); /* wraps back to the first image */
+    CHECK(m.selected == MEDIA_CALC_SLOT + 1);
+    CHECK(media_is_calc(&m) == 0);
     media_next(&m, -1);
-    CHECK(m.selected == 5);
     CHECK(media_is_calc(&m) == 1);
 
     /* The asset pipeline and the layout must agree: this is the contract that
@@ -209,6 +234,7 @@ static void test_ui_draw(void) {
 int main(void) {
     test_pixel_order();
     test_clipping();
+    test_shade();
     test_blit();
     test_media();
     test_ui_draw();

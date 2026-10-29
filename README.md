@@ -29,8 +29,9 @@ The console boots the first guest automatically; **+ new guest** starts another.
 Each guest is a tab with its own state, framebuffer and telemetry row; the top
 bar shows host-level counters (module size, reserved memory, blits, uptime).
 
-The strip at the bottom is the screen picker: five images, then a calculator
-tile. Arrow keys or a click move between them.
+The strip at the bottom is the screen picker: five tiles. The first is image 1
+with the clock; the second is the calculator, drawn over that slot's artwork;
+the rest are the remaining images. Arrow keys or a click move between them.
 
 ## Mini apps
 
@@ -38,7 +39,7 @@ tile. Arrow keys or a click move between them.
 |---|---|
 | image 1 | photo + `HH:MM:SS` overlay, and `HH:MM` on its thumbnail |
 | images 2-5 | photo, `HH:MM` on thumbnail 1 |
-| calculator | clickable keypad, integer and decimal entry |
+| calculator (tile 2) | clickable keypad with a period key, integer and decimal entry, value previewed on its tile |
 
 Both live in the same guest and are reached with the existing
 `app_click()`/`app_key()` path — no per-app exports. The clock repaints about

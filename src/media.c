@@ -6,7 +6,7 @@ void media_init(media_t *m) {
     m->images = g_images;
     m->thumbs = g_thumbs;
     m->count = ASSET_COUNT;
-    m->slots = ASSET_COUNT + 1;
+    m->slots = ASSET_COUNT;
     m->selected = 0;
 }
 

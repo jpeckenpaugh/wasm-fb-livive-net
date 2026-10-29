@@ -7,28 +7,19 @@
 #define COL_SHADOW RGB(0x08, 0x08, 0x0a)
 #define COL_CLOCK RGB(0xf2, 0xf8, 0xfa)
 #define COL_CLOCK_EDGE RGB(0x08, 0x0c, 0x0e)
-#define COL_TILE_BODY RGB(0x1d, 0x26, 0x31)
-#define COL_TILE_KEY RGB(0x3d, 0x4a, 0x5a)
-
-/* A miniature keypad, used for the calculator's tile in the strip. */
-static void draw_calc_tile(fb_t *fb, int x, int y, int w, int h) {
-    fb_fill(fb, x + 12, y + 8, w - 24, h - 16, COL_TILE_BODY);
-    fb_border(fb, x + 12, y + 8, w - 24, h - 16, 1, COL_FRAME);
-    fb_fill(fb, x + 18, y + 14, w - 36, 9, COL_ACCENT);
-
-    for (int row = 0; row < 3; row++) {
-        for (int col = 0; col < 3; col++) {
-            fb_fill(fb, x + 20 + col * 18, y + 29 + row * 10, 12, 6, COL_TILE_KEY);
-        }
-    }
-}
 
 void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
              const calc_state_t *calc) {
-    const int slots = m->count + 1;
     const int on_calc = media_is_calc(m);
 
     if (on_calc && calc) {
+        /* The calculator is merged into its strip slot, so the slot's image is
+         * its wallpaper: scale it over the screen area and dim it so the keys
+         * stay readable. */
+        const image_t *backdrop = &m->images[MEDIA_CALC_SLOT];
+        fb_blit_scaled(fb, 0, 0, UI_W, CALC_SCREEN_H,
+                       backdrop->px, backdrop->w, backdrop->h);
+        fb_shade(fb, 0, 0, UI_W, CALC_SCREEN_H, 88);
         calc_draw(fb, calc);
     } else {
         fb_clear(fb, COL_BG);
@@ -54,7 +45,7 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
 
     fb_fill(fb, 0, UI_TH_Y - 12, UI_W, UI_TH_H + 24, COL_STRIP);
 
-    for (int i = 0; i < slots; i++) {
+    for (int i = 0; i < m->slots; i++) {
         int tx = ui_thumb_x(i);
         int selected = (i == m->selected);
 
@@ -62,10 +53,11 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
                 UI_TH_W + 2 * UI_BORDER, UI_TH_H + 2 * UI_BORDER,
                 selected ? COL_ACCENT : COL_FRAME);
 
-        if (i < m->count) {
-            fb_blit(fb, tx, UI_TH_Y, m->thumbs[i].px, m->thumbs[i].w, m->thumbs[i].h);
-        } else {
-            draw_calc_tile(fb, tx, UI_TH_Y, UI_TH_W, UI_TH_H);
+        fb_blit(fb, tx, UI_TH_Y, m->thumbs[i].px, m->thumbs[i].w, m->thumbs[i].h);
+
+        /* Slot 2 previews the calculator's readout over its own artwork. */
+        if (i == MEDIA_CALC_SLOT && calc) {
+            calc_draw_tile(fb, calc, tx, UI_TH_Y, UI_TH_W, UI_TH_H);
         }
 
         if (selected) {
@@ -86,6 +78,7 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
                    4, COL_CLOCK, COL_CLOCK_EDGE);
     }
 }
+
 /* Deliberately garish: proves channel order, orientation and clipping in one
  * screenshot. If red and blue are swapped here, everything downstream is wrong. */
 void ui_draw_test_pattern(fb_t *fb) {

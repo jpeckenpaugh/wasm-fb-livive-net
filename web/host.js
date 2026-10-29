@@ -24,9 +24,13 @@ const KEY_CODES = {
   '.': 27, ',': 27,
 };
 
-const selectionLabel = (guest) => (guest.selected < guest.count
-  ? `image ${guest.selected + 1} / ${guest.count}`
-  : 'calculator');
+/* Slot 1 is the calculator (see MEDIA_CALC_SLOT in src/media.h); the rest map
+ * one-to-one to images. */
+const CALC_SLOT = 1;
+
+const selectionLabel = (guest) => (guest.selected === CALC_SLOT
+  ? 'calculator'
+  : `image ${guest.selected + 1} / ${guest.count}`);
 
 const KiB = 1024;
 const MiB = 1024 * KiB;
