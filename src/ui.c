@@ -5,8 +5,10 @@
 #define COL_FRAME RGB(0x3a, 0x3a, 0x44)
 #define COL_ACCENT RGB(0x4c, 0xc2, 0xff)
 #define COL_SHADOW RGB(0x08, 0x08, 0x0a)
+#define COL_CLOCK RGB(0xf2, 0xf8, 0xfa)
+#define COL_CLOCK_EDGE RGB(0x08, 0x0c, 0x0e)
 
-void ui_draw(fb_t *fb, const media_t *m) {
+void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock) {
     fb_clear(fb, COL_BG);
 
     /* Drop shadow + frame behind the main image. */
@@ -42,6 +44,18 @@ void ui_draw(fb_t *fb, const media_t *m) {
             /* Selection underline: makes the active image obvious at a glance. */
             fb_fill(fb, tx, UI_TH_Y + UI_TH_H + UI_BORDER + 2, UI_TH_W, 3, COL_ACCENT);
         }
+    }
+
+    /* Clock overlay: HH:MM:SS over the hero while image 1 is selected, and a
+     * compact HH:MM on its thumbnail slot. Lit segments only, with a dark halo,
+     * so it composites on top of the image instead of hiding it. */
+    if (clock && clock->valid) {
+        if (m->selected == 0) {
+            clock_draw(fb, clock, UI_MAIN_X, UI_MAIN_Y, UI_MAIN_W, UI_MAIN_H,
+                       6, COL_CLOCK, COL_CLOCK_EDGE);
+        }
+        clock_draw(fb, clock, ui_thumb_x(0), UI_TH_Y, UI_TH_W, UI_TH_H,
+                   4, COL_CLOCK, COL_CLOCK_EDGE);
     }
 }
 

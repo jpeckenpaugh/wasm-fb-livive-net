@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include "clock.h"
 #include "framebuffer.h"
 #include "media.h"
 #include "ui.h"
@@ -17,6 +18,7 @@
 
 static fb_t g_fb;
 static media_t g_media;
+static clock_state_t g_clock;
 static int g_ready = 0;
 static int g_test_pattern = 0;
 
@@ -25,7 +27,7 @@ static void draw(void) {
     if (g_test_pattern) {
         ui_draw_test_pattern(&g_fb);
     } else {
-        ui_draw(&g_fb, &g_media);
+        ui_draw(&g_fb, &g_media, &g_clock);
     }
 }
 
@@ -46,6 +48,7 @@ int app_init(int width, int height) {
     }
 
     g_test_pattern = 0;
+    clock_init(&g_clock);
     media_init(&g_media);
     g_ready = 1;
     draw();
@@ -112,6 +115,29 @@ int app_selected(void) {
 EMSCRIPTEN_KEEPALIVE
 int app_count(void) {
     return g_media.count;
+}
+
+/* --- clock ------------------------------------------------------------- */
+
+EMSCRIPTEN_KEEPALIVE
+void app_set_time(int hour, int minute, int second, int msec) {
+    clock_set_time(&g_clock, hour, minute, second, msec);
+}
+
+/* Returns 1 when the framebuffer changed and needs copying to the canvas.
+ * The hero clock shows seconds only while image 1 is selected, so the tick
+ * granularity follows the selection. */
+EMSCRIPTEN_KEEPALIVE
+int app_tick(void) {
+    if (!g_ready || g_test_pattern) return 0;
+    if (!clock_advance(&g_clock, g_media.selected == 0)) return 0;
+    draw();
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+unsigned int app_next_timeout_ms(void) {
+    return clock_next_timeout_ms(&g_clock, g_media.selected == 0);
 }
 
 EMSCRIPTEN_KEEPALIVE

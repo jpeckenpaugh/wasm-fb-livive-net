@@ -35,6 +35,11 @@ let totalBlits = 0;
 let moduleBytes = 0;
 const bootAt = performance.now();
 
+/* One timer for the active guest: the clock overlay only needs to repaint the
+ * guest you can actually see, and activation catches up immediately. */
+const CLOCK_MIN_WAIT_MS = 16;
+let clockTimer = null;
+
 const fmtBytes = (n) => {
   if (!n) return '0 B';
   if (n >= MiB) return `${(n / MiB).toFixed(2)} MiB`;
@@ -92,6 +97,37 @@ function updateHostStats() {
   hostMem.textContent = reserved ? fmtBytes(reserved) : '0 B';
   hostBlits.textContent = totalBlits;
   statusCopies.textContent = totalBlits;
+}
+
+/* ------------------------------------------------------------- clock tick -- */
+
+function stopClock() {
+  if (clockTimer !== null) {
+    clearTimeout(clockTimer);
+    clockTimer = null;
+  }
+}
+
+function scheduleClock() {
+  stopClock();
+  const guest = guests.find((candidate) => candidate.id === activeId);
+  if (!guest || !guest.module) return;
+  const wait = Math.max(CLOCK_MIN_WAIT_MS, guest.module._app_next_timeout_ms());
+  clockTimer = setTimeout(pumpClock, Math.min(wait, 60000));
+}
+
+function pumpClock() {
+  clockTimer = null;
+  const guest = guests.find((candidate) => candidate.id === activeId);
+  if (!guest || !guest.module || !guest.render) return;
+
+  const now = new Date();
+  guest.module._app_set_time(now.getHours(), now.getMinutes(),
+                             now.getSeconds(), now.getMilliseconds());
+  /* The guest draws into its framebuffer and tells us whether the visible
+   * content changed; only then is a 1.17 MiB copy worth doing. */
+  if (guest.module._app_tick()) guest.render();
+  scheduleClock();
 }
 
 /* ---------------------------------------------------------------- panels -- */
@@ -152,6 +188,8 @@ function activate(id) {
     tab.tabIndex = on ? 0 : -1;
     guest.panel.hidden = !on;
   }
+  /* Catch up and restart the clock for whichever guest is visible now. */
+  pumpClock();
   updateHostStats();
 }
 
@@ -185,6 +223,7 @@ function markFault(guest, message) {
 function destroyGuest(guest) {
   const index = guests.indexOf(guest);
   if (index < 0) return;
+  if (guest.id === activeId) stopClock(); /* never pump a freed module */
   guest.disposed = true;
   guests.splice(index, 1);
 
@@ -308,6 +347,9 @@ async function createGuest() {
       if (changed) {
         render();
         setStatus(`${vm.name} · image ${vm.selected + 1} / ${vm.count} selected`);
+        /* Selecting image 1 switches the hero clock from minute to second
+         * granularity, so the pending timer is no longer the right one. */
+        scheduleClock();
       }
       return changed;
     };
@@ -337,6 +379,7 @@ async function createGuest() {
       if (vm.module._app_key(code)) {
         render();
         setStatus(`${vm.name} · image ${vm.selected + 1} / ${vm.count} selected`);
+        scheduleClock();
       }
     });
 
@@ -347,6 +390,7 @@ async function createGuest() {
     render();
     if (patternToggle.checked) setPattern(true);
     setStatus(`${vm.name} · booted in ${fmtMs(vm.boot)}`, true);
+    pumpClock(); /* first clock paint + schedule the next tick */
     return vm;
   } catch (error) {
     console.error(error);
@@ -377,6 +421,11 @@ setInterval(() => {
 }, 1000);
 hostUptime.textContent = '00:00:00';
 updateHostStats();
+
+/* Background tabs throttle timers; catch up as soon as we are visible. */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) pumpClock();
+});
 
 /* Small debugging/verification surface; harmless in production. */
 window.__mediaBrowser = {

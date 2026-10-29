@@ -155,7 +155,7 @@ static void test_ui_draw(void) {
     media_t m;
     media_init(&m);
 
-    ui_draw(&fb, &m);
+    ui_draw(&fb, &m, NULL);
 
     /* The hero image occupies its exact slot; compare every pixel against the
      * source. Stop at the first mismatch so a bad row is one failure, not 480. */

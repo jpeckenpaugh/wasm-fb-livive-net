@@ -9,7 +9,7 @@ OBJ   := $(BUILD)/obj
 EMCC ?= emcc
 CC   ?= cc
 
-SRC         := src/main.c src/framebuffer.c src/media.c src/ui.c
+SRC         := src/main.c src/framebuffer.c src/media.c src/ui.c src/lcd.c src/clock.c
 ASSET_UNITS := asset_0 asset_1 asset_2 asset_3 asset_4
 GEN_UNITS   := assets_gen $(ASSET_UNITS)
 
@@ -29,9 +29,9 @@ WASM_LDFLAGS ?= \
 WASM_OUT := $(BUILD)/media_browser.mjs
 ASSETS   := $(wildcard assets/*.png assets/*.jpg assets/*.jpeg)
 
-NATIVE_SRC  := src/framebuffer.c src/media.c src/ui.c tests/test_pixels.c
-NATIVE_OBJS := $(patsubst %.c,$(OBJ)/native/%.o,$(NATIVE_SRC) $(GEN)/assets_gen.c \
-                 $(addprefix $(GEN)/,$(addsuffix .c,$(ASSET_UNITS))))
+NATIVE_COMMON := $(OBJ)/native/src/framebuffer.o
+NATIVE_ASSETS := $(OBJ)/native/$(GEN)/assets_gen.o \
+                 $(addprefix $(OBJ)/native/$(GEN)/,$(addsuffix .o,$(ASSET_UNITS)))
 
 .PHONY: all assets test clean debug release serve
 
@@ -66,11 +66,23 @@ $(OBJ)/native/%.o: %.c $(GEN)/assets_gen.h
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -Itests -c $< -o $@
 
-$(BUILD)/test_pixels: $(NATIVE_OBJS)
+$(BUILD)/test_pixels: $(OBJ)/native/tests/test_pixels.o \
+                      $(OBJ)/native/src/media.o $(OBJ)/native/src/ui.o \
+                      $(OBJ)/native/src/clock.o $(OBJ)/native/src/lcd.o \
+                      $(NATIVE_ASSETS) $(NATIVE_COMMON)
 	$(CC) $^ -o $@
 
-test: $(BUILD)/test_pixels
-	./$(BUILD)/test_pixels
+$(BUILD)/test_lcd: $(OBJ)/native/tests/test_lcd.o \
+                   $(OBJ)/native/src/lcd.o $(NATIVE_COMMON)
+	$(CC) $^ -o $@
+
+$(BUILD)/test_clock: $(OBJ)/native/tests/test_clock.o \
+                     $(OBJ)/native/src/clock.o $(OBJ)/native/src/lcd.o \
+                     $(NATIVE_COMMON)
+	$(CC) $^ -o $@
+
+test: $(BUILD)/test_pixels $(BUILD)/test_lcd $(BUILD)/test_clock
+	@for t in $^; do ./$$t; done
 
 # Force regeneration after editing assets/.
 assets:
