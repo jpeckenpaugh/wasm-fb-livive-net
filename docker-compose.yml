@@ -1,0 +1,19 @@
+services:
+  # Canonical demo: everything prebuilt into the image, no bind mounts.
+  serve:
+    build:
+      context: .
+      target: serve
+    ports:
+      - "8080:80"
+
+  # Fast iteration against the workspace: `docker compose --profile dev run --rm dev make`
+  dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      target: build
+    working_dir: /src
+    volumes:
+      - .:/src
+    command: ["make", "-j4", "all"]

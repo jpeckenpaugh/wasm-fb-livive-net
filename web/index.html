@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wasm Framebuffer Media Browser</title>
+  <style>
+    :root {
+      --bg: #0e0e11;
+      --panel: #17171c;
+      --line: #2a2a33;
+      --text: #e7e7ee;
+      --muted: #8b8b9b;
+      --accent: #4cc2ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 20px 64px;
+      background: radial-gradient(120% 90% at 50% 0%, #1b1b24 0%, var(--bg) 60%);
+      color: var(--text);
+      font: 15px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+    }
+    header.top { max-width: 640px; margin: 0 auto 24px; }
+    h1 { font-size: 20px; margin: 0 0 6px; letter-spacing: 0.2px; }
+    header.top p { margin: 0; color: var(--muted); font-size: 13.5px; }
+    .bar {
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    button {
+      appearance: none; border: 1px solid var(--line); background: var(--panel);
+      color: var(--text); border-radius: 7px; padding: 7px 13px;
+      font: inherit; font-size: 13.5px; cursor: pointer;
+    }
+    button:hover { border-color: #44445500; border-color: #4a4a5a; }
+    button.primary { border-color: #2f6f8f; background: #12303d; }
+    label.toggle { color: var(--muted); font-size: 13.5px; display: flex; gap: 6px; align-items: center; }
+    .muted { color: var(--muted); }
+    main { max-width: 640px; margin: 0 auto; display: grid; gap: 22px; }
+    .instance {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 12px; overflow: hidden;
+    }
+    .instance > header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-bottom: 1px solid var(--line);
+      font-size: 12.5px; color: var(--muted);
+    }
+    .instance .title { color: var(--text); font-weight: 600; }
+    .instance .meta { margin-left: auto; }
+    .instance canvas {
+      display: block; width: 100%; height: auto; background: #000;
+      image-rendering: pixelated; touch-action: none; outline: none;
+      cursor: pointer;
+    }
+    .instance canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+    .instance .stats {
+      padding: 7px 12px; border-top: 1px solid var(--line);
+      font: 11.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--muted); white-space: pre-wrap;
+    }
+    .instance .error { padding: 14px; color: #ff8b8b; font-size: 13px; }
+    footer { max-width: 640px; margin: 28px auto 0; color: var(--muted); font-size: 12.5px; }
+    kbd {
+      background: #22222b; border: 1px solid var(--line); border-bottom-width: 2px;
+      border-radius: 4px; padding: 0 5px; font: inherit; font-size: 11.5px;
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <h1>Wasm Framebuffer Media Browser</h1>
+    <p>
+      Every pixel inside the panels below is drawn by C into its own RGBA
+      framebuffer in wasm linear memory. The page only forwards input and copies
+      bytes into a Canvas.
+    </p>
+    <div class="bar">
+      <button id="add" class="primary" type="button">Add instance</button>
+      <label class="toggle"><input id="pattern" type="checkbox"> Test pattern</label>
+      <span id="status" class="muted"></span>
+    </div>
+  </header>
+
+  <main id="instances"></main>
+
+  <footer>
+    Click a thumbnail to select it. With a panel focused, use
+    <kbd>←</kbd> <kbd>→</kbd> or <kbd>space</kbd>. Append <code>?stats=1</code>
+    to the URL for timings.
+  </footer>
+
+  <script type="module" src="./host.js"></script>
+</body>
+</html>

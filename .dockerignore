@@ -1,0 +1,11 @@
+.git
+.gitignore
+build
+build-*
+out
+.DS_Store
+**/__pycache__
+**/*.o
+concept.md
+README.md
+.github

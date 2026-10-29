@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # The `build` stage runs `make all test`; the native pixel tests gate the
+      # artifacts. Extract them so the job proves reproducibility, not just
+      # that an image built.
+      - name: Build and test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: artifacts
+          outputs: type=local,dest=out
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check artifacts
+        run: |
+          set -eu
+          test -s out/media_browser.wasm
+          test -s out/media_browser.mjs
+          test -x out/test_pixels
+          ls -l out
+
+      - name: Serve smoke test
+        run: |
+          set -eu
+          docker build --target serve -t media-browser:ci .
+          docker run -d --rm -p 8080:80 --name mb media-browser:ci
+          trap 'docker stop mb >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8080/ >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://localhost:8080/ | grep -qi canvas
+          curl -fsS http://localhost:8080/build/media_browser.mjs | grep -q createMediaBrowser
+          curl -fsSI http://localhost:8080/build/media_browser.wasm | grep -qi 'content-type: application/wasm'
