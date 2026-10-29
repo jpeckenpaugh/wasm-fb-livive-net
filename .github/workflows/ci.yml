@@ -21,8 +21,8 @@ jobs:
           context: .
           target: artifacts
           outputs: type=local,dest=out
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=wasm
+          cache-to: type=gha,mode=max,scope=wasm
 
       - name: Check artifacts
         run: |

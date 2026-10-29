@@ -40,6 +40,19 @@ docker compose up --build serve
 
 A native emsdk works too if you have one: `make && make test`.
 
+## Publish
+
+`https://wasm-fb.livive.net/` is served by GitHub Pages from
+`.github/workflows/pages.yml` on every push to `main`. That workflow builds the
+wasm module in the same pinned toolchain image, assembles `web/` plus
+`build/media_browser.{mjs,wasm}` into an artifact, and deploys it. No build
+artifacts are committed.
+
+One-time repository setting: **Settings → Pages → Build and deployment → Source:
+GitHub Actions**. (The custom domain and the `wasm-fb.livive.net →
+jpeckenpaugh.github.io` DNS record are already in place; the workflow writes the
+`CNAME` file into the artifact.)
+
 ## Test
 
 ```bash

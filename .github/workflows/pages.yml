@@ -1,0 +1,62 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a deploy halfway through; queue instead.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Same pinned toolchain as local/compose builds; the native tests run
+      # inside this image, so a broken guest never reaches the site.
+      - name: Build wasm in the pinned toolchain image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: artifacts
+          outputs: type=local,dest=wasm-out
+          cache-from: type=gha,scope=wasm
+          cache-to: type=gha,mode=max,scope=wasm
+
+      - name: Assemble static site
+        run: |
+          set -eu
+          mkdir -p site/build
+          cp -R web/. site/
+          cp wasm-out/media_browser.mjs wasm-out/media_browser.wasm site/build/
+          printf 'wasm-fb.livive.net\n' > site/CNAME
+          touch site/.nojekyll
+          test -s site/build/media_browser.wasm
+          test -s site/build/media_browser.mjs
+          find site -type f | sort
+          du -sh site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
