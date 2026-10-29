@@ -8,6 +8,7 @@
 #ifndef UI_H_INCLUDED
 #define UI_H_INCLUDED
 
+#include "cal.h"
 #include "calc.h"
 #include "clock.h"
 #include "framebuffer.h"
@@ -37,7 +38,7 @@ static inline int ui_thumb_x(int index) {
 }
 
 void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
-             const calc_state_t *calc);
+             const calc_state_t *calc, const cal_state_t *cal);
 void ui_draw_test_pattern(fb_t *fb);
 
 #endif /* UI_H_INCLUDED */

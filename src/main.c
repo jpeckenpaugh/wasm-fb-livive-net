@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include "cal.h"
 #include "calc.h"
 #include "clock.h"
 #include "framebuffer.h"
@@ -21,6 +22,7 @@ static fb_t g_fb;
 static media_t g_media;
 static clock_state_t g_clock;
 static calc_state_t g_calc;
+static cal_state_t g_cal;
 static int g_ready = 0;
 static int g_test_pattern = 0;
 
@@ -29,7 +31,7 @@ static void draw(void) {
     if (g_test_pattern) {
         ui_draw_test_pattern(&g_fb);
     } else {
-        ui_draw(&g_fb, &g_media, &g_clock, &g_calc);
+        ui_draw(&g_fb, &g_media, &g_clock, &g_calc, &g_cal);
     }
 }
 
@@ -52,6 +54,7 @@ int app_init(int width, int height) {
     g_test_pattern = 0;
     clock_init(&g_clock);
     calc_init(&g_calc);
+    cal_init(&g_cal);
     media_init(&g_media);
     g_ready = 1;
     draw();
@@ -80,6 +83,10 @@ int app_click(int x, int y) {
         draw();
         return 1;
     }
+    if (media_is_cal(&g_media) && cal_click(&g_cal, x, y)) {
+        draw();
+        return 1;
+    }
     return 0;
 }
 
@@ -99,6 +106,10 @@ int app_key(int key) {
     }
 
     if (media_is_calc(&g_media) && calc_key(&g_calc, key)) {
+        draw();
+        return 1;
+    }
+    if (media_is_cal(&g_media) && cal_key(&g_cal, key)) {
         draw();
         return 1;
     }
@@ -140,6 +151,7 @@ void app_set_time(int hour, int minute, int second, int msec) {
 EMSCRIPTEN_KEEPALIVE
 void app_set_date(int year, int month, int day, int weekday) {
     clock_set_date(&g_clock, year, month, day, weekday);
+    cal_set_today(&g_cal, year, month, day);
 }
 
 /* Returns 1 when the framebuffer changed and needs copying to the canvas.

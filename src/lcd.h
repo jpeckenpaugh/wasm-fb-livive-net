@@ -85,6 +85,32 @@ uint16_t lcd_14seg_mask(char ch);
 void lcd_draw_char14(fb_t *fb, int x, int y, int w, int h, char ch,
                      uint32_t on_color, uint32_t off_color);
 
+/* ---- 16-segment ---------------------------------------------------------
+ *
+ * Same starburst as the 14-segment font plus two full-length diagonals:
+ *   N  top-left to bottom-right        O  top-right to bottom-left
+ * They let X, N and Z use one continuous stroke instead of two halves that
+ * meet at the centre. Everything else falls back to the 14-segment mask.
+ */
+enum {
+    S16_N = 1u << 14,
+    S16_O = 1u << 15
+};
+
+uint16_t lcd_16seg_mask(char ch);
+void lcd_draw_char16(fb_t *fb, int x, int y, int w, int h, char ch,
+                     uint32_t on_color, uint32_t off_color);
+
+/* ---- 5x7 dot matrix -----------------------------------------------------
+ *
+ * 35 dots per glyph (5 columns x 7 rows), sized by a single `cell` value so
+ * the caller picks the resolution. Lowercase is covered here; 7/14-segment
+ * cannot express it.
+ */
+int lcd_text5x7_width(const char *text, int cell);
+void lcd_draw_text5x7(fb_t *fb, const char *text, int x, int y, int cell,
+                      uint32_t color);
+
 /* Draw one digit in the box (x, y, w, h). digit must be 0-9. */
 void lcd_draw_digit(fb_t *fb, int x, int y, int w, int h, int digit,
                     uint32_t on_color, uint32_t off_color);

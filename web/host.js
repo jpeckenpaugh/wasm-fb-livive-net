@@ -26,15 +26,20 @@ const KEY_CODES = {
   'Escape': 25, 'c': 25, 'C': 25,
   'Backspace': 26,
   '.': 27, ',': 27,
+  /* calendar navigation */
+  '[': 40, ']': 41, '<': 42, '>': 43,
 };
 
 /* Slot 1 is the calculator (see MEDIA_CALC_SLOT in src/media.h); the rest map
  * one-to-one to images. */
 const CALC_SLOT = 1;
+const CAL_SLOT = 2;
 
-const selectionLabel = (guest) => (guest.selected === CALC_SLOT
-  ? 'calculator'
-  : `image ${guest.selected + 1} / ${guest.count}`);
+const selectionLabel = (guest) => {
+  if (guest.selected === CALC_SLOT) return 'calculator';
+  if (guest.selected === CAL_SLOT) return 'calendar';
+  return `image ${guest.selected + 1} / ${guest.count}`;
+};
 
 const KiB = 1024;
 const MiB = 1024 * KiB;

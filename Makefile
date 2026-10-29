@@ -10,7 +10,7 @@ EMCC ?= emcc
 CC   ?= cc
 
 SRC         := src/main.c src/framebuffer.c src/media.c src/ui.c src/lcd.c \
-               src/clock.c src/calc.c
+               src/font5x7.c src/clock.c src/calc.c src/cal.c
 
 LDLIBS      ?= -lm
 ASSET_UNITS := asset_0 asset_1 asset_2 asset_3 asset_4
@@ -72,10 +72,14 @@ $(OBJ)/native/%.o: %.c $(GEN)/assets_gen.h
 # Object files used by the native test binaries, so depfiles cover every TU.
 TEST_OBJS := $(OBJ)/native/tests/test_pixels.o $(OBJ)/native/tests/test_lcd.o \
              $(OBJ)/native/tests/test_clock.o $(OBJ)/native/tests/test_calc.o \
+             $(OBJ)/native/tests/test_cal.o \
              $(OBJ)/native/src/framebuffer.o $(OBJ)/native/src/media.o \
              $(OBJ)/native/src/ui.o $(OBJ)/native/src/clock.o \
-             $(OBJ)/native/src/lcd.o $(OBJ)/native/src/calc.o \
+             $(OBJ)/native/src/lcd.o $(OBJ)/native/src/font5x7.o \
+             $(OBJ)/native/src/calc.o $(OBJ)/native/src/cal.o \
              $(NATIVE_ASSETS)
+
+LCD_OBJS := $(OBJ)/native/src/lcd.o $(OBJ)/native/src/font5x7.o
 
 # Header dependencies: without these, changing a struct (say clock_state_t)
 # leaves stale objects compiled against the old layout.
@@ -83,25 +87,27 @@ TEST_OBJS := $(OBJ)/native/tests/test_pixels.o $(OBJ)/native/tests/test_lcd.o \
 
 $(BUILD)/test_pixels: $(OBJ)/native/tests/test_pixels.o \
                       $(OBJ)/native/src/media.o $(OBJ)/native/src/ui.o \
-                      $(OBJ)/native/src/clock.o $(OBJ)/native/src/lcd.o \
-                      $(OBJ)/native/src/calc.o \
+                      $(OBJ)/native/src/clock.o $(OBJ)/native/src/calc.o \
+                      $(OBJ)/native/src/cal.o $(LCD_OBJS) \
                       $(NATIVE_ASSETS) $(NATIVE_COMMON)
 	$(CC) $^ -o $@ $(LDLIBS)
 
-$(BUILD)/test_lcd: $(OBJ)/native/tests/test_lcd.o \
-                   $(OBJ)/native/src/lcd.o $(NATIVE_COMMON)
-	$(CC) $^ -o $@
+$(BUILD)/test_lcd: $(OBJ)/native/tests/test_lcd.o $(LCD_OBJS) $(NATIVE_COMMON)
+	$(CC) $^ -o $@ $(LDLIBS)
 
 $(BUILD)/test_clock: $(OBJ)/native/tests/test_clock.o \
-                     $(OBJ)/native/src/clock.o $(OBJ)/native/src/lcd.o \
-                     $(NATIVE_COMMON)
+                     $(OBJ)/native/src/clock.o $(LCD_OBJS) $(NATIVE_COMMON)
 	$(CC) $^ -o $@ $(LDLIBS)
 
 $(BUILD)/test_calc: $(OBJ)/native/tests/test_calc.o $(OBJ)/native/src/calc.o \
-                    $(OBJ)/native/src/lcd.o $(NATIVE_COMMON)
+                    $(LCD_OBJS) $(NATIVE_COMMON)
 	$(CC) $^ -o $@ $(LDLIBS)
 
-test: $(BUILD)/test_pixels $(BUILD)/test_lcd $(BUILD)/test_clock $(BUILD)/test_calc
+$(BUILD)/test_cal: $(OBJ)/native/tests/test_cal.o $(OBJ)/native/src/cal.o \
+                   $(LCD_OBJS) $(NATIVE_COMMON)
+	$(CC) $^ -o $@ $(LDLIBS)
+
+test: $(BUILD)/test_pixels $(BUILD)/test_lcd $(BUILD)/test_clock $(BUILD)/test_calc $(BUILD)/test_cal
 	@for t in $^; do ./$$t; done
 
 # Force regeneration after editing assets/.

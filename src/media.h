@@ -10,6 +10,7 @@
 #include "assets_gen.h"
 
 #define MEDIA_CALC_SLOT 1 /* second tile, right after the clock */
+#define MEDIA_CAL_SLOT 2  /* third tile: month calendar */
 
 typedef struct {
     const image_t *images;
@@ -28,6 +29,10 @@ int media_hit(const media_t *m, int x, int y);
 
 static inline int media_is_calc(const media_t *m) {
     return m->selected == MEDIA_CALC_SLOT;
+}
+
+static inline int media_is_cal(const media_t *m) {
+    return m->selected == MEDIA_CAL_SLOT;
 }
 
 #endif /* MEDIA_H */

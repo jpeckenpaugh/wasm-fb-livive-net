@@ -1,6 +1,9 @@
 #include "lcd.h"
 
 #include <stddef.h>
+#include <string.h>
+
+#include "font5x7.h"
 
 enum {
     SEG_A = 1u << 0,
@@ -205,21 +208,8 @@ static void diag14(fb_t *fb, int x0, int y0, int x1, int y1, int t,
     fb_line(fb, x0, y0, x1, y1, t, lit ? on : off);
 }
 
-void lcd_draw_char14(fb_t *fb, int x, int y, int w, int h, char ch,
-                     uint32_t on_color, uint32_t off_color) {
-    if (!fb || !fb->px || w < 12 || h < 16) return;
-
-    /* Punctuation is not a segment shape. */
-    if (ch == '.' || ch == ',') {
-        const int s = h / 8 < 3 ? 3 : h / 8;
-        fb_fill(fb, x + w / 3, y + h - s, s, s, on_color);
-        if (ch == ',') {
-            fb_fill(fb, x + w / 3 - s / 2, y + h - s / 2, s / 2, s, on_color);
-        }
-        return;
-    }
-
-    const uint16_t m = lcd_14seg_mask(ch);
+static void draw_starburst(fb_t *fb, int x, int y, int w, int h, uint16_t m,
+                           uint32_t on_color, uint32_t off_color) {
     /* ~1/5 of the narrow side: the starburst needs a bolder stroke than the
      * 7-segment digits or it reads as an outline font. */
     int t = (w < h ? w : h) / 5;
@@ -249,4 +239,88 @@ void lcd_draw_char14(fb_t *fb, int x, int y, int w, int h, char ch,
     diag14(fb, x + w - t, y + t, x + w / 2, mid, dt, m & S14_I, on_color, off_color);
     diag14(fb, x + t, y + h - t, x + w / 2, mid, dt, m & S14_J, on_color, off_color);
     diag14(fb, x + w - t, y + h - t, x + w / 2, mid, dt, m & S14_K, on_color, off_color);
+
+    /* Full-length diagonals, only present in the 16-segment set. */
+    if (m & (S16_N | S16_O)) {
+        if (m & S16_N) {
+            diag14(fb, x + t, y + t, x + w - t, y + h - t, dt, 1, on_color, off_color);
+        }
+        if (m & S16_O) {
+            diag14(fb, x + w - t, y + t, x + t, y + h - t, dt, 1, on_color, off_color);
+        }
+    }
+}
+
+void lcd_draw_char14(fb_t *fb, int x, int y, int w, int h, char ch,
+                     uint32_t on_color, uint32_t off_color) {
+    if (!fb || !fb->px || w < 12 || h < 16) return;
+
+    /* Punctuation is not a segment shape. */
+    if (ch == '.' || ch == ',') {
+        const int s = h / 8 < 3 ? 3 : h / 8;
+        fb_fill(fb, x + w / 3, y + h - s, s, s, on_color);
+        if (ch == ',') {
+            fb_fill(fb, x + w / 3 - s / 2, y + h - s / 2, s / 2, s, on_color);
+        }
+        return;
+    }
+
+    draw_starburst(fb, x, y, w, h, lcd_14seg_mask(ch), on_color, off_color);
+}
+
+uint16_t lcd_16seg_mask(char ch) {
+    switch (ch) {
+        case 'X': return S16_N | S16_O;
+        case 'N': return S14_B | S14_C | S14_E | S14_F | S16_N;
+        case 'Z': return S14_A | S14_D | S16_O;
+        default: return lcd_14seg_mask(ch);
+    }
+}
+
+void lcd_draw_char16(fb_t *fb, int x, int y, int w, int h, char ch,
+                     uint32_t on_color, uint32_t off_color) {
+    if (!fb || !fb->px || w < 12 || h < 16) return;
+    if (ch == '.' || ch == ',') {
+        lcd_draw_char14(fb, x, y, w, h, ch, on_color, off_color);
+        return;
+    }
+    draw_starburst(fb, x, y, w, h, lcd_16seg_mask(ch), on_color, off_color);
+}
+
+/* ---- 5x7 dot matrix ----------------------------------------------------- */
+
+static const glyph5x7_t *glyph5x7(char ch) {
+    for (int i = 0; i < k_font5x7_count; i++) {
+        if (k_font5x7[i].ch == ch) return &k_font5x7[i];
+    }
+    return NULL;
+}
+
+int lcd_text5x7_width(const char *text, int cell) {
+    if (!text || cell <= 0) return 0;
+    const int n = (int)strlen(text);
+    if (n == 0) return 0;
+    /* 5 cells per glyph plus one cell of tracking, minus the trailing cell. */
+    return (n * 6 - 1) * cell;
+}
+
+void lcd_draw_text5x7(fb_t *fb, const char *text, int x, int y, int cell,
+                      uint32_t color) {
+    if (!fb || !fb->px || !text || cell <= 0) return;
+
+    const int dot = cell > 2 ? cell - 1 : cell; /* 1px gaps read as a matrix */
+
+    for (const char *p = text; *p; p++) {
+        const glyph5x7_t *g = glyph5x7(*p);
+        if (g) {
+            for (int row = 0; row < 7; row++) {
+                const uint8_t bits = g->rows[row];
+                for (int col = 0; col < 5; col++) {
+                    if (!(bits & (1u << (4 - col)))) continue;
+                    fb_fill(fb, x + col * cell, y + row * cell, dot, dot, color);
+                }
+            }
+        }
+        x += 6 * cell;
+    }
 }

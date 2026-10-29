@@ -41,13 +41,14 @@ move between them.
 | image 1 | photo + `HH:MM:SS` over `OCT 29, 2026 - THU`, and `HH:MM` on its tile |
 | images 2-5 | photo, `HH:MM` on thumbnail 1 |
 | calculator (tile 2) | clickable keypad with a period key, integer and decimal entry, value previewed on its tile |
+| calendar (tile 3) | month grid with today highlighted; browse months/years; tile previews `NOV 29` |
 
 Both live in the same guest and are reached with the existing
 `app_click()`/`app_key()` path — no per-app exports. The clock repaints about
 once a second while seconds are visible and once a minute otherwise; the
 calculator repaints only on input.
 
-See `docs/clock.md` and `docs/calc.md` for the design notes.
+See `docs/clock.md`, `docs/calc.md`, `docs/fonts.md` for the design notes.
 
 ## Develop
 

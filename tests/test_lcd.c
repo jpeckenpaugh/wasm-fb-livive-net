@@ -88,6 +88,35 @@ static void test_14seg_masks(void) {
     assert(lcd_14seg_mask('0') != lcd_14seg_mask('O') || 1); /* documented alias */
 }
 
+static void test_16seg_masks(void) {
+    /* The 16-segment set adds two full diagonals; only X/N/Z use them. */
+    assert(lcd_16seg_mask('X') == (S16_N | S16_O));
+    assert(lcd_16seg_mask('N') & S16_N);
+    assert(lcd_16seg_mask('Z') & S16_O);
+    assert(lcd_16seg_mask('A') == lcd_14seg_mask('A'));
+    assert(lcd_16seg_mask(' ') == 0);
+}
+
+static void test_5x7_text(void) {
+    /* Lowercase is the point of this font: it must have width and paint. */
+    assert(lcd_text5x7_width("October 2026", 4) > 0);
+    assert(lcd_text5x7_width("", 4) == 0);
+
+    const uint32_t ON = RGBA(255, 255, 255, 255);
+    const uint32_t SENTINEL = RGBA(0, 0, 80, 255);
+    fb_t fb = make_fb(400, 100);
+    fb_clear(&fb, SENTINEL);
+    lcd_draw_text5x7(&fb, "abc", 10, 10, 6, ON);
+
+    size_t lit = 0;
+    for (int y = 0; y < 100; y++)
+        for (int x = 0; x < 400; x++)
+            if (px(&fb, x, y) == ON) lit++;
+    assert(lit > 50);
+
+    free(fb.px);
+}
+
 static void test_14seg_draw(void) {
     const uint32_t ON = RGBA(255, 255, 255, 255);
     const uint32_t SENTINEL = RGBA(0, 90, 0, 255);
@@ -140,6 +169,8 @@ int main(void) {
     test_off_none_leaves_pixels();
     test_14seg_masks();
     test_14seg_draw();
+    test_16seg_masks();
+    test_5x7_text();
     test_colon();
     test_clipping_is_safe();
     printf("test_lcd: ok\n");

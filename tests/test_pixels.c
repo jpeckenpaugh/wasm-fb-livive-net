@@ -189,7 +189,7 @@ static void test_ui_draw(void) {
     media_t m;
     media_init(&m);
 
-    ui_draw(&fb, &m, NULL, NULL);
+    ui_draw(&fb, &m, NULL, NULL, NULL);
 
     /* The hero now fills the whole canvas, but the tiles float on top of its
      * bottom edge, so compare only the rows above them. Stop at the first
