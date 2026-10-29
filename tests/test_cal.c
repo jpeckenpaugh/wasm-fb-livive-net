@@ -79,7 +79,7 @@ static void test_draw(void) {
     fb_clear(&fb, SENTINEL);
     cal_draw_tile(&fb, &c, 288, 620, 128, 72);
     size_t tile = 0;
-    for (int y = 620; y < 692; y++) {
+    for (int y = 648; y < 720; y++) {
         for (int x = 288; x < 416; x++) {
             if (fb.px[(size_t)y * 1280 + x] != SENTINEL) tile++;
         }

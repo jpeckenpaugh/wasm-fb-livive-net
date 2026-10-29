@@ -91,12 +91,24 @@ void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui) {
         /* The preview tile shows whichever image is open, not its own slot's
          * artwork. */
         int thumb = i;
+        const int doc_tile = (i == MEDIA_PREVIEW_SLOT && preview &&
+                              preview->kind == PREVIEW_DOC);
         if (i == MEDIA_PREVIEW_SLOT && preview && preview->index >= 0 &&
-            preview->index < m->count) {
+            preview->index < m->count && !doc_tile) {
             thumb = preview->index;
         }
         fb_blit(fb, tx, UI_TH_Y, m->thumbs[thumb].px,
                 m->thumbs[thumb].w, m->thumbs[thumb].h);
+        if (doc_tile) {
+            fb_fill(fb, tx + 12, UI_TH_Y + 8, UI_TH_W - 24, UI_TH_H - 16,
+                    RGB(0x14, 0x1a, 0x22));
+            fb_border(fb, tx + 12, UI_TH_Y + 8, UI_TH_W - 24, UI_TH_H - 16, 1,
+                      RGB(0x8f, 0xd8, 0xa8));
+            for (int line = 0; line < 3; line++) {
+                fb_fill(fb, tx + 20, UI_TH_Y + 20 + line * 12, UI_TH_W - 40, 4,
+                        RGB(0xe4, 0xec, 0xf2));
+            }
+        }
 
         /* Each app previews its own state on its tile. */
         if (i == MEDIA_CALC_SLOT && calc) {
@@ -108,8 +120,9 @@ void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui) {
         }
 
         if (selected) {
-            /* Selection underline: makes the active slot obvious at a glance. */
-            fb_fill(fb, tx, UI_TH_Y + UI_TH_H + UI_BORDER + 2, UI_TH_W, 3, COL_ACCENT);
+            /* Selection bar, inside the tile: the row is flush with the bottom
+             * edge, so there is no room underneath it any more. */
+            fb_fill(fb, tx, UI_TH_Y + UI_TH_H - 5, UI_TH_W, 4, COL_ACCENT);
         }
     }
 

@@ -108,8 +108,15 @@ void lcd_draw_char16(fb_t *fb, int x, int y, int w, int h, char ch,
  * cannot express it.
  */
 int lcd_text5x7_width(const char *text, int cell);
+int lcd_text5x7_width_n(const char *text, int len, int cell);
 void lcd_draw_text5x7(fb_t *fb, const char *text, int x, int y, int cell,
                       uint32_t color);
+
+/* Same glyphs with faux styling, since there is only one weight: `bold` draws
+ * the run twice one pixel apart, `italic` shears it by up to a quarter cell
+ * across the seven rows. */
+void lcd_draw_text5x7_ex(fb_t *fb, const char *text, int len, int x, int y,
+                         int cell, uint32_t color, int bold, int italic);
 
 /* Draw one digit in the box (x, y, w, h). digit must be 0-9. */
 void lcd_draw_digit(fb_t *fb, int x, int y, int w, int h, int digit,

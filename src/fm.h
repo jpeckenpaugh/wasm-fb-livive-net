@@ -28,6 +28,7 @@ typedef struct {
 /* Returned by fm_click()/fm_key(). */
 #define FM_NOOP (-1)
 #define FM_CHANGED (-2)
+#define FM_OPEN_ABOUT (-3)
 
 void fm_init(fm_state_t *f);
 

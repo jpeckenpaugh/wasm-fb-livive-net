@@ -218,7 +218,7 @@ static void test_ui_draw(void) {
         CHECK(ui_thumb_x(i) >= 0);
         CHECK(ui_thumb_x(i) + UI_TH_W <= UI_W);
     }
-    CHECK(UI_TH_Y + UI_TH_H + UI_BORDER + 2 + 3 <= UI_H);
+    CHECK(UI_TH_Y + UI_TH_H <= UI_H); /* tiles are flush with the bottom */
 
     fb_clear(&fb, RGB(7, 7, 7));
     ui_draw_test_pattern(&fb);

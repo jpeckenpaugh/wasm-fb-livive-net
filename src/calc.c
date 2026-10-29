@@ -170,18 +170,49 @@ int calc_key(calc_state_t *c, int key) {
 
 /* --------------------------------------------------------------- display -- */
 
+/* "1234567.89" -> "1,234,567.89". Display only: the stored entry stays raw so
+ * strtod and backspace keep working. */
+static void group_digits(const char *in, char *out, size_t n) {
+    const size_t len = strlen(in);
+    if (len == 0 || len + len / 3 + 2 > n) {
+        snprintf(out, n, "%s", in);
+        return;
+    }
+
+    const int sign = (in[0] == '-') ? 1 : 0;
+    const char *dot = strchr(in, '.');
+    const int int_len = dot ? (int)(dot - in) : (int)len;
+    const int digits = int_len - sign;
+    if (digits <= 3) {
+        snprintf(out, n, "%s", in);
+        return;
+    }
+
+    size_t o = 0;
+    if (sign) out[o++] = '-';
+    for (int i = 0; i < digits; i++) {
+        if (i > 0 && (digits - i) % 3 == 0) out[o++] = ',';
+        out[o++] = in[sign + i];
+    }
+    if (dot) {
+        for (const char *p = dot; *p && o + 1 < n; p++) out[o++] = *p;
+    }
+    out[o] = '\0';
+}
+
 static void format_value(double value, char *out, size_t n) {
     if (!isfinite(value) || fabs(value) >= 1e9) {
         snprintf(out, n, "E");
         return;
     }
 
-    /* Most decimals that still fit the panel; the display is ~9 characters. */
+    /* Nine digits is the numeric limit, so with separators the widest render
+     * is "-999,999,999.999" (16 characters); the readout fits ~21. */
     for (int prec = 3; prec >= 0; prec--) {
         snprintf(out, n, "%.*f", prec, value);
-        if (strlen(out) <= 9) break;
+        if (strlen(out) <= 14) break;
     }
-    if (strlen(out) > 9) {
+    if (strlen(out) > 14) {
         snprintf(out, n, "E");
         return;
     }
@@ -191,7 +222,14 @@ static void format_value(double value, char *out, size_t n) {
         while (len > 0 && out[len - 1] == '0') out[--len] = '\0';
         if (len > 0 && out[len - 1] == '.') out[--len] = '\0';
     }
-    if (strcmp(out, "-0") == 0) snprintf(out, n, "0");
+    if (strcmp(out, "-0") == 0) {
+        snprintf(out, n, "0");
+        return;
+    }
+
+    char grouped[24];
+    group_digits(out, grouped, sizeof(grouped));
+    snprintf(out, n, "%s", grouped);
 }
 
 void calc_display(const calc_state_t *c, char *out, size_t n) {
@@ -199,7 +237,9 @@ void calc_display(const calc_state_t *c, char *out, size_t n) {
     if (c->error) {
         snprintf(out, n, "E");
     } else if (c->entry_len > 0) {
-        snprintf(out, n, "%s", c->entry);
+        /* Group while typing too, otherwise the display jumps on every
+         * fourth digit. */
+        group_digits(c->entry, out, n);
     } else {
         format_value(c->acc, out, n);
     }

@@ -58,6 +58,12 @@ static void test_arithmetic(void) {
     EXPECT("0.1+0.2=", "0.3");
     EXPECT("1.5*2=", "3");
     EXPECT("2+3=", "5");
+    /* Thousands separators: display only, the value stays raw. */
+    EXPECT("1234", "1,234");
+    EXPECT("1234.5", "1,234.5");
+    EXPECT("1234567+1=", "1,234,568");
+    EXPECT("999999999", "999,999,999");
+    EXPECT("123", "123");
 }
 
 static void test_chaining(void) {
@@ -96,7 +102,8 @@ static void test_entry_editing(void) {
 
     calc_init(&c);
     press_text(&c, "12345678901234");
-    assert(strlen(display(&c)) == 10);       /* entry is capped */
+    assert(c.entry_len == 10);                /* entry is capped */
+    assert(strcmp(display(&c), "1,234,567,890") == 0);
 
     calc_init(&c);
     press_text(&c, "12+34c");

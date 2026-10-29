@@ -11,14 +11,15 @@ CC   ?= cc
 
 SRC         := src/main.c src/framebuffer.c src/media.c src/ui.c src/lcd.c \
                src/font5x7.c src/clock.c src/calc.c src/cal.c \
-               src/fm.c src/preview.c
+               src/fm.c src/preview.c src/markdown.c
 
 LDLIBS      ?= -lm
 ASSET_UNITS := asset_0 asset_1 asset_2 asset_3 asset_4
 GEN_UNITS   := assets_gen $(ASSET_UNITS)
 
 WASM_OBJS := $(patsubst src/%.c,$(OBJ)/wasm/%.o,$(SRC)) \
-             $(addprefix $(OBJ)/wasm/,$(addsuffix .o,$(GEN_UNITS)))
+             $(addprefix $(OBJ)/wasm/,$(addsuffix .o,$(GEN_UNITS))) \
+             $(OBJ)/wasm/about_gen.o
 
 CFLAGS    ?= -std=c11 -Wall -Wextra -O2
 INCLUDES  := -Isrc -I$(GEN)
@@ -35,11 +36,20 @@ ASSETS   := $(wildcard assets/*.png assets/*.jpg assets/*.jpeg)
 
 NATIVE_COMMON := $(OBJ)/native/src/framebuffer.o
 NATIVE_ASSETS := $(OBJ)/native/$(GEN)/assets_gen.o \
-                 $(addprefix $(OBJ)/native/$(GEN)/,$(addsuffix .o,$(ASSET_UNITS)))
+                 $(addprefix $(OBJ)/native/$(GEN)/,$(addsuffix .o,$(ASSET_UNITS))) \
+                 $(OBJ)/native/$(GEN)/about_gen.o
 
 .PHONY: all assets test clean debug release serve
 
 all: $(WASM_OUT)
+
+# ABOUT.md is embedded as a C string so the Preview app renders the same file
+# GitHub shows.
+$(GEN)/about_gen.c: ABOUT.md tools/embed_about.py
+	@mkdir -p $(GEN)
+	python3 tools/embed_about.py --in ABOUT.md --out $(GEN)
+
+$(GEN)/about_gen.h: $(GEN)/about_gen.c
 
 # The generated header is the marker for the whole asset set.
 $(GEN)/assets_gen.h: $(ASSETS) tools/prepare_assets.py
@@ -79,6 +89,7 @@ TEST_OBJS := $(OBJ)/native/tests/test_pixels.o $(OBJ)/native/tests/test_lcd.o \
              $(OBJ)/native/src/lcd.o $(OBJ)/native/src/font5x7.o \
              $(OBJ)/native/src/calc.o $(OBJ)/native/src/cal.o \
              $(OBJ)/native/src/fm.o $(OBJ)/native/src/preview.o \
+             $(OBJ)/native/src/markdown.o \
              $(NATIVE_ASSETS)
 
 LCD_OBJS := $(OBJ)/native/src/lcd.o $(OBJ)/native/src/font5x7.o
@@ -91,7 +102,8 @@ $(BUILD)/test_pixels: $(OBJ)/native/tests/test_pixels.o \
                       $(OBJ)/native/src/media.o $(OBJ)/native/src/ui.o \
                       $(OBJ)/native/src/clock.o $(OBJ)/native/src/calc.o \
                       $(OBJ)/native/src/cal.o $(OBJ)/native/src/fm.o \
-                      $(OBJ)/native/src/preview.o $(NATIVE_ASSETS) $(LCD_OBJS) \
+                      $(OBJ)/native/src/preview.o $(OBJ)/native/src/markdown.o \
+                      $(NATIVE_ASSETS) $(LCD_OBJS) \
                       $(NATIVE_ASSETS) $(NATIVE_COMMON)
 	$(CC) $^ -o $@ $(LDLIBS)
 

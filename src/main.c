@@ -103,7 +103,10 @@ int app_click(int x, int y) {
         if (r == FM_NOOP) return 0;
         if (r >= 0) {
             /* Opening a file hands it to Preview and switches screens. */
-            preview_set(&g_preview, r, g_media.count);
+            preview_set_image(&g_preview, r, g_media.count);
+            media_select(&g_media, MEDIA_PREVIEW_SLOT);
+        } else if (r == FM_OPEN_ABOUT) {
+            preview_set_doc(&g_preview);
             media_select(&g_media, MEDIA_PREVIEW_SLOT);
         }
         draw();
@@ -142,7 +145,10 @@ int app_key(int key) {
         int r = fm_key(&g_fm, g_media.count, fm_key_code);
         if (r == FM_NOOP) return 0;
         if (r >= 0) {
-            preview_set(&g_preview, r, g_media.count);
+            preview_set_image(&g_preview, r, g_media.count);
+            media_select(&g_media, MEDIA_PREVIEW_SLOT);
+        } else if (r == FM_OPEN_ABOUT) {
+            preview_set_doc(&g_preview);
             media_select(&g_media, MEDIA_PREVIEW_SLOT);
         }
         draw();

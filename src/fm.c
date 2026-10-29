@@ -38,7 +38,7 @@ static const char *file_name(int i) {
 
 static int row_count(const fm_state_t *f, int count) {
     (void)count;
-    if (f->level == 0) return 1;      /* the folder */
+    if (f->level == 0) return 2;      /* Wallpapers + ABOUT.md */
     return count + 1;                 /* ".." plus the files */
 }
 
@@ -55,6 +55,7 @@ static void clamp_selection(fm_state_t *f, int count) {
 
 static int activate(fm_state_t *f) {
     if (f->level == 0) {
+        if (f->selected == 1) return FM_OPEN_ABOUT;
         f->level = 1;
         f->selected = 0;
         return FM_CHANGED;
@@ -117,6 +118,15 @@ static void folder_icon(fb_t *fb, int x, int y, int w, int h, uint32_t color) {
     fb_fill(fb, x, y + tab_h, w, h - tab_h, color);
 }
 
+static void doc_icon(fb_t *fb, int x, int y, int w, int h, uint32_t color) {
+    fb_fill(fb, x, y, w, h, color);
+    const int fold = h / 4;
+    fb_fill(fb, x + w - fold, y, fold, fold, RGB(0x1a, 0x22, 0x2c));
+    for (int i = 0; i < 3; i++) {
+        fb_fill(fb, x + 8, y + h / 3 + i * (h / 6), w - 16, 2, RGB(0x1a, 0x22, 0x2c));
+    }
+}
+
 static void draw_row(fb_t *fb, const fm_state_t *f, int count, int row) {
     int x, y, w, h;
     row_rect(row, &x, &y, &w, &h);
@@ -131,17 +141,25 @@ static void draw_row(fb_t *fb, const fm_state_t *f, int count, int row) {
     const int text_x = x + 12 + 128 + 16;
 
     if (f->level == 0) {
-        folder_icon(fb, icon_x + 16, y + 14, 96, h - 28, COL_FOLDER);
-
         const int cell = 5;
-        lcd_draw_text5x7(fb, "Wallpapers", text_x,
-                         y + (h - 7 * cell) / 2, cell, COL_TEXT);
+        const int ty = y + (h - 7 * cell) / 2;
 
-        char meta[24];
-        snprintf(meta, sizeof(meta), "%d items", count);
-        const int mw = lcd_text5x7_width(meta, cell);
-        lcd_draw_text5x7(fb, meta, x + w - mw - 24, y + (h - 7 * cell) / 2,
-                         cell, COL_DIM);
+        if (row == 0) {
+            folder_icon(fb, icon_x + 16, y + 14, 96, h - 28, COL_FOLDER);
+            lcd_draw_text5x7(fb, "Wallpapers", text_x, ty, cell, COL_TEXT);
+
+            char meta[24];
+            snprintf(meta, sizeof(meta), "%d items", count);
+            const int mw = lcd_text5x7_width(meta, cell);
+            lcd_draw_text5x7(fb, meta, x + w - mw - 24, ty, cell, COL_DIM);
+        } else {
+            doc_icon(fb, icon_x + 24, y + 12, 80, h - 24, COL_TEXT);
+            lcd_draw_text5x7(fb, "ABOUT.md", text_x, ty, cell, COL_TEXT);
+
+            const char *meta = "markdown";
+            const int mw = lcd_text5x7_width(meta, cell);
+            lcd_draw_text5x7(fb, meta, x + w - mw - 24, ty, cell, COL_DIM);
+        }
         return;
     }
 

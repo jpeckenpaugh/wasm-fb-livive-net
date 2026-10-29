@@ -52,7 +52,9 @@ meeting at the centre. Every other character falls back to the 14-segment mask.
 
 ## 5x7 dot matrix
 
-`lcd_draw_text5x7` / `lcd_text5x7_width`. Each glyph is 7 rows of 5 bits, drawn
+`lcd_draw_text5x7` / `lcd_text5x7_width`, and `lcd_draw_text5x7_ex` for the faux
+styles used by the markdown renderer (bold = drawn twice two pixels apart,
+italic = sheared row by row). Each glyph is 7 rows of 5 bits, drawn
 as square dots with a 1px gap so it reads as a matrix. `cell` sets the dot size,
 so the same data renders at 30px or 210px cap height. Covers A-Z, a-z, 0-9 and
 `.,:-/()+=!?<>` plus space — the lowercase coverage is the reason it exists.

@@ -296,31 +296,50 @@ static const glyph5x7_t *glyph5x7(char ch) {
     return NULL;
 }
 
-int lcd_text5x7_width(const char *text, int cell) {
-    if (!text || cell <= 0) return 0;
-    const int n = (int)strlen(text);
-    if (n == 0) return 0;
+int lcd_text5x7_width_n(const char *text, int len, int cell) {
+    if (!text || cell <= 0 || len <= 0) return 0;
     /* 5 cells per glyph plus one cell of tracking, minus the trailing cell. */
-    return (n * 6 - 1) * cell;
+    return (len * 6 - 1) * cell;
 }
 
-void lcd_draw_text5x7(fb_t *fb, const char *text, int x, int y, int cell,
-                      uint32_t color) {
-    if (!fb || !fb->px || !text || cell <= 0) return;
+int lcd_text5x7_width(const char *text, int cell) {
+    if (!text) return 0;
+    return lcd_text5x7_width_n(text, (int)strlen(text), cell);
+}
 
+/* One pass of a run; `italic` shears each row progressively. */
+static void text5x7_pass(fb_t *fb, const char *text, int len, int x, int y,
+                         int cell, uint32_t color, int italic) {
     const int dot = cell > 2 ? cell - 1 : cell; /* 1px gaps read as a matrix */
+    const int shear = (cell + 3) / 4;
 
-    for (const char *p = text; *p; p++) {
-        const glyph5x7_t *g = glyph5x7(*p);
+    for (int i = 0; i < len; i++) {
+        const glyph5x7_t *g = glyph5x7(text[i]);
         if (g) {
             for (int row = 0; row < 7; row++) {
+                const int dx = italic ? ((6 - row) * shear) / 6 : 0;
                 const uint8_t bits = g->rows[row];
                 for (int col = 0; col < 5; col++) {
                     if (!(bits & (1u << (4 - col)))) continue;
-                    fb_fill(fb, x + col * cell, y + row * cell, dot, dot, color);
+                    fb_fill(fb, x + col * cell + dx, y + row * cell, dot, dot, color);
                 }
             }
         }
         x += 6 * cell;
     }
+}
+
+void lcd_draw_text5x7_ex(fb_t *fb, const char *text, int len, int x, int y,
+                         int cell, uint32_t color, int bold, int italic) {
+    if (!fb || !fb->px || !text || cell <= 0 || len <= 0) return;
+
+    text5x7_pass(fb, text, len, x, y, cell, color, italic);
+    /* Two pixels at text sizes: one is too subtle against the dot gaps. */
+    if (bold) text5x7_pass(fb, text, len, x + ((cell + 2) / 3), y, cell, color, italic);
+}
+
+void lcd_draw_text5x7(fb_t *fb, const char *text, int x, int y, int cell,
+                      uint32_t color) {
+    if (!text) return;
+    lcd_draw_text5x7_ex(fb, text, (int)strlen(text), x, y, cell, color, 0, 0);
 }

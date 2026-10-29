@@ -28,8 +28,8 @@
 #define UI_TH_W 128
 #define UI_TH_H 72
 #define UI_TH_GAP 16
-#define UI_TH_BOTTOM 28
-#define UI_TH_Y (UI_H - UI_TH_BOTTOM - UI_TH_H) /* 620 */
+#define UI_TH_BOTTOM 0
+#define UI_TH_Y (UI_H - UI_TH_BOTTOM - UI_TH_H) /* 648: flush with the bottom */
 #define UI_SLOTS ASSET_COUNT
 #define UI_TH_X0 ((UI_W - (UI_SLOTS * UI_TH_W + (UI_SLOTS - 1) * UI_TH_GAP)) / 2)
 

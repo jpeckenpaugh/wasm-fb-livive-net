@@ -9,12 +9,20 @@
 #include "assets_gen.h"
 #include "framebuffer.h"
 
+enum {
+    PREVIEW_NONE = 0,
+    PREVIEW_IMAGE = 1,
+    PREVIEW_DOC = 2
+};
+
 typedef struct {
     int index; /* image index, -1 when nothing has been opened yet */
+    int kind;  /* PREVIEW_* */
 } preview_state_t;
 
 void preview_init(preview_state_t *p);
-void preview_set(preview_state_t *p, int index, int count);
+void preview_set_image(preview_state_t *p, int index, int count);
+void preview_set_doc(preview_state_t *p);
 void preview_draw(fb_t *fb, const preview_state_t *p, const image_t *images, int count);
 
 #endif /* PREVIEW_H */
