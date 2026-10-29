@@ -10,13 +10,21 @@ Full-bleed panel with a line-number gutter, 4-column tabs, and scroll state in
 the preview (`line_off` / `col_off`). No wrapping: long lines scroll sideways,
 because wrapped code loses its shape.
 
-| Key | Action |
+| Input | Action |
 |---|---|
+| wheel | scroll lines |
+| `Shift` + wheel | scroll columns |
 | `↑` / `↓` | scroll a line |
 | `PageUp` / `PageDown` | scroll a screenful |
+| `Home` / `End` | jump to the first/last line |
 | `[` / `]` | scroll four columns |
 
+Scrollbars appear on the right and bottom edges whenever the content is larger
+than the panel, so the extent is visible without trying to scroll first. The
+caption shows the language and total line count.
+
 Only visible lines are scanned, so a long file costs the same as a short one.
+The panel stops above the floating tiles; the document view does the same.
 
 ## Highlighting
 

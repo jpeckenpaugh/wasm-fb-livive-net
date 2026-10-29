@@ -14,6 +14,9 @@
 #define COL_DOC_EDGE RGB(0x8f, 0xd8, 0xa8)
 #define COL_CODE_EDGE RGB(0x4c, 0xc2, 0xff)
 
+/* Panels stop above the floating tiles (they start 72px from the bottom). */
+#define PREVIEW_BOTTOM_MARGIN 90
+
 static const char *k_names[] = {
     "01_aurora.png", "02_rings.png", "03_checker.png",
     "04_dunes.png", "05_orbits.png"
@@ -60,6 +63,8 @@ int preview_scroll(preview_state_t *p, int key) {
         case 61: /* pgdn */  p->line_off += 14; break;
         case 40: /* [ */     p->col_off -= 4; break;
         case 41: /* ] */     p->col_off += 4; break;
+        case 62: /* home */  p->line_off = 0; break;
+        case 63: /* end */   p->line_off = 1 << 20; break;
         default: return 0;
     }
     if (p->line_off < 0) p->line_off = 0;
@@ -72,17 +77,20 @@ static void draw_code(fb_t *fb, preview_state_t *p) {
 
     const int margin = 30;
     const int top = 108;
-    fb_fill(fb, margin, top, fb->w - 2 * margin, fb->h - top - 20,
-            RGB(0x0c, 0x10, 0x15));
-    fb_border(fb, margin, top, fb->w - 2 * margin, fb->h - top - 20, 1,
+    const int panel_h = fb->h - top - PREVIEW_BOTTOM_MARGIN;
+    fb_fill(fb, margin, top, fb->w - 2 * margin, panel_h, RGB(0x0c, 0x10, 0x15));
+    fb_border(fb, margin, top, fb->w - 2 * margin, panel_h, 1,
               RGB(0x2a, 0x36, 0x44));
 
     const code_lang_t lang = code_lang_for(p->file->name);
     code_draw(fb, p->file->text, margin + 6, top + 6,
-              fb->w - 2 * margin - 12, fb->h - top - 32, 4, lang,
+              fb->w - 2 * margin - 12, panel_h - 12, 4, lang,
               &p->line_off, &p->col_off);
 
-    draw_caption(fb, p->file->name, code_lang_name(lang), 18, COL_CODE_EDGE);
+    char meta[64];
+    snprintf(meta, sizeof(meta), "%s  %d lines", code_lang_name(lang),
+             code_line_count(p->file->text));
+    draw_caption(fb, p->file->name, meta, 18, COL_CODE_EDGE);
 }
 
 static void draw_caption(fb_t *fb, const char *title, const char *meta_text,
@@ -107,7 +115,7 @@ static void draw_doc(fb_t *fb) {
 
     const int margin_x = 90;
     const int top = 118;
-    const int bottom = 700;
+    const int bottom = fb->h - PREVIEW_BOTTOM_MARGIN;
     fb_fill(fb, margin_x - 24, top - 24, fb->w - 2 * (margin_x - 24),
             bottom - top + 40, RGB(0x14, 0x1a, 0x22));
     fb_border(fb, margin_x - 24, top - 24, fb->w - 2 * (margin_x - 24),

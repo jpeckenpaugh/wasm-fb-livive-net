@@ -17,6 +17,8 @@
 #define COL_ATTR RGB(0xf0, 0xc6, 0x74)
 #define COL_PREPROC RGB(0xf0, 0xb8, 0x6a)
 #define COL_GUTTER RGB(0x4f, 0x5d, 0x68)
+#define COL_TRACK RGB(0x1a, 0x22, 0x2c)
+#define COL_THUMB RGB(0x3f, 0x4e, 0x5e)
 #define COL_LINE RGB(0x2a, 0x36, 0x44)
 
 /* --------------------------------------------------------------- language -- */
@@ -381,6 +383,15 @@ static int expand_line(const char *src, int len, char *dst, int cap) {
     return o;
 }
 
+int code_line_count(const char *text) {
+    if (!text) return 0;
+    int n = 1;
+    for (const char *p = text; *p; p++) {
+        if (*p == '\n' && p[1] != '\0') n++;
+    }
+    return n;
+}
+
 void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
                int cell, code_lang_t lang, int *line_off, int *col_off) {
     if (!fb || !fb->px || !text || cell <= 0) return;
@@ -475,5 +486,33 @@ void code_draw(fb_t *fb, const char *text, int x, int y, int w, int h,
         line_no++;
         if (!eol) break;
         p = eol + 1;
+    }
+
+    /* Scrollbars: only when there is something to scroll to. */
+    const int bar = 7;
+    if (lines > visible) {
+        const int track_x = x + w - bar;
+        const int track_h = h - 2 * pad - (widest > max_cols ? bar + 4 : 0);
+        int thumb_h = track_h * visible / lines;
+        if (thumb_h < 24) thumb_h = 24;
+        if (thumb_h > track_h) thumb_h = track_h;
+        const int max_line = lines - visible;
+        const int thumb_y = y + pad +
+            (max_line > 0 ? (track_h - thumb_h) * loff / max_line : 0);
+        fb_fill(fb, track_x, y + pad, bar, track_h, COL_TRACK);
+        fb_fill(fb, track_x, thumb_y, bar, thumb_h, COL_THUMB);
+    }
+    if (widest > max_cols) {
+        const int track_y = y + h - bar;
+        const int track_x = text_x;
+        const int track_w = w - (text_x - x) - pad - (lines > visible ? bar + 4 : 0);
+        int thumb_w = track_w * max_cols / widest;
+        if (thumb_w < 30) thumb_w = 30;
+        if (thumb_w > track_w) thumb_w = track_w;
+        const int max_col = widest - max_cols;
+        const int thumb_x = track_x +
+            (max_col > 0 ? (track_w - thumb_w) * coff / max_col : 0);
+        fb_fill(fb, track_x, track_y, track_w, bar, COL_TRACK);
+        fb_fill(fb, thumb_x, track_y, thumb_w, bar, COL_THUMB);
     }
 }

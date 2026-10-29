@@ -31,6 +31,7 @@ const KEY_CODES = {
   /* file manager + code scrolling */
   'ArrowUp': 50, 'ArrowDown': 51,
   'PageUp': 60, 'PageDown': 61,
+  'Home': 62, 'End': 63,
 };
 
 /* Slot 1 is the calculator (see MEDIA_CALC_SLOT in src/media.h); the rest map
@@ -407,6 +408,24 @@ async function createGuest() {
       vm.canvas.focus({ preventScroll: true });
       clickLogical(x, y);
     });
+
+    /* Wheel scrolls the code view: vertical by default, horizontal with Shift. */
+    let wheelAcc = 0;
+    vm.canvas.addEventListener('wheel', (event) => {
+      if (!vm.module) return;
+      event.preventDefault();
+      const horizontal = event.shiftKey;
+      wheelAcc += horizontal ? (event.deltaX || event.deltaY) : event.deltaY;
+
+      let moved = false;
+      while (Math.abs(wheelAcc) >= 24) {
+        const step = wheelAcc > 0 ? 1 : -1;
+        const code = horizontal ? (step > 0 ? 41 : 40) : (step > 0 ? 51 : 50);
+        if (vm.module._app_key(code)) moved = true;
+        wheelAcc -= step * 24;
+      }
+      if (moved) render();
+    }, { passive: false });
 
     vm.canvas.addEventListener('keydown', (event) => {
       const code = KEY_CODES[event.key];
