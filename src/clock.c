@@ -1,10 +1,15 @@
 #include "clock.h"
 
+#include <stdio.h>
+#include <string.h>
+
 #include "lcd.h"
 
 void clock_init(clock_state_t *c) {
     c->hour = c->minute = c->second = c->msec = 0;
     c->valid = 0;
+    c->year = c->month = c->day = c->weekday = 0;
+    c->date_valid = 0;
     c->drawn_hour = c->drawn_minute = c->drawn_second = -1;
     c->has_drawn = 0;
 }
@@ -28,6 +33,39 @@ void clock_set_time(clock_state_t *c, int h, int m, int s, int ms) {
     c->second = s;
     c->msec = ms;
     c->valid = 1;
+}
+
+void clock_set_date(clock_state_t *c, int year, int month, int day, int weekday) {
+    if (month < 1) month = 1;
+    if (month > 12) month = 12;
+    if (day < 1) day = 1;
+    if (day > 31) day = 31;
+    if (weekday < 0) weekday = 0;
+    if (weekday > 6) weekday = 6;
+    if (year < 0) year = 0;
+
+    c->year = year;
+    c->month = month;
+    c->day = day;
+    c->weekday = weekday;
+    c->date_valid = 1;
+}
+
+void clock_format_date(const clock_state_t *c, char *out, size_t n) {
+    static const char *k_months[12] = {
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+    };
+    static const char *k_days[7] = {
+        "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"
+    };
+
+    if (!c->date_valid) {
+        snprintf(out, n, " ");
+        return;
+    }
+    snprintf(out, n, "%s %d, %d - %s",
+             k_months[c->month - 1], c->day, c->year, k_days[c->weekday]);
 }
 
 int clock_advance(clock_state_t *c, int with_seconds) {
@@ -160,5 +198,47 @@ void clock_draw(fb_t *fb, const clock_state_t *c, int x, int y, int w, int h,
         } else {
             cx += L.gap;
         }
+    }
+}
+
+void clock_draw_date(fb_t *fb, const clock_state_t *c, int x, int y, int w, int h,
+                     uint32_t on_color, uint32_t outline_color) {
+    if (!fb || !fb->px || !c || !c->date_valid || h < 12) return;
+
+    char text[32];
+    clock_format_date(c, text, sizeof(text));
+    const int len = (int)strlen(text);
+    if (len <= 0) return;
+
+    /* Character cells are 3:5 (14-segment proportions); shrink to fit. */
+    int ch = h;
+    int cw = ch * 3 / 5;
+    int gap = cw / 5;
+    while (ch > 12 && len * (cw + gap) - gap > w - 16) {
+        ch -= 2;
+        cw = ch * 3 / 5;
+        gap = cw / 5;
+    }
+    if (len * (cw + gap) - gap > w - 16) return; /* cannot fit at all */
+
+    int cx = x + (w - (len * (cw + gap) - gap)) / 2;
+    const int cy = y + (h - ch) / 2;
+
+    int off = ch / 36;
+    if (off < 1) off = 1;
+    if (off > 3) off = 3;
+
+    for (int i = 0; i < len; i++) {
+        if (outline_color != 0) {
+            for (int dy = -off; dy <= off; dy += off) {
+                for (int dx = -off; dx <= off; dx += off) {
+                    if (dx == 0 && dy == 0) continue;
+                    lcd_draw_char14(fb, cx + dx, cy + dy, cw, ch, text[i],
+                                    outline_color, LCD_OFF_NONE);
+                }
+            }
+        }
+        lcd_draw_char14(fb, cx, cy, cw, ch, text[i], on_color, LCD_OFF_NONE);
+        cx += cw + gap;
     }
 }

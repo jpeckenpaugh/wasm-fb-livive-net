@@ -13,8 +13,8 @@ decisions; the source is authoritative.
 
 | Where | Format | When |
 |---|---|---|
-| Hero image, centred | `HH:MM:SS` | only while image 1 is selected (the default at boot) |
-| Thumbnail slot 1, centred | `HH:MM` | always |
+| Hero, centred | `HH:MM:SS` over `OCT 29, 2026 - THU` | only while image 1 is selected (the default at boot) |
+| Tile 1, centred | `HH:MM` | always |
 
 Both are drawn in the guest, on top of the image, in `ui_draw()`:
 
@@ -166,3 +166,48 @@ rendering would only matter if the guest exposed partial updates.
   millisecond readout is a rendering change plus a ~16 ms timeout.
 - Local time is whatever the browser reports; DST and timezone are inherited,
   never computed in the guest.
+
+## Date line
+
+The host pushes the local date once per pump (`app_set_date(year, month, day,
+weekday)`); the guest formats it so the text is testable natively:
+
+```
+OCT 29, 2026 - THU
+```
+
+Month and weekday come from small tables, the day is not zero padded, and the
+line is centred under the time. Since the tiles float over the hero, the time
+and date block is centred in the space *above* them, not in the full canvas.
+
+### 14-segment alphanumerics
+
+The date needs letters, which 7-segment cannot draw. `src/lcd.c` now has a
+14-segment starburst:
+
+```
+    -- a --            a    top              h/i  upper diagonals (to centre)
+   |\  |  /|           b    upper right      j/k  lower diagonals
+   f h l i b           c    lower right      g1   middle left
+   |  \|/  |           d    bottom           g2   middle right
+    g1--g2             e    lower left       l    upper centre vertical
+   |  /|\  |           f    upper left       m    lower centre vertical
+   e j m k c
+   |/  |  \|
+    -- d --
+```
+
+- Upper-case only. 14 segments cannot express x-height or descenders, so
+  lowercase is out of scope rather than badly approximated.
+- The diagonals are the reason this exists: `M W N V K X Y Z` are impossible
+  with rectangles alone, so `fb_line()` (thick Bresenham) was added to the
+  framebuffer.
+- Stroke thickness is 1/5 of the narrow side. At 1/8 the glyphs read as an
+  outline font next to the bold 7-segment time.
+- Conventional approximations: `O`/`0`/`D` share a shape, `I` is the left stem
+  (so it never collides with `1`), and `V`/`Y` share the upper-V-plus-stem.
+  No string in the app contains both members of an ambiguous pair.
+- Punctuation (`,` `.` `-` space) is handled outside the mask table.
+
+The table covers `A-Z`, `0-9`, space, comma, period and hyphen; anything else
+renders blank rather than garbage.

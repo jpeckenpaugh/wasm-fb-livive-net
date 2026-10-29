@@ -27,6 +27,10 @@ void fb_border(fb_t *fb, int x, int y, int w, int h, int thickness, uint32_t col
  * backdrop behind a UI that has to stay readable. Alpha is untouched. */
 void fb_shade(fb_t *fb, int x, int y, int w, int h, int shade);
 
+/* Thick line (Bresenham with a square brush). Needed by the 14-segment
+ * alphanumeric renderer, whose diagonals cannot be rectangles. */
+void fb_line(fb_t *fb, int x0, int y0, int x1, int y1, int thickness, uint32_t color);
+
 /* src is tightly packed RGBA8888, sw * sh pixels. Clipped to the framebuffer. */
 void fb_blit(fb_t *fb, int x, int y, const uint8_t *src, int sw, int sh);
 void fb_blit_scaled(fb_t *fb, int x, int y, int dw, int dh,

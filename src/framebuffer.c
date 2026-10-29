@@ -1,6 +1,7 @@
 #include "framebuffer.h"
 
 #include <stddef.h>
+#include <stdlib.h>
 
 static inline uint32_t rgba_from_bytes(const uint8_t *s) {
     return (uint32_t)s[3] << 24 | (uint32_t)s[2] << 16 | (uint32_t)s[1] << 8 | (uint32_t)s[0];
@@ -92,5 +93,24 @@ void fb_blit_scaled(fb_t *fb, int x, int y, int dw, int dh,
             if (sx >= sw) sx = sw - 1;
             row[dx] = rgba_from_bytes(srow + (size_t)sx * 4);
         }
+    }
+}
+
+void fb_line(fb_t *fb, int x0, int y0, int x1, int y1, int thickness, uint32_t color) {
+    if (!fb || !fb->px || thickness <= 0) return;
+
+    const int half = thickness / 2;
+    int dx = abs(x1 - x0);
+    int dy = -abs(y1 - y0);
+    const int sx = x0 < x1 ? 1 : -1;
+    const int sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy;
+
+    for (;;) {
+        fb_fill(fb, x0 - half, y0 - half, thickness, thickness, color);
+        if (x0 == x1 && y0 == y1) break;
+        const int e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
     }
 }

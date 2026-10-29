@@ -38,7 +38,7 @@ move between them.
 
 | Screen | What it shows |
 |---|---|
-| image 1 | photo + `HH:MM:SS` overlay, and `HH:MM` on its thumbnail |
+| image 1 | photo + `HH:MM:SS` over `OCT 29, 2026 - THU`, and `HH:MM` on its tile |
 | images 2-5 | photo, `HH:MM` on thumbnail 1 |
 | calculator (tile 2) | clickable keypad with a period key, integer and decimal entry, value previewed on its tile |
 

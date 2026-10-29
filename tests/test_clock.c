@@ -127,10 +127,57 @@ static void test_draw(void) {
     free(fb.px);
 }
 
+static void test_date(void) {
+    clock_state_t c;
+    char buf[40];
+
+    clock_init(&c);
+    clock_format_date(&c, buf, sizeof(buf));
+    assert(strcmp(buf, " ") == 0);          /* no date pushed yet */
+
+    clock_set_date(&c, 2026, 10, 29, 4);    /* Thu */
+    clock_format_date(&c, buf, sizeof(buf));
+    assert(strcmp(buf, "OCT 29, 2026 - THU") == 0);
+
+    clock_set_date(&c, 2026, 1, 1, 0);      /* Sun, no zero padding */
+    clock_format_date(&c, buf, sizeof(buf));
+    assert(strcmp(buf, "JAN 1, 2026 - SUN") == 0);
+
+    clock_set_date(&c, 2026, 13, 40, 9);    /* clamped */
+    assert(c.month == 12 && c.day == 31 && c.weekday == 6);
+
+    /* The date line draws inside its box and leaves the rest alone. */
+    const uint32_t WHITE = RGBA(255, 255, 255, 255);
+    const uint32_t SENTINEL = RGBA(255, 0, 255, 255);
+    fb_t fb = make_fb(1280, 720);
+    fb_clear(&fb, SENTINEL);
+
+    clock_state_t d;
+    clock_init(&d);
+    clock_draw_date(&fb, &d, 0, 400, 1280, 112, WHITE, RGBA(0, 0, 0, 255));
+    assert(fb.px[0] == SENTINEL);           /* invalid date: no paint */
+
+    clock_set_date(&d, 2026, 10, 29, 4);
+    clock_draw_date(&fb, &d, 0, 400, 1280, 112, WHITE, RGBA(0, 0, 0, 255));
+
+    size_t inside = 0;
+    for (int y = 400; y < 512; y++) {
+        for (int x = 0; x < 1280; x++) {
+            if (fb.px[(size_t)y * 1280 + x] != SENTINEL) inside++;
+        }
+    }
+    assert(inside > 500);
+    assert(fb.px[0] == SENTINEL);
+    assert(fb.px[(size_t)700 * 1280 + 640] == SENTINEL);
+
+    free(fb.px);
+}
+
 int main(void) {
     test_dirty_tracking();
     test_timeout();
     test_layout();
+    test_date();
     test_draw();
     printf("test_clock: ok\n");
     return 0;

@@ -44,6 +44,47 @@ typedef enum {
 void lcd_draw_symbol(fb_t *fb, int x, int y, int w, int h, lcd_symbol_t symbol,
                      uint32_t color);
 
+/* ---- 14-segment alphanumerics ------------------------------------------
+ *
+ *     -- a --            a  top          h/i  upper diagonals (to centre)
+ *    |\  |  /|           b  upper right  j/k  lower diagonals
+ *    f h l i b           c  lower right  g1   middle left
+ *    |  \|/  |           d  bottom       g2   middle right
+ *     g1--g2             e  lower left   l    upper centre vertical
+ *    |  /|\  |           f  upper left   m    lower centre vertical
+ *    e j m k c
+ *    |/  |  \|
+ *     -- d --
+ *
+ * Uppercase only: 14 segments cannot express x-height or descenders, so
+ * lowercase is out of scope. A few glyphs are conventional approximations
+ * (O/0 and D, I and 1, M/W/N from the diagonals). Everything else, plus
+ * digits and , - . space, is exact.
+ */
+enum {
+    S14_A = 1u << 0,
+    S14_B = 1u << 1,
+    S14_C = 1u << 2,
+    S14_D = 1u << 3,
+    S14_E = 1u << 4,
+    S14_F = 1u << 5,
+    S14_G1 = 1u << 6,
+    S14_G2 = 1u << 7,
+    S14_H = 1u << 8,
+    S14_I = 1u << 9,
+    S14_J = 1u << 10,
+    S14_K = 1u << 11,
+    S14_L = 1u << 12,
+    S14_M = 1u << 13
+};
+
+/* Bitmask for a character; 0 for anything unsupported (drawn as a space). */
+uint16_t lcd_14seg_mask(char ch);
+
+/* Draw one character in the box. Pass LCD_OFF_NONE to light only segments. */
+void lcd_draw_char14(fb_t *fb, int x, int y, int w, int h, char ch,
+                     uint32_t on_color, uint32_t off_color);
+
 /* Draw one digit in the box (x, y, w, h). digit must be 0-9. */
 void lcd_draw_digit(fb_t *fb, int x, int y, int w, int h, int digit,
                     uint32_t on_color, uint32_t off_color);

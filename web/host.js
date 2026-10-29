@@ -147,6 +147,8 @@ function pumpClock() {
   const now = new Date();
   guest.module._app_set_time(now.getHours(), now.getMinutes(),
                              now.getSeconds(), now.getMilliseconds());
+  guest.module._app_set_date(now.getFullYear(), now.getMonth() + 1,
+                             now.getDate(), now.getDay());
   /* The guest draws into its framebuffer and tells us whether the visible
    * content changed; only then is a 1.17 MiB copy worth doing. */
   if (guest.module._app_tick()) guest.render();

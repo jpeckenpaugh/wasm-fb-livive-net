@@ -55,11 +55,11 @@ $(GEN_CS): $(GEN)/assets_gen.h
 
 $(OBJ)/wasm/%.o: src/%.c $(GEN)/assets_gen.h
 	@mkdir -p $(dir $@)
-	$(EMCC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(EMCC) $(CFLAGS) -MMD -MP $(INCLUDES) -c $< -o $@
 
 $(OBJ)/wasm/%.o: $(GEN)/%.c $(GEN)/assets_gen.h
 	@mkdir -p $(dir $@)
-	$(EMCC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(EMCC) $(CFLAGS) -MMD -MP $(INCLUDES) -c $< -o $@
 
 $(WASM_OUT): $(WASM_OBJS)
 	$(EMCC) $^ -o $@ $(WASM_LDFLAGS)
@@ -67,7 +67,19 @@ $(WASM_OUT): $(WASM_OBJS)
 
 $(OBJ)/native/%.o: %.c $(GEN)/assets_gen.h
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $(INCLUDES) -Itests -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -MP $(INCLUDES) -Itests -c $< -o $@
+
+# Object files used by the native test binaries, so depfiles cover every TU.
+TEST_OBJS := $(OBJ)/native/tests/test_pixels.o $(OBJ)/native/tests/test_lcd.o \
+             $(OBJ)/native/tests/test_clock.o $(OBJ)/native/tests/test_calc.o \
+             $(OBJ)/native/src/framebuffer.o $(OBJ)/native/src/media.o \
+             $(OBJ)/native/src/ui.o $(OBJ)/native/src/clock.o \
+             $(OBJ)/native/src/lcd.o $(OBJ)/native/src/calc.o \
+             $(NATIVE_ASSETS)
+
+# Header dependencies: without these, changing a struct (say clock_state_t)
+# leaves stale objects compiled against the old layout.
+-include $(patsubst %.o,%.d,$(WASM_OBJS) $(GEN_OBJS) $(TEST_OBJS))
 
 $(BUILD)/test_pixels: $(OBJ)/native/tests/test_pixels.o \
                       $(OBJ)/native/src/media.o $(OBJ)/native/src/ui.o \

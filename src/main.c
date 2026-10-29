@@ -137,6 +137,11 @@ void app_set_time(int hour, int minute, int second, int msec) {
     clock_set_time(&g_clock, hour, minute, second, msec);
 }
 
+EMSCRIPTEN_KEEPALIVE
+void app_set_date(int year, int month, int day, int weekday) {
+    clock_set_date(&g_clock, year, month, day, weekday);
+}
+
 /* Returns 1 when the framebuffer changed and needs copying to the canvas.
  * The hero clock shows seconds only while image 1 is selected, so the tick
  * granularity follows the selection. */

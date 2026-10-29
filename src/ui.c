@@ -37,11 +37,19 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
         }
     }
 
-    /* Hero clock: HH:MM:SS over the whole frame while image 1 is selected.
-     * Drawn before the tiles so they always sit on top. */
+    /* Hero clock: HH:MM:SS stacked over the date line, centred in the space
+     * above the floating tiles. Drawn before the tiles so they sit on top. */
     if (clock && clock->valid && m->selected == 0 && !on_calc) {
-        clock_draw(fb, clock, UI_MAIN_X, UI_MAIN_Y, UI_MAIN_W, UI_MAIN_H,
+        const int time_h = 304;
+        const int date_h = 112;
+        const int gap = 24;
+        const int content_bottom = UI_TH_Y - 28;
+        const int top = (content_bottom - (time_h + gap + date_h)) / 2;
+
+        clock_draw(fb, clock, UI_MAIN_X, top, UI_MAIN_W, time_h,
                    6, COL_CLOCK, COL_CLOCK_EDGE);
+        clock_draw_date(fb, clock, UI_MAIN_X, top + time_h + gap, UI_MAIN_W, date_h,
+                        COL_CLOCK, COL_CLOCK_EDGE);
     }
 
     for (int i = 0; i < m->slots; i++) {
