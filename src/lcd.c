@@ -86,8 +86,10 @@ void lcd_draw_colon(fb_t *fb, int x, int y, int w, int h, int lit,
     if (!lit && off_color == LCD_OFF_NONE) return;
 
     const uint32_t c = lit ? on_color : off_color;
-    int s = w; /* square dot */
-    if (s > h / 4) s = h / 4;
+    /* Square dot, comfortably narrower than the colon cell: at full width the
+     * two dots read as blocks that crowd the neighbouring digits. */
+    int s = w * 2 / 3;
+    if (s > h / 6) s = h / 6;
     if (s < 2) s = 2;
     const int cx = x + (w - s) / 2;
     fb_fill(fb, cx, y + h / 3 - s / 2, s, s, c);
