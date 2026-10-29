@@ -191,10 +191,12 @@ static void test_ui_draw(void) {
 
     ui_draw(&fb, &m, NULL, NULL);
 
-    /* The hero image occupies its exact slot; compare every pixel against the
-     * source. Stop at the first mismatch so a bad row is one failure, not 480. */
+    /* The hero now fills the whole canvas, but the tiles float on top of its
+     * bottom edge, so compare only the rows above them. Stop at the first
+     * mismatch so a bad row is one failure, not thousands. */
     int mismatch = -1;
-    for (int y = 0; y < UI_MAIN_H && mismatch < 0; y++) {
+    const int hero_rows = UI_TH_Y - 8;
+    for (int y = 0; y < hero_rows && mismatch < 0; y++) {
         for (int x = 0; x < UI_MAIN_W; x++) {
             const uint8_t *s = g_images[m.selected].px +
                                ((size_t)y * UI_MAIN_W + (size_t)x) * 4;

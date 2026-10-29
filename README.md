@@ -29,9 +29,10 @@ The console boots the first guest automatically; **+ new guest** starts another.
 Each guest is a tab with its own state, framebuffer and telemetry row; the top
 bar shows host-level counters (module size, reserved memory, blits, uptime).
 
-The strip at the bottom is the screen picker: five tiles. The first is image 1
-with the clock; the second is the calculator, drawn over that slot's artwork;
-the rest are the remaining images. Arrow keys or a click move between them.
+The tiles floating over the lower middle are the screen picker: five tiles.
+The first is image 1 with the clock; the second is the calculator, drawn over
+that slot's artwork; the rest are the remaining images. Arrow keys or a click
+move between them.
 
 ## Mini apps
 
@@ -100,9 +101,9 @@ tests/             native pixel/logic tests
 ```
 
 Geometry is chosen so no scaling ever happens for the hero image: assets are
-pre-cropped to 1280×576 (hero) and 144×108 (thumbnails), the hero is full-bleed at (0,0)
-and the thumbnails at y=396 with 10px gaps. Scaling exists but is only used if
-an asset does not match the layout.
+pre-cropped to 1280×720 (hero) and 128×72 (tiles). The hero is the whole
+canvas; the five tiles float over its lower middle rather than sitting in a
+strip. Scaling exists but is only used if an asset does not match the layout.
 
 ## Guest API (`src/main.c`)
 
@@ -161,7 +162,7 @@ by GC.
 
 | Metric | Value |
 |---|---|
-| `media_browser.wasm` | 15,098,588 bytes (14.4 MiB, mostly the 14.4 MB of raw RGBA assets) |
+| `media_browser.wasm` | 18,658,093 bytes (17.8 MiB, mostly the 17.8 MB of raw RGBA assets) |
 | `media_browser.mjs` glue | small; ES module, no FS or Node shims |
 | instance init (`app_init` → first pixels) | 1–2.4 ms |
 | full redraw + `putImageData` copy | 0.6–1.0 ms per 1280×720 frame |
@@ -189,7 +190,7 @@ reserved linear memory), not a benchmark harness.
   `test_clock`, `test_calc`); there is no headless-browser assertion of the
   Canvas output yet.
 - No font rendering: the "UI" is frames, borders and an accent underline.
-- Raw RGBA assets: 5 × (1280·576 + 144·108) × 4 ≈ 14.4 MB inside the wasm binary.
+- Raw RGBA assets: 5 × (1280·720 + 128·72) × 4 ≈ 17.8 MB inside the wasm binary.
   That is the price of a 720p framebuffer with decode-free assets; a decoder or
   compressed assets would cut it substantially.
   gzip does not help much on raw pixels.

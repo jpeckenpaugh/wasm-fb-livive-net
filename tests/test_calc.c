@@ -177,11 +177,9 @@ static void test_draw(void) {
     }
     assert(changed > 10000);
 
-    /* ... and nothing was painted over the thumbnail strip. */
-    for (int y = CALC_SCREEN_H; y < 720; y++) {
-        assert(fb.px[(size_t)y * 1280 + 0] == SENTINEL);
-        assert(fb.px[(size_t)y * 1280 + 1279] == SENTINEL);
-    }
+    /* ... and the calculator paints only its panel and keys, no backdrop. */
+    assert(fb.px[0] == SENTINEL);
+    assert(fb.px[(size_t)719 * 1280 + 1279] == SENTINEL);
 
     /* NULL tolerance. */
     calc_draw(NULL, &c);
@@ -203,17 +201,18 @@ static void test_tile_preview(void) {
     calc_state_t c;
     calc_init(&c);
     press_text(&c, "42/4=");           /* 10.5 */
-    calc_draw_tile(&fb, &c, 244, 594, 144, 108);
+    calc_draw_tile(&fb, &c, 288, 620, 128, 72);
 
     size_t inside = 0;
-    for (int y = 594; y < 702; y++) {
-        for (int x = 244; x < 388; x++) {
+    for (int y = 620; y < 692; y++) {
+        for (int x = 288; x < 416; x++) {
             if (fb.px[(size_t)y * 1280 + x] != SENTINEL) inside++;
         }
     }
     assert(inside > 100);
     assert(fb.px[0] == SENTINEL);
     assert(fb.px[(size_t)300 * 1280 + 300] == SENTINEL);
+    assert(fb.px[(size_t)700 * 1280 + 640] == SENTINEL);
 
     free(fb.px);
 }

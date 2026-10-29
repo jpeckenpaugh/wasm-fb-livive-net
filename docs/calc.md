@@ -28,7 +28,7 @@ clock keeps updating at minute granularity.
 
 The slot's image doubles as the calculator's skin:
 
-- **Screen**: the image is scaled over the 1280x576 screen area and dimmed with
+- **Screen**: the image is scaled over the 1280x720 screen area and dimmed with
   `fb_shade()` (88/255), so the button grid sits on a recognisable but quiet
   backdrop.
 - **Tile preview**: the thumbnail is drawn unchanged, then the current value is

@@ -86,8 +86,8 @@ the glyph eight times at ±`t` before the bright pass. That keeps the clock
 readable on top of arbitrary imagery without a background plate, so the image
 stays visible inside the digit counters.
 
-Halo thickness is `digit_w / 24`, clamped to 1..3 px: 3 px on the 1280x576 hero
-(digit 152x304) and 1 px on the 144x108 thumbnail.
+Halo thickness is `digit_w / 24`, clamped to 1..3 px: 3 px on the 1280x720 hero
+(digit 152x304) and 1 px on the 128x72 tile.
 
 Layout is proportional to the box, never to the canvas: `clock_layout(box_w,
 box_h, digits, &L)` is called with the hero rectangle and with the thumbnail

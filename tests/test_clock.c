@@ -64,24 +64,24 @@ static void test_layout(void) {
     clock_layout_t hero;
     clock_layout_t thumb;
 
-    clock_layout(1280, 576, 6, &hero);
+    clock_layout(1280, 720, 6, &hero);
     assert(hero.digits == 6);
     assert(hero.pairs == 3);
     assert(hero.x0 >= 0 && hero.y0 >= 0);
     assert(hero.x0 + hero.total_w <= 1280);
-    assert(hero.y0 + hero.digit_h <= 576);
+    assert(hero.y0 + hero.digit_h <= 720);
     assert(hero.digit_w >= 8 && hero.gap >= 2 && hero.colon_w >= 4);
 
-    clock_layout(144, 108, 4, &thumb);
+    clock_layout(128, 72, 4, &thumb);
     assert(thumb.digits == 4);
     assert(thumb.pairs == 2);
     assert(thumb.x0 >= 0 && thumb.y0 >= 0);
-    assert(thumb.x0 + thumb.total_w <= 144);
-    assert(thumb.y0 + thumb.digit_h <= 108);
+    assert(thumb.x0 + thumb.total_w <= 128);
+    assert(thumb.y0 + thumb.digit_h <= 72);
 
     /* Anything other than 6 falls back to 4 digits. */
     clock_layout_t odd;
-    clock_layout(144, 108, 5, &odd);
+    clock_layout(128, 72, 5, &odd);
     assert(odd.digits == 4);
 
     /* Degenerate boxes still produce a usable layout. */
@@ -100,24 +100,25 @@ static void test_draw(void) {
 
     /* Invalid time draws nothing at all. */
     fb_clear(&fb, SENTINEL);
-    clock_draw(&fb, &c, 0, 0, 1280, 576, 6, WHITE, RGBA(0, 0, 0, 255));
+    clock_draw(&fb, &c, 0, 0, 1280, 720, 6, WHITE, RGBA(0, 0, 0, 255));
     assert(fb.px[0] == SENTINEL);
 
     clock_set_time(&c, 12, 34, 56, 0);
     fb_clear(&fb, SENTINEL);
-    clock_draw(&fb, &c, 0, 0, 1280, 576, 6, WHITE, RGBA(0, 0, 0, 255));
+    clock_draw(&fb, &c, 0, 0, 1280, 720, 6, WHITE, RGBA(0, 0, 0, 255));
 
     /* Pixels changed inside the hero box ... */
     size_t inside = 0;
-    for (int y = 0; y < 576; y++) {
+    for (int y = 0; y < 720; y++) {
         for (int x = 0; x < 1280; x++) {
             if (fb.px[(size_t)y * 1280 + x] != SENTINEL) inside++;
         }
     }
     assert(inside > 1000);
 
-    /* ... and nothing leaked outside it. */
-    assert(fb.px[(size_t)700 * 1280 + 1279] == SENTINEL);
+    /* ... and the overlay paints no background of its own. */
+    assert(fb.px[0] == SENTINEL);
+    assert(fb.px[(size_t)719 * 1280 + 1279] == SENTINEL);
 
     /* NULL inputs are tolerated. */
     clock_draw(NULL, &c, 0, 0, 100, 100, 4, WHITE, 0);

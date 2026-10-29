@@ -25,9 +25,8 @@
 #define CALC_KEY_BACK 26
 #define CALC_KEY_DOT 27
 
-/* The calculator paints 0..CALC_SCREEN_H; the thumbnail strip below stays
- * visible, so the top of UI_TH_Y - 12 in ui.h must match this. */
-#define CALC_SCREEN_H 384
+/* The calculator paints over the whole canvas; the tiles float on top. */
+#define CALC_SCREEN_H 720
 
 typedef struct {
     double acc;

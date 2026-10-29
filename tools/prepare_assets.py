@@ -19,8 +19,8 @@ import sys
 
 from PIL import Image, ImageOps
 
-MAIN_SIZE = (1280, 576)  # 16:9 hero area; matches UI_MAIN_W/UI_MAIN_H (1:1 blit)
-THUMB_SIZE = (144, 108)  # matches UI_TH_W/UI_TH_H
+MAIN_SIZE = (1280, 720)  # full-canvas hero; matches UI_MAIN_W/UI_MAIN_H (1:1 blit)
+THUMB_SIZE = (128, 72)   # matches UI_TH_W/UI_TH_H
 EXPECTED = 5
 BACKGROUND = (0x20, 0x20, 0x20)
 HEX = ["0x%02x" % i for i in range(256)]

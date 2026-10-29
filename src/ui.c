@@ -37,11 +37,22 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
         }
     }
 
-    fb_fill(fb, 0, UI_MAIN_H, UI_W, UI_H - UI_MAIN_H, COL_STRIP);
+    /* Hero clock: HH:MM:SS over the whole frame while image 1 is selected.
+     * Drawn before the tiles so they always sit on top. */
+    if (clock && clock->valid && m->selected == 0 && !on_calc) {
+        clock_draw(fb, clock, UI_MAIN_X, UI_MAIN_Y, UI_MAIN_W, UI_MAIN_H,
+                   6, COL_CLOCK, COL_CLOCK_EDGE);
+    }
 
     for (int i = 0; i < m->slots; i++) {
         int tx = ui_thumb_x(i);
         int selected = (i == m->selected);
+
+        /* Floating tiles: a dark plate behind the frame keeps them readable on
+         * top of whatever the hero is showing. */
+        const int plate = UI_BORDER + 4;
+        fb_fill(fb, tx - plate, UI_TH_Y - plate,
+                UI_TH_W + 2 * plate, UI_TH_H + 2 * plate, COL_SHADOW);
 
         fb_fill(fb, tx - UI_BORDER, UI_TH_Y - UI_BORDER,
                 UI_TH_W + 2 * UI_BORDER, UI_TH_H + 2 * UI_BORDER,
@@ -60,17 +71,13 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
         }
     }
 
-    /* Clock overlay: HH:MM:SS over the hero while image 1 is selected, and a
-     * compact HH:MM on its thumbnail slot. Lit segments only, with a dark halo,
-     * so it composites on top of the image instead of hiding it. */
+    /* Compact HH:MM on the clock's tile, over its thumbnail. */
     if (clock && clock->valid) {
-        if (m->selected == 0 && !on_calc) {
-            clock_draw(fb, clock, UI_MAIN_X, UI_MAIN_Y, UI_MAIN_W, UI_MAIN_H,
-                       6, COL_CLOCK, COL_CLOCK_EDGE);
-        }
         clock_draw(fb, clock, ui_thumb_x(0), UI_TH_Y, UI_TH_W, UI_TH_H,
                    4, COL_CLOCK, COL_CLOCK_EDGE);
     }
+
+
 }
 
 /* Deliberately garish: proves channel order, orientation and clipping in one

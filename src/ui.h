@@ -16,16 +16,17 @@
 #define UI_W 1280
 #define UI_H 720
 
-#define UI_MAIN_W UI_W          /* full-bleed hero */
-#define UI_MAIN_H 576
+#define UI_MAIN_W UI_W          /* the hero is the whole canvas */
+#define UI_MAIN_H UI_H
 #define UI_MAIN_X 0
 #define UI_MAIN_Y 0
 
-#define UI_TH_W 144
-#define UI_TH_H 108
-#define UI_TH_GAP 18
-#define UI_TH_PAD 18
-#define UI_TH_Y (UI_MAIN_H + UI_TH_PAD) /* 594: thumbs under the hero */
+/* Tiles float over the hero instead of living in a strip. */
+#define UI_TH_W 128
+#define UI_TH_H 72
+#define UI_TH_GAP 16
+#define UI_TH_BOTTOM 28
+#define UI_TH_Y (UI_H - UI_TH_BOTTOM - UI_TH_H) /* 620 */
 #define UI_SLOTS ASSET_COUNT
 #define UI_TH_X0 ((UI_W - (UI_SLOTS * UI_TH_W + (UI_SLOTS - 1) * UI_TH_GAP)) / 2)
 
