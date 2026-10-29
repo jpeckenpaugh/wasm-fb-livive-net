@@ -11,6 +11,8 @@
 
 #define MEDIA_CALC_SLOT 1 /* second tile, right after the clock */
 #define MEDIA_CAL_SLOT 2  /* third tile: month calendar */
+#define MEDIA_FM_SLOT 3   /* fourth tile: file manager */
+#define MEDIA_PREVIEW_SLOT 4 /* fifth tile: image preview */
 
 typedef struct {
     const image_t *images;
@@ -33,6 +35,14 @@ static inline int media_is_calc(const media_t *m) {
 
 static inline int media_is_cal(const media_t *m) {
     return m->selected == MEDIA_CAL_SLOT;
+}
+
+static inline int media_is_fm(const media_t *m) {
+    return m->selected == MEDIA_FM_SLOT;
+}
+
+static inline int media_is_preview(const media_t *m) {
+    return m->selected == MEDIA_PREVIEW_SLOT;
 }
 
 #endif /* MEDIA_H */

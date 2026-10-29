@@ -8,12 +8,19 @@
 #define COL_CLOCK RGB(0xf2, 0xf8, 0xfa)
 #define COL_CLOCK_EDGE RGB(0x08, 0x0c, 0x0e)
 
-void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
-             const calc_state_t *calc, const cal_state_t *cal) {
-    const int on_calc = media_is_calc(m);
-    const int on_cal = media_is_cal(m);
+void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui) {
+    const clock_state_t *clock = ui ? ui->clock : NULL;
+    const calc_state_t *calc = ui ? ui->calc : NULL;
+    const cal_state_t *cal = ui ? ui->cal : NULL;
+    const fm_state_t *fm = ui ? ui->fm : NULL;
+    const preview_state_t *preview = ui ? ui->preview : NULL;
 
-    if (on_calc && calc) {
+    const int on_calc = media_is_calc(m) && calc;
+    const int on_cal = media_is_cal(m) && cal;
+    const int on_fm = media_is_fm(m) && fm;
+    const int on_preview = media_is_preview(m) && preview;
+
+    if (on_calc) {
         /* The calculator is merged into its strip slot, so the slot's image is
          * its wallpaper: scale it over the screen area and dim it so the keys
          * stay readable. */
@@ -22,12 +29,20 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
                        backdrop->px, backdrop->w, backdrop->h);
         fb_shade(fb, 0, 0, UI_W, UI_MAIN_H, 88);
         calc_draw(fb, calc);
-    } else if (on_cal && cal) {
+    } else if (on_cal) {
         const image_t *backdrop = &m->images[MEDIA_CAL_SLOT];
         fb_blit_scaled(fb, 0, 0, UI_W, UI_MAIN_H,
                        backdrop->px, backdrop->w, backdrop->h);
         fb_shade(fb, 0, 0, UI_W, UI_MAIN_H, 74);
         cal_draw(fb, cal);
+    } else if (on_fm) {
+        const image_t *backdrop = &m->images[MEDIA_FM_SLOT];
+        fb_blit_scaled(fb, 0, 0, UI_W, UI_MAIN_H,
+                       backdrop->px, backdrop->w, backdrop->h);
+        fb_shade(fb, 0, 0, UI_W, UI_MAIN_H, 70);
+        fm_draw(fb, fm, m->count);
+    } else if (on_preview) {
+        preview_draw(fb, preview, m->images, m->count);
     } else {
         fb_clear(fb, COL_BG);
 
@@ -73,13 +88,23 @@ void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
                 UI_TH_W + 2 * UI_BORDER, UI_TH_H + 2 * UI_BORDER,
                 selected ? COL_ACCENT : COL_FRAME);
 
-        fb_blit(fb, tx, UI_TH_Y, m->thumbs[i].px, m->thumbs[i].w, m->thumbs[i].h);
+        /* The preview tile shows whichever image is open, not its own slot's
+         * artwork. */
+        int thumb = i;
+        if (i == MEDIA_PREVIEW_SLOT && preview && preview->index >= 0 &&
+            preview->index < m->count) {
+            thumb = preview->index;
+        }
+        fb_blit(fb, tx, UI_TH_Y, m->thumbs[thumb].px,
+                m->thumbs[thumb].w, m->thumbs[thumb].h);
 
-        /* The calculator and calendar preview their state on their tiles. */
+        /* Each app previews its own state on its tile. */
         if (i == MEDIA_CALC_SLOT && calc) {
             calc_draw_tile(fb, calc, tx, UI_TH_Y, UI_TH_W, UI_TH_H);
         } else if (i == MEDIA_CAL_SLOT && cal) {
             cal_draw_tile(fb, cal, tx, UI_TH_Y, UI_TH_W, UI_TH_H);
+        } else if (i == MEDIA_FM_SLOT) {
+            fm_draw_tile(fb, tx, UI_TH_Y, UI_TH_W, UI_TH_H);
         }
 
         if (selected) {

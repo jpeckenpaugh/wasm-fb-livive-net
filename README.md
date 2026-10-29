@@ -42,6 +42,8 @@ move between them.
 | images 2-5 | photo, `HH:MM` on thumbnail 1 |
 | calculator (tile 2) | clickable keypad with a period key, integer and decimal entry, value previewed on its tile |
 | calendar (tile 3) | month grid with today highlighted; browse months/years; tile previews `NOV 29` |
+| files (tile 4) | `/ Wallpapers` folder listing the five baked images; click a file to open it |
+| preview (tile 5) | full-bleed view of the selected image with a name/size caption |
 
 Both live in the same guest and are reached with the existing
 `app_click()`/`app_key()` path — no per-app exports. The clock repaints about

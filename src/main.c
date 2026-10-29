@@ -9,6 +9,8 @@
 
 #include "cal.h"
 #include "calc.h"
+#include "fm.h"
+#include "preview.h"
 #include "clock.h"
 #include "framebuffer.h"
 #include "media.h"
@@ -23,6 +25,12 @@ static media_t g_media;
 static clock_state_t g_clock;
 static calc_state_t g_calc;
 static cal_state_t g_cal;
+static fm_state_t g_fm;
+static preview_state_t g_preview;
+
+static const ui_state_t g_ui = {
+    &g_clock, &g_calc, &g_cal, &g_fm, &g_preview
+};
 static int g_ready = 0;
 static int g_test_pattern = 0;
 
@@ -31,7 +39,7 @@ static void draw(void) {
     if (g_test_pattern) {
         ui_draw_test_pattern(&g_fb);
     } else {
-        ui_draw(&g_fb, &g_media, &g_clock, &g_calc, &g_cal);
+        ui_draw(&g_fb, &g_media, &g_ui);
     }
 }
 
@@ -55,6 +63,8 @@ int app_init(int width, int height) {
     clock_init(&g_clock);
     calc_init(&g_calc);
     cal_init(&g_cal);
+    fm_init(&g_fm);
+    preview_init(&g_preview);
     media_init(&g_media);
     g_ready = 1;
     draw();
@@ -87,6 +97,18 @@ int app_click(int x, int y) {
         draw();
         return 1;
     }
+
+    if (media_is_fm(&g_media)) {
+        int r = fm_click(&g_fm, g_media.count, x, y);
+        if (r == FM_NOOP) return 0;
+        if (r >= 0) {
+            /* Opening a file hands it to Preview and switches screens. */
+            preview_set(&g_preview, r, g_media.count);
+            media_select(&g_media, MEDIA_PREVIEW_SLOT);
+        }
+        draw();
+        return 1;
+    }
     return 0;
 }
 
@@ -110,6 +132,19 @@ int app_key(int key) {
         return 1;
     }
     if (media_is_cal(&g_media) && cal_key(&g_cal, key)) {
+        draw();
+        return 1;
+    }
+
+    if (media_is_fm(&g_media)) {
+        /* Enter shares the calculator's "=" code; only one screen is active. */
+        const int fm_key_code = (key == 24) ? FM_KEY_OPEN : key;
+        int r = fm_key(&g_fm, g_media.count, fm_key_code);
+        if (r == FM_NOOP) return 0;
+        if (r >= 0) {
+            preview_set(&g_preview, r, g_media.count);
+            media_select(&g_media, MEDIA_PREVIEW_SLOT);
+        }
         draw();
         return 1;
     }

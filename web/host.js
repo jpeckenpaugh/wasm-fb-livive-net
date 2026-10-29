@@ -28,17 +28,23 @@ const KEY_CODES = {
   '.': 27, ',': 27,
   /* calendar navigation */
   '[': 40, ']': 41, '<': 42, '>': 43,
+  /* file manager */
+  'ArrowUp': 50, 'ArrowDown': 51,
 };
 
 /* Slot 1 is the calculator (see MEDIA_CALC_SLOT in src/media.h); the rest map
  * one-to-one to images. */
 const CALC_SLOT = 1;
 const CAL_SLOT = 2;
+const FM_SLOT = 3;
+const PREVIEW_SLOT = 4;
 
 const selectionLabel = (guest) => {
   if (guest.selected === CALC_SLOT) return 'calculator';
   if (guest.selected === CAL_SLOT) return 'calendar';
-  return `image ${guest.selected + 1} / ${guest.count}`;
+  if (guest.selected === FM_SLOT) return 'files';
+  if (guest.selected === PREVIEW_SLOT) return 'preview';
+  return 'clock';
 };
 
 const KiB = 1024;

@@ -11,6 +11,8 @@
 #include "cal.h"
 #include "calc.h"
 #include "clock.h"
+#include "fm.h"
+#include "preview.h"
 #include "framebuffer.h"
 #include "media.h"
 
@@ -37,8 +39,17 @@ static inline int ui_thumb_x(int index) {
     return UI_TH_X0 + index * (UI_TH_W + UI_TH_GAP);
 }
 
-void ui_draw(fb_t *fb, const media_t *m, const clock_state_t *clock,
-             const calc_state_t *calc, const cal_state_t *cal);
+/* Everything the screens need, so ui_draw keeps a stable signature as apps
+ * are added. Any member may be NULL (tests draw the gallery only). */
+typedef struct {
+    const clock_state_t *clock;
+    const calc_state_t *calc;
+    const cal_state_t *cal;
+    const fm_state_t *fm;
+    const preview_state_t *preview;
+} ui_state_t;
+
+void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui);
 void ui_draw_test_pattern(fb_t *fb);
 
 #endif /* UI_H_INCLUDED */
