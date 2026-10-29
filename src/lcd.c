@@ -61,9 +61,10 @@ void lcd_draw_digit(fb_t *fb, int x, int y, int w, int h, int digit,
 
     const uint8_t m = k_masks[digit];
 
-    /* Horizontals: a (top), g (middle), d (bottom) */
-    const int hx = x + t;
-    const int hw = w - 2 * t;
+    /* Horizontals: a (top), g (middle), d (bottom). Full width, so the corners
+     * meet the verticals instead of leaving square notches. */
+    const int hx = x;
+    const int hw = w;
     if (hw > 0) {
         put_seg(fb, hx, y, hw, t, m & SEG_A, on_color, off_color);
         put_seg(fb, hx, y + t + vh, hw, t, m & SEG_G, on_color, off_color);
