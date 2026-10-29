@@ -4,6 +4,8 @@
 #include <string.h>
 
 #include "assets_gen.h"
+#include "code.h"
+#include "demo_gen.h"
 #include "lcd.h"
 
 #define FM_X 40
@@ -15,6 +17,9 @@
 #define ROW_Y 116
 #define ROW_H 72
 #define ROW_GAP 8
+/* Rows must stay clear of the floating tiles at the bottom. */
+#define ROWS_VISIBLE 6
+#define ROW_LIMIT (ROW_Y + ROWS_VISIBLE * (ROW_H + ROW_GAP))
 
 #define COL_PANEL RGB(0x0b, 0x10, 0x15)
 #define COL_ROW RGB(0x14, 0x1a, 0x22)
@@ -36,57 +41,76 @@ static const char *file_name(int i) {
     return (i >= 0 && i < n) ? k_names[i] : "image";
 }
 
+static fm_action_t act(int kind, int index) {
+    fm_action_t a = { kind, index };
+    return a;
+}
+
 static int row_count(const fm_state_t *f, int count) {
     (void)count;
-    if (f->level == 0) return 2;      /* Wallpapers + ABOUT.md */
-    return count + 1;                 /* ".." plus the files */
+    if (f->level == 0) return 3;      /* Wallpapers, demo, ABOUT.md */
+    if (f->level == 2) return DEMO_FILE_COUNT + 1;
+    return count + 1;                 /* ".." plus the wallpapers */
 }
 
 void fm_init(fm_state_t *f) {
     f->level = 0;
     f->selected = 0;
+    f->scroll = 0;
 }
 
 static void clamp_selection(fm_state_t *f, int count) {
     const int rows = row_count(f, count);
     if (f->selected < 0) f->selected = 0;
     if (f->selected >= rows) f->selected = rows - 1;
+
+    /* Keep the selection in view; the demo folder has more rows than fit. */
+    if (f->selected < f->scroll) f->scroll = f->selected;
+    if (f->selected >= f->scroll + ROWS_VISIBLE) {
+        f->scroll = f->selected - ROWS_VISIBLE + 1;
+    }
+    if (f->scroll > rows - ROWS_VISIBLE) f->scroll = rows - ROWS_VISIBLE;
+    if (f->scroll < 0) f->scroll = 0;
 }
 
-static int activate(fm_state_t *f) {
+static void reset_level(fm_state_t *f, int level) {
+    f->level = level;
+    f->selected = 0;
+    f->scroll = 0;
+}
+
+static fm_action_t activate(fm_state_t *f) {
     if (f->level == 0) {
-        if (f->selected == 1) return FM_OPEN_ABOUT;
-        f->level = 1;
-        f->selected = 0;
-        return FM_CHANGED;
+        if (f->selected == 2) return act(FM_ACT_ABOUT, 0);
+        reset_level(f, (f->selected == 1) ? 2 : 1);
+        return act(FM_ACT_CHANGED, 0);
     }
     if (f->selected == 0) { /* ".." */
-        f->level = 0;
-        f->selected = 0;
-        return FM_CHANGED;
+        reset_level(f, 0);
+        return act(FM_ACT_CHANGED, 0);
     }
-    return f->selected - 1; /* image index */
+    if (f->level == 2) return act(FM_ACT_DEMO, f->selected - 1);
+    return act(FM_ACT_IMAGE, f->selected - 1);
 }
 
-int fm_key(fm_state_t *f, int count, int key) {
+fm_action_t fm_key(fm_state_t *f, int count, int key) {
     switch (key) {
         case FM_KEY_DOWN:
             f->selected += 1;
             clamp_selection(f, count);
-            return FM_CHANGED;
+            return act(FM_ACT_CHANGED, 0);
         case FM_KEY_UP:
             f->selected -= 1;
             clamp_selection(f, count);
-            return FM_CHANGED;
+            return act(FM_ACT_CHANGED, 0);
         case FM_KEY_OPEN:
             return activate(f);
         case FM_KEY_BACK:
-            if (f->level == 0) return FM_NOOP;
-            f->level = 0;
-            f->selected = 0;
-            return FM_CHANGED;
+            if (f->level == 0) return act(FM_ACT_NONE, 0);
+            reset_level(f, 0);
+            return act(FM_ACT_CHANGED, 0);
         default:
-            return FM_NOOP;
+            return act(FM_ACT_NONE, 0);
     }
 }
 
@@ -97,17 +121,18 @@ static void row_rect(int row, int *x, int *y, int *w, int *h) {
     *h = ROW_H;
 }
 
-int fm_click(fm_state_t *f, int count, int x, int y) {
+fm_action_t fm_click(fm_state_t *f, int count, int x, int y) {
     const int rows = row_count(f, count);
-    for (int i = 0; i < rows; i++) {
+    for (int i = f->scroll; i < rows && i < f->scroll + ROWS_VISIBLE; i++) {
         int rx, ry, rw, rh;
-        row_rect(i, &rx, &ry, &rw, &rh);
+        row_rect(i - f->scroll, &rx, &ry, &rw, &rh);
         if (x < rx || x >= rx + rw || y < ry || y >= ry + rh) continue;
         if (f->selected == i) return activate(f);
         f->selected = i;
-        return FM_CHANGED;
+        clamp_selection(f, count);
+        return act(FM_ACT_CHANGED, 0);
     }
-    return FM_NOOP;
+    return act(FM_ACT_NONE, 0);
 }
 
 /* ---------------------------------------------------------------- drawing -- */
@@ -144,12 +169,14 @@ static void draw_row(fb_t *fb, const fm_state_t *f, int count, int row) {
         const int cell = 5;
         const int ty = y + (h - 7 * cell) / 2;
 
-        if (row == 0) {
+        if (row < 2) {
             folder_icon(fb, icon_x + 16, y + 14, 96, h - 28, COL_FOLDER);
-            lcd_draw_text5x7(fb, "Wallpapers", text_x, ty, cell, COL_TEXT);
+            const char *label = (row == 0) ? "Wallpapers" : "demo";
+            lcd_draw_text5x7(fb, label, text_x, ty, cell, COL_TEXT);
 
             char meta[24];
-            snprintf(meta, sizeof(meta), "%d items", count);
+            if (row == 0) snprintf(meta, sizeof(meta), "%d items", count);
+            else snprintf(meta, sizeof(meta), "%d files", DEMO_FILE_COUNT);
             const int mw = lcd_text5x7_width(meta, cell);
             lcd_draw_text5x7(fb, meta, x + w - mw - 24, ty, cell, COL_DIM);
         } else {
@@ -169,6 +196,21 @@ static void draw_row(fb_t *fb, const fm_state_t *f, int count, int row) {
         const int label_cell = 4;
         lcd_draw_text5x7(fb, "back", text_x + lcd_text5x7_width(".. ", cell),
                          y + (h - 7 * label_cell) / 2, label_cell, COL_DIM);
+        return;
+    }
+
+    if (f->level == 2) {
+        const int index = row - 1;
+        if (index < DEMO_FILE_COUNT) {
+            const char *name = k_demo_files[index].name;
+            doc_icon(fb, icon_x + 24, y + 12, 80, h - 24, COL_TEXT);
+            lcd_draw_text5x7(fb, name, text_x, y + (h - 7 * 5) / 2, 5, COL_TEXT);
+
+            const char *lang = code_lang_name(code_lang_for(name));
+            const int mw = lcd_text5x7_width(lang, 5);
+            lcd_draw_text5x7(fb, lang, x + w - mw - 24, y + (h - 7 * 5) / 2, 5,
+                             COL_DIM);
+        }
         return;
     }
 
@@ -199,13 +241,17 @@ void fm_draw(fb_t *fb, const fm_state_t *f, int count) {
     fb_border(fb, FM_X, HEADER_Y, FM_W, HEADER_H, 2, COL_LINE);
 
     const int cell = 6;
-    const char *path = (f->level == 0) ? "/" : "/ Wallpapers";
+    const char *path = (f->level == 0) ? "/"
+                     : (f->level == 2) ? "/ demo"
+                                       : "/ Wallpapers";
     lcd_draw_text5x7(fb, path, FM_X + 18,
                      HEADER_Y + (HEADER_H - 7 * cell) / 2, cell, COL_TEXT);
 
     char meta[32];
     if (f->level == 0) {
-        snprintf(meta, sizeof(meta), "1 folder");
+        snprintf(meta, sizeof(meta), "3 items");
+    } else if (f->level == 2) {
+        snprintf(meta, sizeof(meta), "%d files", DEMO_FILE_COUNT);
     } else {
         snprintf(meta, sizeof(meta), "%d files", count);
     }
@@ -214,7 +260,18 @@ void fm_draw(fb_t *fb, const fm_state_t *f, int count) {
                      HEADER_Y + (HEADER_H - 7 * 4) / 2, 4, COL_DIM);
 
     const int rows = row_count(f, count);
-    for (int i = 0; i < rows; i++) draw_row(fb, f, count, i);
+    const int last = rows < f->scroll + ROWS_VISIBLE ? rows : f->scroll + ROWS_VISIBLE;
+    for (int i = f->scroll; i < last; i++) draw_row(fb, f, count, i);
+
+    if (rows > ROWS_VISIBLE) {
+        const int track_x = FM_X + FM_W - 6;
+        const int track_y = ROW_Y;
+        const int track_h = ROWS_VISIBLE * (ROW_H + ROW_GAP) - ROW_GAP;
+        fb_fill(fb, track_x, track_y, 3, track_h, COL_LINE);
+        const int thumb_h = track_h * ROWS_VISIBLE / rows;
+        const int thumb_y = track_y + (track_h - thumb_h) * f->scroll / (rows - ROWS_VISIBLE);
+        fb_fill(fb, track_x, thumb_y, 3, thumb_h, COL_ACCENT);
+    }
 }
 
 void fm_draw_tile(fb_t *fb, int x, int y, int w, int h) {

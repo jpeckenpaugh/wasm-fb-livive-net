@@ -21,20 +21,29 @@
 #define FM_SCREEN_H 720
 
 typedef struct {
-    int level;    /* 0 = root, 1 = inside Wallpapers */
+    int level;    /* 0 = root, 1 = Wallpapers, 2 = demo */
     int selected; /* row index at the current level */
+    int scroll;   /* first visible row; only the first few rows fit */
 } fm_state_t;
 
 /* Returned by fm_click()/fm_key(). */
-#define FM_NOOP (-1)
-#define FM_CHANGED (-2)
-#define FM_OPEN_ABOUT (-3)
+enum {
+    FM_ACT_NONE = 0,
+    FM_ACT_CHANGED,
+    FM_ACT_IMAGE,
+    FM_ACT_ABOUT,
+    FM_ACT_DEMO
+};
+
+typedef struct {
+    int kind;  /* FM_ACT_* */
+    int index; /* image or demo index */
+} fm_action_t;
 
 void fm_init(fm_state_t *f);
 
-/* Returns FM_NOOP, FM_CHANGED, or an image index to open in Preview. */
-int fm_key(fm_state_t *f, int count, int key);
-int fm_click(fm_state_t *f, int count, int x, int y);
+fm_action_t fm_key(fm_state_t *f, int count, int key);
+fm_action_t fm_click(fm_state_t *f, int count, int x, int y);
 
 void fm_draw(fb_t *fb, const fm_state_t *f, int count);
 void fm_draw_tile(fb_t *fb, int x, int y, int w, int h);

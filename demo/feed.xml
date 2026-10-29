@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>wasm-fb</title>
+  <updated>2026-10-29T12:00:00Z</updated>
+  <entry>
+    <title>Framebuffer demo</title>
+    <id>urn:uuid:1</id>
+  </entry>
+</feed>

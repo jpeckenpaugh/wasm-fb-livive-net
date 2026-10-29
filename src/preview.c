@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "about_gen.h"
+#include "code.h"
 #include "lcd.h"
 #include "markdown.h"
 
@@ -11,6 +12,7 @@
 #define COL_DIM RGB(0x8b, 0x9b, 0xaa)
 #define COL_ACCENT RGB(0x4c, 0xc2, 0xff)
 #define COL_DOC_EDGE RGB(0x8f, 0xd8, 0xa8)
+#define COL_CODE_EDGE RGB(0x4c, 0xc2, 0xff)
 
 static const char *k_names[] = {
     "01_aurora.png", "02_rings.png", "03_checker.png",
@@ -35,6 +37,52 @@ void preview_set_image(preview_state_t *p, int index, int count) {
 
 void preview_set_doc(preview_state_t *p) {
     p->kind = PREVIEW_DOC;
+}
+
+void preview_set_code(preview_state_t *p, const demo_file_t *file) {
+    if (!file) return;
+    p->kind = PREVIEW_CODE;
+    p->file = file;
+    p->line_off = 0;
+    p->col_off = 0;
+}
+
+static void draw_caption(fb_t *fb, const char *title, const char *meta_text,
+                         int pad, uint32_t edge);
+
+int preview_scroll(preview_state_t *p, int key) {
+    if (!p || p->kind != PREVIEW_CODE) return 0;
+
+    switch (key) {
+        case 50: /* up */    p->line_off -= 1; break;
+        case 51: /* down */  p->line_off += 1; break;
+        case 60: /* pgup */  p->line_off -= 14; break;
+        case 61: /* pgdn */  p->line_off += 14; break;
+        case 40: /* [ */     p->col_off -= 4; break;
+        case 41: /* ] */     p->col_off += 4; break;
+        default: return 0;
+    }
+    if (p->line_off < 0) p->line_off = 0;
+    if (p->col_off < 0) p->col_off = 0;
+    return 1;
+}
+
+static void draw_code(fb_t *fb, preview_state_t *p) {
+    fb_clear(fb, RGB(0x08, 0x0b, 0x0f));
+
+    const int margin = 30;
+    const int top = 108;
+    fb_fill(fb, margin, top, fb->w - 2 * margin, fb->h - top - 20,
+            RGB(0x0c, 0x10, 0x15));
+    fb_border(fb, margin, top, fb->w - 2 * margin, fb->h - top - 20, 1,
+              RGB(0x2a, 0x36, 0x44));
+
+    const code_lang_t lang = code_lang_for(p->file->name);
+    code_draw(fb, p->file->text, margin + 6, top + 6,
+              fb->w - 2 * margin - 12, fb->h - top - 32, 4, lang,
+              &p->line_off, &p->col_off);
+
+    draw_caption(fb, p->file->name, code_lang_name(lang), 18, COL_CODE_EDGE);
 }
 
 static void draw_caption(fb_t *fb, const char *title, const char *meta_text,
@@ -69,12 +117,17 @@ static void draw_doc(fb_t *fb) {
             bottom - top, 5);
 }
 
-void preview_draw(fb_t *fb, const preview_state_t *p, const image_t *images, int count) {
+void preview_draw(fb_t *fb, preview_state_t *p, const image_t *images, int count) {
     if (!fb || !fb->px || !p) return;
 
     if (p->kind == PREVIEW_DOC) {
         draw_doc(fb);
         draw_caption(fb, "ABOUT.md", "markdown", 18, COL_DOC_EDGE);
+        return;
+    }
+
+    if (p->kind == PREVIEW_CODE && p->file) {
+        draw_code(fb, p);
         return;
     }
 

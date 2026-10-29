@@ -9,6 +9,7 @@
 
 #include "cal.h"
 #include "calc.h"
+#include "demo_gen.h"
 #include "fm.h"
 #include "preview.h"
 #include "clock.h"
@@ -99,14 +100,16 @@ int app_click(int x, int y) {
     }
 
     if (media_is_fm(&g_media)) {
-        int r = fm_click(&g_fm, g_media.count, x, y);
-        if (r == FM_NOOP) return 0;
-        if (r >= 0) {
-            /* Opening a file hands it to Preview and switches screens. */
-            preview_set_image(&g_preview, r, g_media.count);
+        const fm_action_t a = fm_click(&g_fm, g_media.count, x, y);
+        if (a.kind == FM_ACT_NONE) return 0;
+        if (a.kind == FM_ACT_IMAGE) {
+            preview_set_image(&g_preview, a.index, g_media.count);
             media_select(&g_media, MEDIA_PREVIEW_SLOT);
-        } else if (r == FM_OPEN_ABOUT) {
+        } else if (a.kind == FM_ACT_ABOUT) {
             preview_set_doc(&g_preview);
+            media_select(&g_media, MEDIA_PREVIEW_SLOT);
+        } else if (a.kind == FM_ACT_DEMO) {
+            preview_set_code(&g_preview, &k_demo_files[a.index]);
             media_select(&g_media, MEDIA_PREVIEW_SLOT);
         }
         draw();
@@ -142,15 +145,23 @@ int app_key(int key) {
     if (media_is_fm(&g_media)) {
         /* Enter shares the calculator's "=" code; only one screen is active. */
         const int fm_key_code = (key == 24) ? FM_KEY_OPEN : key;
-        int r = fm_key(&g_fm, g_media.count, fm_key_code);
-        if (r == FM_NOOP) return 0;
-        if (r >= 0) {
-            preview_set_image(&g_preview, r, g_media.count);
+        const fm_action_t a = fm_key(&g_fm, g_media.count, fm_key_code);
+        if (a.kind == FM_ACT_NONE) return 0;
+        if (a.kind == FM_ACT_IMAGE) {
+            preview_set_image(&g_preview, a.index, g_media.count);
             media_select(&g_media, MEDIA_PREVIEW_SLOT);
-        } else if (r == FM_OPEN_ABOUT) {
+        } else if (a.kind == FM_ACT_ABOUT) {
             preview_set_doc(&g_preview);
             media_select(&g_media, MEDIA_PREVIEW_SLOT);
+        } else if (a.kind == FM_ACT_DEMO) {
+            preview_set_code(&g_preview, &k_demo_files[a.index]);
+            media_select(&g_media, MEDIA_PREVIEW_SLOT);
         }
+        draw();
+        return 1;
+    }
+
+    if (media_is_preview(&g_media) && preview_scroll(&g_preview, key)) {
         draw();
         return 1;
     }

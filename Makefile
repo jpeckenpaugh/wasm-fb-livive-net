@@ -11,7 +11,7 @@ CC   ?= cc
 
 SRC         := src/main.c src/framebuffer.c src/media.c src/ui.c src/lcd.c \
                src/font5x7.c src/clock.c src/calc.c src/cal.c \
-               src/fm.c src/preview.c src/markdown.c
+               src/fm.c src/preview.c src/markdown.c src/code.c
 
 LDLIBS      ?= -lm
 ASSET_UNITS := asset_0 asset_1 asset_2 asset_3 asset_4
@@ -19,7 +19,7 @@ GEN_UNITS   := assets_gen $(ASSET_UNITS)
 
 WASM_OBJS := $(patsubst src/%.c,$(OBJ)/wasm/%.o,$(SRC)) \
              $(addprefix $(OBJ)/wasm/,$(addsuffix .o,$(GEN_UNITS))) \
-             $(OBJ)/wasm/about_gen.o
+             $(OBJ)/wasm/about_gen.o $(OBJ)/wasm/demo_gen.o
 
 CFLAGS    ?= -std=c11 -Wall -Wextra -O2
 INCLUDES  := -Isrc -I$(GEN)
@@ -37,7 +37,8 @@ ASSETS   := $(wildcard assets/*.png assets/*.jpg assets/*.jpeg)
 NATIVE_COMMON := $(OBJ)/native/src/framebuffer.o
 NATIVE_ASSETS := $(OBJ)/native/$(GEN)/assets_gen.o \
                  $(addprefix $(OBJ)/native/$(GEN)/,$(addsuffix .o,$(ASSET_UNITS))) \
-                 $(OBJ)/native/$(GEN)/about_gen.o
+                 $(OBJ)/native/$(GEN)/about_gen.o \
+                 $(OBJ)/native/$(GEN)/demo_gen.o
 
 .PHONY: all assets test clean debug release serve
 
@@ -50,6 +51,13 @@ $(GEN)/about_gen.c: ABOUT.md tools/embed_about.py
 	python3 tools/embed_about.py --in ABOUT.md --out $(GEN)
 
 $(GEN)/about_gen.h: $(GEN)/about_gen.c
+
+# demo/* source samples, one per supported language.
+$(GEN)/demo_gen.c: $(wildcard demo/*) tools/embed_demo.py
+	@mkdir -p $(GEN)
+	python3 tools/embed_demo.py --dir demo --out $(GEN)
+
+$(GEN)/demo_gen.h: $(GEN)/demo_gen.c
 
 # The generated header is the marker for the whole asset set.
 $(GEN)/assets_gen.h: $(ASSETS) tools/prepare_assets.py
@@ -89,7 +97,7 @@ TEST_OBJS := $(OBJ)/native/tests/test_pixels.o $(OBJ)/native/tests/test_lcd.o \
              $(OBJ)/native/src/lcd.o $(OBJ)/native/src/font5x7.o \
              $(OBJ)/native/src/calc.o $(OBJ)/native/src/cal.o \
              $(OBJ)/native/src/fm.o $(OBJ)/native/src/preview.o \
-             $(OBJ)/native/src/markdown.o \
+             $(OBJ)/native/src/markdown.o $(OBJ)/native/src/code.o \
              $(NATIVE_ASSETS)
 
 LCD_OBJS := $(OBJ)/native/src/lcd.o $(OBJ)/native/src/font5x7.o
@@ -103,6 +111,7 @@ $(BUILD)/test_pixels: $(OBJ)/native/tests/test_pixels.o \
                       $(OBJ)/native/src/clock.o $(OBJ)/native/src/calc.o \
                       $(OBJ)/native/src/cal.o $(OBJ)/native/src/fm.o \
                       $(OBJ)/native/src/preview.o $(OBJ)/native/src/markdown.o \
+                      $(OBJ)/native/src/code.o \
                       $(NATIVE_ASSETS) $(LCD_OBJS) \
                       $(NATIVE_ASSETS) $(NATIVE_COMMON)
 	$(CC) $^ -o $@ $(LDLIBS)
@@ -123,10 +132,14 @@ $(BUILD)/test_cal: $(OBJ)/native/tests/test_cal.o $(OBJ)/native/src/cal.o \
 	$(CC) $^ -o $@ $(LDLIBS)
 
 $(BUILD)/test_fm: $(OBJ)/native/tests/test_fm.o $(OBJ)/native/src/fm.o \
-                  $(LCD_OBJS) $(NATIVE_ASSETS) $(NATIVE_COMMON)
+                  $(OBJ)/native/src/code.o $(LCD_OBJS) $(NATIVE_ASSETS) $(NATIVE_COMMON)
 	$(CC) $^ -o $@ $(LDLIBS)
 
-test: $(BUILD)/test_pixels $(BUILD)/test_lcd $(BUILD)/test_clock $(BUILD)/test_calc $(BUILD)/test_cal $(BUILD)/test_fm
+$(BUILD)/test_code: $(OBJ)/native/tests/test_code.o $(OBJ)/native/src/code.o \
+                    $(LCD_OBJS) $(NATIVE_COMMON)
+	$(CC) $^ -o $@ $(LDLIBS)
+
+test: $(BUILD)/test_pixels $(BUILD)/test_lcd $(BUILD)/test_clock $(BUILD)/test_calc $(BUILD)/test_cal $(BUILD)/test_fm $(BUILD)/test_code
 	@for t in $^; do ./$$t; done
 
 # Force regeneration after editing assets/.

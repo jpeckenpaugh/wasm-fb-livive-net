@@ -28,8 +28,9 @@ const KEY_CODES = {
   '.': 27, ',': 27,
   /* calendar navigation */
   '[': 40, ']': 41, '<': 42, '>': 43,
-  /* file manager */
+  /* file manager + code scrolling */
   'ArrowUp': 50, 'ArrowDown': 51,
+  'PageUp': 60, 'PageDown': 61,
 };
 
 /* Slot 1 is the calculator (see MEDIA_CALC_SLOT in src/media.h); the rest map

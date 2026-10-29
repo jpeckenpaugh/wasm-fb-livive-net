@@ -7,22 +7,31 @@
 #define PREVIEW_H
 
 #include "assets_gen.h"
+#include "demo_gen.h"
 #include "framebuffer.h"
 
 enum {
     PREVIEW_NONE = 0,
     PREVIEW_IMAGE = 1,
-    PREVIEW_DOC = 2
+    PREVIEW_DOC = 2,
+    PREVIEW_CODE = 3
 };
 
 typedef struct {
-    int index; /* image index, -1 when nothing has been opened yet */
-    int kind;  /* PREVIEW_* */
+    int index;        /* image index, -1 when nothing has been opened yet */
+    int kind;         /* PREVIEW_* */
+    const demo_file_t *file; /* for PREVIEW_CODE */
+    int line_off;     /* code scroll, in lines */
+    int col_off;      /* code scroll, in columns */
 } preview_state_t;
 
 void preview_init(preview_state_t *p);
 void preview_set_image(preview_state_t *p, int index, int count);
 void preview_set_doc(preview_state_t *p);
-void preview_draw(fb_t *fb, const preview_state_t *p, const image_t *images, int count);
+void preview_set_code(preview_state_t *p, const demo_file_t *file);
+void preview_draw(fb_t *fb, preview_state_t *p, const image_t *images, int count);
+
+/* Scroll the code view. Returns 1 when the offset changed. */
+int preview_scroll(preview_state_t *p, int key);
 
 #endif /* PREVIEW_H */

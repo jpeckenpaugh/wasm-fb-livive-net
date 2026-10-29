@@ -1,0 +1,18 @@
+:root {
+  --bg: #0c1015;
+  --fg: #e4ecf2;
+}
+
+.app {
+  background: var(--bg);
+  color: var(--fg);
+  padding: 24px;
+}
+
+.list > li {
+  margin: 6px 0;
+}
+
+@media (max-width: 640px) {
+  .app { padding: 8px; }
+}

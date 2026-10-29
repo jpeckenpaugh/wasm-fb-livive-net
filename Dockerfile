@@ -16,6 +16,7 @@ RUN embuilder build sysroot --quiet || true
 FROM toolchain AS build
 COPY Makefile ./
 COPY ABOUT.md ./
+COPY demo ./demo
 COPY tools ./tools
 COPY assets ./assets
 COPY src ./src

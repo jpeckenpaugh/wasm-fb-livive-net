@@ -13,7 +13,7 @@ void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui) {
     const calc_state_t *calc = ui ? ui->calc : NULL;
     const cal_state_t *cal = ui ? ui->cal : NULL;
     const fm_state_t *fm = ui ? ui->fm : NULL;
-    const preview_state_t *preview = ui ? ui->preview : NULL;
+    preview_state_t *preview = ui ? ui->preview : NULL;
 
     const int on_calc = media_is_calc(m) && calc;
     const int on_cal = media_is_cal(m) && cal;
@@ -92,7 +92,8 @@ void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui) {
          * artwork. */
         int thumb = i;
         const int doc_tile = (i == MEDIA_PREVIEW_SLOT && preview &&
-                              preview->kind == PREVIEW_DOC);
+                              (preview->kind == PREVIEW_DOC ||
+                               preview->kind == PREVIEW_CODE));
         if (i == MEDIA_PREVIEW_SLOT && preview && preview->index >= 0 &&
             preview->index < m->count && !doc_tile) {
             thumb = preview->index;

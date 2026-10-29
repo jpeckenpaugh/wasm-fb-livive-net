@@ -42,15 +42,15 @@ move between them.
 | images 2-5 | photo, `HH:MM` on thumbnail 1 |
 | calculator (tile 2) | clickable keypad, integer and decimal entry with thousands separators, value previewed on its tile |
 | calendar (tile 3) | month grid with today highlighted; browse months/years; tile previews `NOV 29` |
-| files (tile 4) | `/` with `Wallpapers` (the five baked images) and `ABOUT.md`; click a file to open it |
-| preview (tile 5) | full-bleed image with a name/size caption, or a rendered `ABOUT.md` |
+| files (tile 4) | `/` with `Wallpapers` (5 images), `demo` (8 source samples) and `ABOUT.md`; scrolls when the list is long |
+| preview (tile 5) | full-bleed image with a caption, rendered `ABOUT.md`, or a syntax-highlighted source file |
 
 Both live in the same guest and are reached with the existing
 `app_click()`/`app_key()` path — no per-app exports. The clock repaints about
 once a second while seconds are visible and once a minute otherwise; the
 calculator repaints only on input.
 
-See `docs/clock.md`, `docs/calc.md`, `docs/fonts.md`, `docs/markdown.md` for the design notes.
+See `docs/clock.md`, `docs/calc.md`, `docs/fonts.md`, `docs/markdown.md`, `docs/code.md` for the design notes.
 
 ## Develop
 

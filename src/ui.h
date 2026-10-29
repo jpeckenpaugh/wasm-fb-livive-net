@@ -46,7 +46,7 @@ typedef struct {
     const calc_state_t *calc;
     const cal_state_t *cal;
     const fm_state_t *fm;
-    const preview_state_t *preview;
+    preview_state_t *preview;
 } ui_state_t;
 
 void ui_draw(fb_t *fb, const media_t *m, const ui_state_t *ui);

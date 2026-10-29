@@ -1,0 +1,8 @@
+{
+  "name": "wasm-fb",
+  "version": 1,
+  "apps": ["clock", "calculator", "calendar"],
+  "preview": { "width": 1280, "height": 720 },
+  "ok": true,
+  "ratio": 0.5
+}
