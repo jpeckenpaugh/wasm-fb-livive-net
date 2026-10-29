@@ -25,8 +25,9 @@ That builds the wasm module inside the pinned toolchain image (Emscripten
 6.0.13 + Pillow 11.3.0) and serves `web/` with nginx. Nothing is written to the
 host filesystem.
 
-Append `?stats=1` for per-frame timings. The first panel starts automatically;
-**Add instance** creates a fully independent second one.
+The console boots the first guest automatically; **+ new guest** starts another.
+Each guest is a tab with its own state, framebuffer and telemetry row; the top
+bar shows host-level counters (module size, reserved memory, blits, uptime).
 
 ## Develop
 
@@ -94,7 +95,8 @@ an asset does not match the layout.
 | `app_key(k)` | 1 = left, 2 = right, 3 = next; returns 1 if changed |
 | `app_framebuffer()` | pointer to RGBA8888 bytes (JS reads via `HEAPU8`) |
 | `app_width()` / `app_height()` | logical dimensions |
-| `app_selected()` | current index (debug/stats) |
+| `app_selected()` | current index (telemetry) |
+| `app_count()` | number of bundled images |
 | `app_set_test_pattern(on)` | M1 colour/orientation pattern |
 | `app_destroy()` | free the buffer |
 
@@ -148,7 +150,8 @@ by GC.
 | reserved linear memory | 64 MiB (`ALLOW_MEMORY_GROWTH=0`) |
 | cold container build (cached toolchain layer) | ~2 s of actual compilation |
 
-Numbers come from the `?stats=1` panel, not a benchmark harness.
+Numbers come from the console telemetry (render / blit / present timings,
+reserved linear memory), not a benchmark harness.
 
 ## Status against the concept milestones
 
@@ -158,7 +161,7 @@ Numbers come from the `?stats=1` panel, not a benchmark harness.
 | M2 — bundled five-image gallery | done, zero network requests for image data |
 | M3 — host-to-guest input | done, hit testing lives in C |
 | M4 — independent instances | done, shared wasm binary / separate memories |
-| M5 — cleanup and evaluation | `?stats=1` panel, `make test`, this README; module size printed at link |
+| M5 — cleanup and evaluation | console telemetry, `make test`, this README; module size printed at link |
 
 ### Known limitations
 

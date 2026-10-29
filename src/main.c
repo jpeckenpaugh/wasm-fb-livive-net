@@ -110,6 +110,11 @@ int app_selected(void) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+int app_count(void) {
+    return g_media.count;
+}
+
+EMSCRIPTEN_KEEPALIVE
 void app_set_test_pattern(int enabled) {
     g_test_pattern = enabled ? 1 : 0;
     draw();

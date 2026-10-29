@@ -1,8 +1,8 @@
 /* Host bridge: instantiate the wasm module, forward input, blit pixels.
  *
  * This file must never contain gallery logic. It knows only: logical size,
- * how to map a pointer into it, how to copy the framebuffer to a canvas, and
- * how to create/destroy instances.
+ * how to map a pointer into it, how to copy the framebuffer to a canvas, how
+ * to create/destroy guests, and how to report the resulting telemetry.
  */
 import createMediaBrowser from './build/media_browser.mjs';
 
@@ -13,15 +13,45 @@ const FB_BYTES = W * H * 4;
 /* Keep in sync with KEY_* in src/main.c. */
 const KEY_CODES = { ArrowLeft: 1, ArrowRight: 2, ' ': 3, Enter: 3 };
 
-const showStats = new URLSearchParams(location.search).has('stats');
+const KiB = 1024;
+const MiB = 1024 * KiB;
 
-const instancesEl = document.getElementById('instances');
-const statusEl = document.getElementById('status');
-const addButton = document.getElementById('add');
+const tabsEl = document.getElementById('tabs');
+const panelsEl = document.getElementById('panels');
+const newVmButton = document.getElementById('new-vm');
 const patternToggle = document.getElementById('pattern');
+const statusLeft = document.getElementById('sb-left');
+const statusCopies = document.getElementById('sb-copies');
+const hostModule = document.getElementById('h-module');
+const hostGuests = document.getElementById('h-guests');
+const hostMem = document.getElementById('h-mem');
+const hostBlits = document.getElementById('h-frames');
+const hostUptime = document.getElementById('h-uptime');
 
-/* Compile the module once and share it between instances; each factory call
- * still gets its own linear memory and application state.
+const guests = [];
+let activeId = null;
+let nextId = 1;
+let totalBlits = 0;
+let moduleBytes = 0;
+const bootAt = performance.now();
+
+const fmtBytes = (n) => {
+  if (!n) return '0 B';
+  if (n >= MiB) return `${(n / MiB).toFixed(2)} MiB`;
+  if (n >= KiB) return `${(n / KiB).toFixed(1)} KiB`;
+  return `${n} B`;
+};
+const fmtMs = (n) => `${n.toFixed(2)} ms`;
+const fmtDuration = (ms) => {
+  const total = Math.floor(ms / 1000);
+  const hh = String(Math.floor(total / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const ss = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+};
+
+/* Compile the module once and share it between guests; each factory call still
+ * gets its own linear memory and application state.
  *
  * `wasmBinary` is not accepted by Emscripten 6's trimmed INCOMING_MODULE_JS_API,
  * so we use the supported `instantiateWasm` hook instead. */
@@ -34,58 +64,197 @@ function loadWasmModule() {
         if (!response.ok) throw new Error(`failed to fetch ${url}: HTTP ${response.status}`);
         return response.arrayBuffer();
       })
-      .then((bytes) => WebAssembly.compile(bytes));
+      .then((bytes) => {
+        moduleBytes = bytes.byteLength;
+        updateHostStats();
+        return WebAssembly.compile(bytes);
+      });
   }
   return wasmModulePromise;
 }
 
-const instances = new Set();
-let nextId = 1;
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
+function setStatus(text, ok = false) {
+  statusLeft.replaceChildren();
+  if (ok) {
+    const dot = document.createElement('span');
+    dot.className = 'ok';
+    dot.textContent = text;
+    statusLeft.append(dot);
+  } else {
+    statusLeft.textContent = text;
+  }
 }
 
-async function createInstance() {
+function updateHostStats() {
+  hostModule.textContent = moduleBytes ? fmtBytes(moduleBytes) : '—';
+  hostGuests.textContent = guests.length;
+  const reserved = guests.reduce((sum, guest) => sum + (guest.heapBytes || 0), 0);
+  hostMem.textContent = reserved ? fmtBytes(reserved) : '0 B';
+  hostBlits.textContent = totalBlits;
+  statusCopies.textContent = totalBlits;
+}
+
+/* ---------------------------------------------------------------- panels -- */
+
+const PANEL_TEMPLATE = `
+  <div class="screen"><canvas tabindex="0" width="${W}" height="${H}"></canvas></div>
+  <dl class="vm-stats">
+    <div class="cell"><dt>state</dt><dd class="state" data-stat="state">running</dd></div>
+    <div class="cell"><dt>boot</dt><dd data-stat="boot">—</dd></div>
+    <div class="cell"><dt>render</dt><dd data-stat="render">—</dd></div>
+    <div class="cell"><dt>blit</dt><dd data-stat="blit">—</dd></div>
+    <div class="cell"><dt>present</dt><dd data-stat="present">—</dd></div>
+    <div class="cell"><dt>blits</dt><dd data-stat="blits">0</dd></div>
+    <div class="cell"><dt>selected</dt><dd data-stat="selected">—</dd></div>
+    <div class="cell"><dt>guest mem</dt><dd data-stat="mem">—</dd></div>
+    <div class="cell"><dt>framebuffer</dt><dd data-stat="fb">${fmtBytes(FB_BYTES)}</dd></div>
+  </dl>`;
+
+function createTab(vm) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tab-wrap';
+  wrap.innerHTML = `
+    <button class="tab" role="tab" type="button" id="tab-${vm.id}"
+            aria-controls="panel-${vm.id}" aria-selected="false" tabindex="-1">
+      <span class="dot running"></span><span>${vm.name}</span>
+    </button>
+    <button class="tab-close" type="button" aria-label="Stop ${vm.name}"
+            title="Stop ${vm.name}">×</button>`;
+
+  const tab = wrap.querySelector('.tab');
+  tab.addEventListener('click', () => {
+    activate(vm.id);
+    vm.canvas.focus({ preventScroll: true });
+  });
+  tab.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const index = guests.indexOf(vm);
+    const step = event.key === 'ArrowRight' ? 1 : guests.length - 1;
+    const next = guests[(index + step) % guests.length];
+    activate(next.id);
+    next.wrap.querySelector('.tab').focus();
+  });
+  wrap.querySelector('.tab-close').addEventListener('click', (event) => {
+    event.stopPropagation();
+    destroyGuest(vm);
+  });
+  return wrap;
+}
+
+function activate(id) {
+  activeId = id;
+  for (const guest of guests) {
+    const on = guest.id === id;
+    guest.wrap.classList.toggle('active', on);
+    const tab = guest.wrap.querySelector('.tab');
+    tab.setAttribute('aria-selected', on ? 'true' : 'false');
+    tab.tabIndex = on ? 0 : -1;
+    guest.panel.hidden = !on;
+  }
+  updateHostStats();
+}
+
+function statNode(guest, key) {
+  return guest.panel.querySelector(`[data-stat="${key}"]`);
+}
+
+function updateGuestStats(guest) {
+  statNode(guest, 'boot').textContent = fmtMs(guest.boot);
+  statNode(guest, 'render').textContent = fmtMs(guest.last.render);
+  statNode(guest, 'blit').textContent = fmtMs(guest.last.blit);
+  statNode(guest, 'present').textContent = fmtMs(guest.last.present);
+  statNode(guest, 'blits').textContent = guest.frames;
+  statNode(guest, 'selected').textContent =
+    `${guest.selected + 1} / ${guest.count}`;
+  statNode(guest, 'mem').textContent = fmtBytes(guest.heapBytes);
+}
+
+function markFault(guest, message) {
+  guest.faulted = true;
+  const state = statNode(guest, 'state');
+  state.textContent = 'fault';
+  state.style.color = '#ff9b9b';
+  guest.wrap.classList.remove('active');
+  guest.wrap.querySelector('.dot').classList.remove('running');
+  guest.panel.querySelector('.screen').innerHTML =
+    `<div class="fault">instantiation failed<br><span>${message}</span></div>`;
+  setStatus(`${guest.name} · fault`);
+}
+
+function destroyGuest(guest) {
+  const index = guests.indexOf(guest);
+  if (index < 0) return;
+  guest.disposed = true;
+  guests.splice(index, 1);
+
+  if (guest.module) {
+    try {
+      guest.module._app_destroy();
+    } catch (error) {
+      console.error(error);
+    }
+    guest.module = null;
+  }
+
+  guest.wrap.remove();
+  guest.panel.remove();
+
+  if (activeId === guest.id) {
+    const next = guests[Math.min(index, guests.length - 1)];
+    activate(next ? next.id : null);
+  }
+  if (guests.length === 0) emptyState.hidden = false;
+  updateHostStats();
+  setStatus('ready · click a thumbnail to select', true);
+}
+
+/* ---------------------------------------------------------------- create -- */
+
+async function createGuest() {
   const id = nextId++;
+  const vm = {
+    id,
+    name: `vm-${String(id).padStart(2, '0')}`,
+    module: null,
+    frames: 0,
+    boot: 0,
+    heapBytes: 0,
+    count: 0,
+    selected: 0,
+    disposed: false,
+    faulted: false,
+    last: { render: 0, blit: 0, present: 0 },
+  };
 
-  const section = el('section', 'instance');
-  const header = el('header');
-  header.append(
-    el('span', 'title', `Instance ${id}`),
-    el('span', 'meta', `${W} × ${H} · RGBA8888`),
-  );
-  const closeButton = el('button', 'close', 'Close');
-  closeButton.type = 'button';
-  header.append(closeButton);
+  vm.wrap = createTab(vm);
+  tabsEl.append(vm.wrap);
 
-  const canvas = el('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  canvas.tabIndex = 0;
+  vm.panel = document.createElement('section');
+  vm.panel.className = 'vm-panel';
+  vm.panel.id = `panel-${id}`;
+  vm.panel.setAttribute('role', 'tabpanel');
+  vm.panel.setAttribute('aria-labelledby', `tab-${id}`);
+  vm.panel.hidden = true;
+  vm.panel.innerHTML = PANEL_TEMPLATE;
+  panelsEl.append(vm.panel);
 
-  const stats = el('div', 'stats');
-  if (!showStats) stats.hidden = true;
+  vm.canvas = vm.panel.querySelector('canvas');
+  guests.push(vm);
+  emptyState.hidden = true;
+  activate(id);
+  updateHostStats();
 
-  section.append(header, canvas, stats);
-  instancesEl.append(section);
-
-  const ctx = canvas.getContext('2d', { alpha: false });
-  const image = ctx.createImageData(W, H);
-
-  let module = null;
   try {
     const wasmModule = await loadWasmModule();
-    const startedAt = performance.now();
+
     /* instantiateWasm has no error channel: if linking fails, Emscripten's
      * factory promise never settles. Race it so the panel surfaces the error
      * instead of hanging blank forever. */
     let rejectInit;
     const initFailed = new Promise((_, reject) => { rejectInit = reject; });
-    module = await Promise.race([
+    const startedAt = performance.now();
+    const module = await Promise.race([
       createMediaBrowser({
         locateFile: (file) => new URL(`./build/${file}`, import.meta.url).href,
         instantiateWasm(imports, success) {
@@ -98,138 +267,135 @@ async function createInstance() {
       }),
       initFailed,
     ]);
+
+    if (vm.disposed) {
+      module._app_destroy();
+      return vm;
+    }
     if (!module._app_init(W, H)) throw new Error('app_init() returned 0');
-    const initMs = performance.now() - startedAt;
 
+    vm.module = module;
+    vm.boot = performance.now() - startedAt;
+    vm.heapBytes = module.HEAPU8.length;
+    vm.count = module._app_count();
+    vm.selected = module._app_selected();
+
+    const ctx = vm.canvas.getContext('2d', { alpha: false });
+    const image = ctx.createImageData(W, H);
     const fbPtr = module._app_framebuffer();
-    const heap = module.HEAPU8;
-    if (!heap) throw new Error('HEAPU8 is not exported; check EXPORTED_RUNTIME_METHODS');
-
-    let lastRenderMs = 0;
-    let renders = 0;
+    if (!fbPtr) throw new Error('app_framebuffer() returned null');
 
     const render = () => {
-      const started = performance.now();
-      module._app_render();
-      // No ALLOW_MEMORY_GROWTH in this build, so the view is stable; we still
-      // re-read it every frame because that is the documented contract.
-      image.data.set(module.HEAPU8.subarray(fbPtr, fbPtr + FB_BYTES));
+      if (vm.disposed || !vm.module) return;
+      const t0 = performance.now();
+      vm.module._app_render();
+      const t1 = performance.now();
+      image.data.set(vm.module.HEAPU8.subarray(fbPtr, fbPtr + FB_BYTES));
+      const t2 = performance.now();
       ctx.putImageData(image, 0, 0);
-      lastRenderMs = performance.now() - started;
-      renders++;
-      if (showStats) {
-        stats.textContent =
-          `${lastRenderMs.toFixed(2)} ms/render · ` +
-          `${(FB_BYTES / 1048576).toFixed(2)} MiB copy · ` +
-          `heap ${(module.HEAPU8.length / 1048576).toFixed(1)} MiB · ` +
-          `selected ${module._app_selected()} · init ${initMs.toFixed(1)} ms · ` +
-          `${renders} render(s)`;
-      }
+      const t3 = performance.now();
+
+      vm.last = { render: t1 - t0, blit: t2 - t1, present: t3 - t2 };
+      vm.frames += 1;
+      totalBlits += 1;
+      vm.selected = vm.module._app_selected();
+      updateGuestStats(vm);
+      updateHostStats();
     };
 
     const clickLogical = (x, y) => {
-      const changed = module._app_click(x, y);
+      const changed = vm.module._app_click(x, y);
       if (changed) {
         render();
-        updateStatus();
+        setStatus(`${vm.name} · image ${vm.selected + 1} / ${vm.count} selected`);
       }
       return changed;
     };
 
-    const setTestPattern = (enabled) => {
-      module._app_set_test_pattern(enabled ? 1 : 0);
+    const setPattern = (enabled) => {
+      vm.module._app_set_test_pattern(enabled ? 1 : 0);
       render();
     };
 
-    canvas.addEventListener('pointerdown', (event) => {
+    vm.canvas.addEventListener('pointerdown', (event) => {
       event.preventDefault();
-      const rect = canvas.getBoundingClientRect();
+      const rect = vm.canvas.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
-      // CSS scaling only: the backing store is always W×H, so devicePixelRatio
-      // must NOT be involved here. Measure before focusing: focus() may scroll
-      // the page and move the rect underneath us.
+      /* CSS scaling only: the backing store is always W×H, so devicePixelRatio
+       * must NOT be involved here. Measure before focusing: focus() may scroll
+       * the page and move the rect underneath us. */
       const x = Math.floor(((event.clientX - rect.left) * W) / rect.width);
       const y = Math.floor(((event.clientY - rect.top) * H) / rect.height);
-      canvas.focus({ preventScroll: true });
+      vm.canvas.focus({ preventScroll: true });
       clickLogical(x, y);
     });
 
-    canvas.addEventListener('keydown', (event) => {
+    vm.canvas.addEventListener('keydown', (event) => {
       const code = KEY_CODES[event.key];
       if (code == null) return;
       event.preventDefault();
-      if (module._app_key(code)) {
+      if (vm.module._app_key(code)) {
         render();
-        updateStatus();
+        setStatus(`${vm.name} · image ${vm.selected + 1} / ${vm.count} selected`);
       }
     });
 
+    vm.render = render;
+    vm.clickLogical = clickLogical;
+    vm.setPattern = setPattern;
+
     render();
-
-    const handle = {
-      id,
-      section,
-      render,
-      clickLogical,
-      setTestPattern,
-      selected: () => module._app_selected(),
-      renders: () => renders,
-      destroy() {
-        instances.delete(handle);
-        module._app_destroy();
-        module = null;
-        section.remove();
-        updateStatus();
-      },
-    };
-
-    closeButton.addEventListener('click', () => handle.destroy());
-    instances.add(handle);
-    if (patternToggle.checked) handle.setTestPattern(true);
-    updateStatus();
-    return handle;
+    if (patternToggle.checked) setPattern(true);
+    setStatus(`${vm.name} · booted in ${fmtMs(vm.boot)}`, true);
+    return vm;
   } catch (error) {
     console.error(error);
-    section.querySelector('.title').textContent = `Instance ${id} — failed`;
-    section.append(el('div', 'error', String(error && error.message ? error.message : error)));
-    canvas.remove();
-    stats.remove();
-    return null;
+    if (!vm.disposed) markFault(vm, String(error && error.message ? error.message : error));
+    return vm;
   }
 }
 
-function updateStatus() {
-  const selected = [...instances].map((i) => i.selected() + 1).join(', ');
-  statusEl.textContent = instances.size === 0
-    ? 'no instances'
-    : `${instances.size} instance(s) · selected image: ${selected}`;
-}
+/* ------------------------------------------------------------------ boot -- */
 
-addButton.addEventListener('click', () => {
-  createInstance().catch((error) => console.error(error));
+const emptyState = document.createElement('div');
+emptyState.className = 'empty';
+emptyState.textContent = 'no guests attached — press “+ new guest”';
+panelsEl.append(emptyState);
+
+newVmButton.addEventListener('click', () => {
+  createGuest().catch((error) => console.error(error));
 });
 
 patternToggle.addEventListener('change', () => {
-  for (const instance of instances) instance.setTestPattern(patternToggle.checked);
+  for (const guest of guests) {
+    if (guest.setPattern) guest.setPattern(patternToggle.checked);
+  }
 });
+
+setInterval(() => {
+  hostUptime.textContent = fmtDuration(performance.now() - bootAt);
+}, 1000);
+hostUptime.textContent = '00:00:00';
+updateHostStats();
 
 /* Small debugging/verification surface; harmless in production. */
 window.__mediaBrowser = {
-  list: () => [...instances].map((i) => ({
-    id: i.id,
-    selected: i.selected(),
-    renders: i.renders(),
+  list: () => guests.map((guest) => ({
+    id: guest.id,
+    selected: guest.selected,
+    renders: guest.frames,
   })),
   click: (id, x, y) => {
-    const instance = [...instances].find((i) => i.id === id);
-    if (!instance) return null;
-    instance.clickLogical(x, y);
-    return instance.selected();
+    const guest = guests.find((candidate) => candidate.id === id);
+    if (!guest || !guest.clickLogical) return null;
+    guest.clickLogical(x, y);
+    return guest.selected;
   },
-  add: () => createInstance(),
+  add: () => createGuest(),
 };
 
-createInstance().catch((error) => {
+setStatus('booting wasm module…', true);
+createGuest().catch((error) => {
   console.error(error);
-  statusEl.textContent = 'failed to start: see console';
+  setStatus('failed to start: see console');
 });
