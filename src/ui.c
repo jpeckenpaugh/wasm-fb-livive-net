@@ -16,7 +16,9 @@ void ui_draw(fb_t *fb, const media_t *m) {
 
     if (m->count > 0) {
         const image_t *hero = &m->images[m->selected];
-        /* Blit 1:1 when the asset matches the layout; otherwise centre-fit. */
+        /* Blit 1:1 when the asset matches the layout; otherwise stretch into
+         * the slot. Assets are authored at the exact size, so this is only a
+         * fallback for a bad pipeline run. */
         if (hero->w == UI_MAIN_W && hero->h == UI_MAIN_H) {
             fb_blit(fb, UI_MAIN_X, UI_MAIN_Y, hero->px, hero->w, hero->h);
         } else {
@@ -55,8 +57,7 @@ void ui_draw_test_pattern(fb_t *fb) {
     fb_fill(fb, half_w, half_h, fb->w - half_w, fb->h - half_h, RGB(255, 255, 255));
 
     /* Diagonal: top-left to bottom-right. Catches vertical flips. */
-    int steps = fb->w < fb->h ? fb->w : fb->h;
-    for (int i = 0; i < steps; i++) {
+    for (int i = 0; i < fb->w; i++) {
         fb_fill(fb, i, i * fb->h / fb->w, 3, 3, RGB(255, 255, 0));
     }
 

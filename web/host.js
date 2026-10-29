@@ -51,7 +51,6 @@ function el(tag, className, text) {
 
 async function createInstance() {
   const id = nextId++;
-  const wasmModule = await loadWasmModule();
 
   const section = el('section', 'instance');
   const header = el('header');
@@ -79,14 +78,26 @@ async function createInstance() {
 
   let module = null;
   try {
+    const wasmModule = await loadWasmModule();
     const startedAt = performance.now();
-    module = await createMediaBrowser({
-      locateFile: (file) => new URL(`./build/${file}`, import.meta.url).href,
-      instantiateWasm(imports, success) {
-        WebAssembly.instantiate(wasmModule, imports).then((instance) => success(instance));
-        return {}; /* exports are delivered asynchronously via success() */
-      },
-    });
+    /* instantiateWasm has no error channel: if linking fails, Emscripten's
+     * factory promise never settles. Race it so the panel surfaces the error
+     * instead of hanging blank forever. */
+    let rejectInit;
+    const initFailed = new Promise((_, reject) => { rejectInit = reject; });
+    module = await Promise.race([
+      createMediaBrowser({
+        locateFile: (file) => new URL(`./build/${file}`, import.meta.url).href,
+        instantiateWasm(imports, success) {
+          WebAssembly.instantiate(wasmModule, imports).then(
+            (instance) => success(instance),
+            (error) => rejectInit(error),
+          );
+          return {}; /* exports are delivered asynchronously via success() */
+        },
+      }),
+      initFailed,
+    ]);
     if (!module._app_init(W, H)) throw new Error('app_init() returned 0');
     const initMs = performance.now() - startedAt;
 
@@ -174,6 +185,7 @@ async function createInstance() {
 
     closeButton.addEventListener('click', () => handle.destroy());
     instances.add(handle);
+    if (patternToggle.checked) handle.setTestPattern(true);
     updateStatus();
     return handle;
   } catch (error) {

@@ -135,6 +135,14 @@ static void test_media(void) {
     media_next(&m, -1);
     CHECK(m.selected == 4);
 
+    /* The asset pipeline and the layout must agree: this is the contract that
+     * makes the hero blit 1:1 and lets hit testing assume thumbnail size.
+     * Cross-file checks, because ASSET_* == ASSET_* alone proves nothing. */
+    CHECK(ASSET_MAIN_W == UI_MAIN_W);
+    CHECK(ASSET_MAIN_H == UI_MAIN_H);
+    CHECK(ASSET_THUMB_W == UI_TH_W);
+    CHECK(ASSET_THUMB_H == UI_TH_H);
+
     CHECK(g_images[0].w == ASSET_MAIN_W && g_images[0].h == ASSET_MAIN_H);
     CHECK(g_thumbs[0].w == ASSET_THUMB_W && g_thumbs[0].h == ASSET_THUMB_H);
     CHECK(g_images[0].px != NULL && g_thumbs[0].px != NULL);
@@ -149,19 +157,24 @@ static void test_ui_draw(void) {
 
     ui_draw(&fb, &m);
 
-    /* The hero image occupies its exact slot; sample the top-left pixel of the
-     * source and compare with what landed in the framebuffer. */
-    for (int y = 0; y < UI_MAIN_H; y++) {
+    /* The hero image occupies its exact slot; compare every pixel against the
+     * source. Stop at the first mismatch so a bad row is one failure, not 480. */
+    int mismatch = -1;
+    for (int y = 0; y < UI_MAIN_H && mismatch < 0; y++) {
         for (int x = 0; x < UI_MAIN_W; x++) {
             const uint8_t *s = g_images[m.selected].px +
                                ((size_t)y * UI_MAIN_W + (size_t)x) * 4;
             const uint8_t *d = at(&fb, UI_MAIN_X + x, UI_MAIN_Y + y);
             if (d[0] != s[0] || d[1] != s[1] || d[2] != s[2] || d[3] != s[3]) {
-                fprintf(stderr, "FAIL ui_draw: hero pixel mismatch at %d,%d\n", x, y);
-                failures++;
+                mismatch = y * UI_MAIN_W + x;
                 break;
             }
         }
+    }
+    if (mismatch >= 0) {
+        fprintf(stderr, "FAIL ui_draw: hero pixel mismatch at %d,%d\n",
+                mismatch % UI_MAIN_W, mismatch / UI_MAIN_W);
+        failures++;
     }
 
     /* Every thumbnail placement must be inside the canvas. */

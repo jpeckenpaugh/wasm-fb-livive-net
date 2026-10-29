@@ -42,13 +42,13 @@ $(GEN)/assets_gen.h: $(ASSETS) tools/prepare_assets.py
 	@mkdir -p $(GEN)
 	python3 tools/prepare_assets.py --assets assets --out $(GEN)
 
-# Side-effect files: the script writes these alongside the header. They are
-# listed as explicit targets so make does not treat them as deletable
-# intermediates, and so pattern rules can resolve them on a clean tree.
+# Side-effect files: the script writes these after the header (see
+# prepare_assets.py) so they are newer than the marker and this recipe does not
+# run on a normal build. If one goes missing, drop the marker and regenerate.
 GEN_CS := $(GEN)/assets_gen.c $(addprefix $(GEN)/,$(addsuffix .c,$(ASSET_UNITS)))
 
 $(GEN_CS): $(GEN)/assets_gen.h
-	@test -f $@ || { echo "missing $@: run 'make assets'"; exit 1; }
+	@test -f $@ || { echo "regenerating missing $@"; rm -f $(GEN)/assets_gen.h; $(MAKE) --no-print-directory $(GEN)/assets_gen.h; }
 
 $(OBJ)/wasm/%.o: src/%.c $(GEN)/assets_gen.h
 	@mkdir -p $(dir $@)

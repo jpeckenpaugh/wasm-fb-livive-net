@@ -45,6 +45,7 @@ int app_init(int width, int height) {
         return 0;
     }
 
+    g_test_pattern = 0;
     media_init(&g_media);
     g_ready = 1;
     draw();
@@ -120,5 +121,6 @@ void app_destroy(void) {
     g_fb.px = NULL;
     g_fb.w = 0;
     g_fb.h = 0;
+    g_test_pattern = 0;
     g_ready = 0;
 }
