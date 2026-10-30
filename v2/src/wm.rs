@@ -15,6 +15,7 @@ use crate::calc::{self, CalcApp};
 use crate::fb::{rgb, Framebuffer};
 use crate::files::{self, FilesApp};
 use crate::font::draw_str;
+use crate::mines::{self, MinesApp};
 use crate::system::{self, SystemApp, SystemSection};
 
 pub const TITLE_H: i32 = 32;
@@ -23,10 +24,10 @@ pub const DOCK_BTN_W: i32 = 44;
 // Left App Dock geometry: 128x72 icons (1/10th of 1280x720) stacked vertically
 pub const DOCK_ICON_W: i32 = 128;
 pub const DOCK_ICON_H: i32 = 72;
-pub const DOCK_GAP: i32 = 12;
+pub const DOCK_GAP: i32 = 10;
 pub const DOCK_X: i32 = 12;
-pub const DOCK_Y: i32 = TITLE_H + 12;
-pub const APP_COUNT: usize = 3; // 0 = System, 1 = Calc, 2 = Files
+pub const DOCK_Y: i32 = TITLE_H + 10;
+pub const APP_COUNT: usize = 4; // 0 = System, 1 = Calc, 2 = Files, 3 = Mines
 
 #[inline]
 pub const fn dock_icon_y(slot_idx: usize) -> i32 {
@@ -35,10 +36,21 @@ pub const fn dock_icon_y(slot_idx: usize) -> i32 {
 
 // Menu Bar geometry
 pub const MENU_COUNT: usize = 3;
-pub const MENU_X0: i32 = DOCK_BTN_W + 8;
+pub const MENU_X0: i32 = DOCK_BTN_W + 4;
 pub const MENU_HEADER_W: i32 = 104;
 pub const MENU_DROP_W: i32 = 224;
 pub const MENU_ITEM_H: i32 = 30;
+
+#[inline]
+pub const fn menu_header_w(fb_w: i32) -> i32 {
+    if fb_w < 540 {
+        72
+    } else if fb_w < 720 {
+        88
+    } else {
+        MENU_HEADER_W
+    }
+}
 
 // Click return codes
 pub const CLICK_NOOP: i32 = 0;
@@ -51,6 +63,7 @@ pub enum AppSlot {
     System = 1,
     Calc = 2,
     Files = 3,
+    Mines = 4,
 }
 
 pub struct WmState {
@@ -73,6 +86,7 @@ pub struct WmState {
     pub system: SystemApp,
     pub calc: CalcApp,
     pub files: FilesApp,
+    pub mines: MinesApp,
 }
 
 impl WmState {
@@ -97,6 +111,7 @@ impl WmState {
             system: SystemApp::new(),
             calc: CalcApp::new(),
             files: FilesApp::new(),
+            mines: MinesApp::new_const(),
         }
     }
 
@@ -112,6 +127,7 @@ impl WmState {
         self.system = SystemApp::new();
         self.calc = CalcApp::new();
         self.files = FilesApp::new();
+        self.mines.init_default();
         self.ready = true;
     }
 
@@ -121,6 +137,7 @@ impl WmState {
                 AppSlot::Desktop | AppSlot::System => "SYSTEM",
                 AppSlot::Calc => "CALC",
                 AppSlot::Files => "FILES",
+                AppSlot::Mines => "MINES",
             },
             1 => "VIEW",
             2 => "TESTING",
@@ -135,9 +152,17 @@ impl WmState {
                 AppSlot::System => &["ABOUT", "LOCALE", "FONTS", "CLOSE WINDOW"],
                 AppSlot::Calc => &["CLEAR (AC)", "CLOSE WINDOW"],
                 AppSlot::Files => &[
-                    "~/WALLPAPERS",
-                    "~/SAMPLES",
+                    "HOME (~/)",
+                    "GITHUB (GH://)",
+                    "TOGGLE CONTEXT",
                     "SET AS WALLPAPER",
+                    "CLOSE WINDOW",
+                ],
+                AppSlot::Mines => &[
+                    "NEW SEED (N)",
+                    "REPLAY SEED (R)",
+                    "TOGGLE FLAG (F)",
+                    "TOGGLE SHIELD RULE",
                     "CLOSE WINDOW",
                 ],
             },
@@ -147,7 +172,13 @@ impl WmState {
         }
     }
 
-    pub fn render(&mut self, fb: &mut Framebuffer, staged_px: &[u32], staged_text: &[u8]) {
+    pub fn render(
+        &mut self,
+        fb: &mut Framebuffer,
+        staged_px: &[u32],
+        staged_text: &[u8],
+        staged_context: &[u8],
+    ) {
         if !self.ready {
             return;
         }
@@ -181,11 +212,20 @@ impl WmState {
                         system::draw_desktop_backdrop(&mut client_fb);
                     }
                 }
-                AppSlot::System => system::draw_window(&mut client_fb, &self.system),
+                AppSlot::System => {
+                    system::draw_window(&mut client_fb, &self.system, self.width, self.height)
+                }
                 AppSlot::Calc => calc::draw_window(&mut client_fb, &self.calc),
                 AppSlot::Files => {
-                    files::draw_window(&mut client_fb, &self.files, staged_px, staged_text)
+                    files::draw_window(
+                        &mut client_fb,
+                        &self.files,
+                        staged_px,
+                        staged_text,
+                        staged_context,
+                    )
                 }
+                AppSlot::Mines => mines::draw_window(&mut client_fb, &self.mines),
             }
         }
 
@@ -230,19 +270,22 @@ impl WmState {
         }
 
         // 2. Menu Headers
+        let mhw = menu_header_w(fb.w);
+        let menu_sc = if fb.w < 540 { 1 } else { 2 };
+        let menu_ty = if menu_sc == 1 { 12 } else { 9 };
         for i in 0..MENU_COUNT {
-            let mx = MENU_X0 + (i as i32) * MENU_HEADER_W;
+            let mx = MENU_X0 + (i as i32) * mhw;
             let is_open = self.open_menu == Some(i);
             if is_open {
-                fb.fill(mx, 2, MENU_HEADER_W - 4, TITLE_H - 3, rgb(0x1b, 0x28, 0x36));
-                fb.fill(mx, TITLE_H - 3, MENU_HEADER_W - 4, 2, rgb(0x2d, 0xd4, 0xbf));
+                fb.fill(mx, 2, mhw - 4, TITLE_H - 3, rgb(0x1b, 0x28, 0x36));
+                fb.fill(mx, TITLE_H - 3, mhw - 4, 2, rgb(0x2d, 0xd4, 0xbf));
             }
             let fg = if is_open {
                 rgb(0xf0, 0xf6, 0xfc)
             } else {
                 rgb(0xc8, 0xd7, 0xe2)
             };
-            draw_str(fb, mx + 12, 9, self.menu_title(i), 2, fg);
+            draw_str(fb, mx + 8, menu_ty, self.menu_title(i), menu_sc, fg);
         }
 
         // 3. Right Side: User, Session, and Full Timestamp shown ONCE
@@ -256,9 +299,12 @@ impl WmState {
             self.hour,
             self.minute,
             self.second,
+            fb.w < 680,
         );
-        let rw = crate::font::text_width(right_str, 2);
-        draw_str(fb, fb.w - rw - 14, 9, right_str, 2, rgb(0x9f, 0xb3, 0xc8));
+        let right_sc = if fb.w < 540 { 1 } else { 2 };
+        let right_ty = if right_sc == 1 { 12 } else { 9 };
+        let rw = crate::font::text_width(right_str, right_sc);
+        draw_str(fb, fb.w - rw - 10, right_ty, right_str, right_sc, rgb(0x9f, 0xb3, 0xc8));
     }
 
     fn draw_left_dock(&self, fb: &mut Framebuffer) {
@@ -300,6 +346,19 @@ impl WmState {
             DOCK_ICON_H,
             self.active_app == AppSlot::Files,
         );
+
+        // Tile 3: Mines (`mines-sm` 8x8 state machine)
+        let y3 = dock_icon_y(3);
+        fb.shade(DOCK_X - 4, y3 - 4, DOCK_ICON_W + 8, DOCK_ICON_H + 8, 64);
+        mines::draw_dock_tile(
+            fb,
+            &self.mines,
+            DOCK_X,
+            y3,
+            DOCK_ICON_W,
+            DOCK_ICON_H,
+            self.active_app == AppSlot::Mines,
+        );
     }
 
     fn draw_dropdown_menu(&self, fb: &mut Framebuffer, menu_idx: usize) {
@@ -307,18 +366,20 @@ impl WmState {
         if items.is_empty() {
             return;
         }
-        let mx = MENU_X0 + (menu_idx as i32) * MENU_HEADER_W;
+        let mhw = menu_header_w(fb.w);
+        let drop_w = MENU_DROP_W.min(fb.w - 16);
+        let mx = (MENU_X0 + (menu_idx as i32) * mhw).min(fb.w - drop_w - 4);
         let my = TITLE_H;
         let mh = (items.len() as i32) * MENU_ITEM_H + 8;
 
-        fb.shade(mx + 4, my + 4, MENU_DROP_W, mh, 80);
-        fb.fill(mx, my, MENU_DROP_W, mh, rgb(0x10, 0x17, 0x20));
-        fb.border(mx, my, MENU_DROP_W, mh, 2, rgb(0x2d, 0xd4, 0xbf));
+        fb.shade(mx + 4, my + 4, drop_w, mh, 80);
+        fb.fill(mx, my, drop_w, mh, rgb(0x10, 0x17, 0x20));
+        fb.border(mx, my, drop_w, mh, 2, rgb(0x2d, 0xd4, 0xbf));
 
         for (idx, &label) in items.iter().enumerate() {
             let iy = my + 4 + (idx as i32) * MENU_ITEM_H;
             if idx > 0 {
-                fb.fill(mx + 8, iy, MENU_DROP_W - 16, 1, rgb(0x1f, 0x2c, 0x38));
+                fb.fill(mx + 8, iy, drop_w - 16, 1, rgb(0x1f, 0x2c, 0x38));
             }
             draw_str(fb, mx + 14, iy + 8, label, 2, rgb(0xd4, 0xe2, 0xea));
         }
@@ -334,14 +395,17 @@ impl WmState {
             return CLICK_CHANGED;
         }
 
+        let mhw = menu_header_w(self.width);
+        let drop_w = MENU_DROP_W.min(self.width - 16);
+
         // Layer 1: Active Drop-Down Menu
         if let Some(menu_idx) = self.open_menu {
             let items = self.menu_items(menu_idx);
-            let mx = MENU_X0 + (menu_idx as i32) * MENU_HEADER_W;
+            let mx = (MENU_X0 + (menu_idx as i32) * mhw).min(self.width - drop_w - 4);
             let my = TITLE_H;
             let mh = (items.len() as i32) * MENU_ITEM_H + 8;
 
-            if x >= mx && x < mx + MENU_DROP_W && y >= my && y < my + mh {
+            if x >= mx && x < mx + drop_w && y >= my && y < my + mh {
                 let rel_y = y - (my + 4);
                 if rel_y >= 0 {
                     let item_idx = (rel_y / MENU_ITEM_H) as usize;
@@ -359,8 +423,8 @@ impl WmState {
                     return CLICK_CHANGED;
                 }
                 for i in 0..MENU_COUNT {
-                    let hx = MENU_X0 + (i as i32) * MENU_HEADER_W;
-                    if x >= hx && x < hx + MENU_HEADER_W {
+                    let hx = MENU_X0 + (i as i32) * mhw;
+                    if x >= hx && x < hx + mhw {
                         self.open_menu = if i == menu_idx { None } else { Some(i) };
                         return CLICK_CHANGED;
                     }
@@ -378,8 +442,8 @@ impl WmState {
                 return CLICK_CHANGED;
             }
             for i in 0..MENU_COUNT {
-                let hx = MENU_X0 + (i as i32) * MENU_HEADER_W;
-                if x >= hx && x < hx + MENU_HEADER_W {
+                let hx = MENU_X0 + (i as i32) * mhw;
+                if x >= hx && x < hx + mhw {
                     self.open_menu = Some(i);
                     return CLICK_CHANGED;
                 }
@@ -395,10 +459,11 @@ impl WmState {
                     self.active_app = match slot {
                         0 => AppSlot::System,
                         1 => AppSlot::Calc,
-                        _ => {
+                        2 => {
                             self.files.ensure_selected_staged();
                             AppSlot::Files
                         }
+                        _ => AppSlot::Mines,
                     };
                     self.dock_visible = false;
                     return CLICK_CHANGED;
@@ -409,16 +474,25 @@ impl WmState {
         // Layer 4: Maximized Client Window (`y >= TITLE_H`)
         let cx = x;
         let cy = y - TITLE_H;
+        let client_w = self.width;
+        let client_h = (self.height - TITLE_H).max(1);
         match self.active_app {
             AppSlot::Calc => {
-                if calc::click_window(&mut self.calc, cx, cy) {
+                if calc::click_window(&mut self.calc, cx, cy, client_w, client_h) {
                     CLICK_CHANGED
                 } else {
                     CLICK_NOOP
                 }
             }
             AppSlot::Files => {
-                if files::click_window(&mut self.files, cx, cy) {
+                if files::click_window(&mut self.files, cx, cy, client_w, client_h) {
+                    CLICK_CHANGED
+                } else {
+                    CLICK_NOOP
+                }
+            }
+            AppSlot::Mines => {
+                if mines::click_window(&mut self.mines, cx, cy, client_w, client_h) {
                     CLICK_CHANGED
                 } else {
                     CLICK_NOOP
@@ -450,14 +524,18 @@ impl WmState {
                     CLICK_CHANGED
                 }
                 (AppSlot::Files, 0) => {
-                    self.files.open_subfolder(files::FolderLevel::Wallpapers);
+                    self.files.open_subfolder(files::FolderLevel::HomeRoot);
                     CLICK_CHANGED
                 }
                 (AppSlot::Files, 1) => {
-                    self.files.open_subfolder(files::FolderLevel::Samples);
+                    self.files.open_subfolder(files::FolderLevel::GithubRepo);
                     CLICK_CHANGED
                 }
                 (AppSlot::Files, 2) => {
+                    self.files.context_mode = !self.files.context_mode;
+                    CLICK_CHANGED
+                }
+                (AppSlot::Files, 3) => {
                     if let Some(sel) = self.files.active_file_idx() {
                         if self.files.entries[sel].is_image() {
                             self.files.wallpaper_active = true;
@@ -468,7 +546,27 @@ impl WmState {
                     }
                     CLICK_CHANGED
                 }
-                (AppSlot::Files, 3) => {
+                (AppSlot::Files, 4) => {
+                    self.active_app = AppSlot::Desktop;
+                    CLICK_CHANGED
+                }
+                (AppSlot::Mines, 0) => {
+                    self.mines.next_seed();
+                    CLICK_CHANGED
+                }
+                (AppSlot::Mines, 1) => {
+                    self.mines.reset_seed(self.mines.board.seed);
+                    CLICK_CHANGED
+                }
+                (AppSlot::Mines, 2) => {
+                    self.mines.toggle_mode();
+                    CLICK_CHANGED
+                }
+                (AppSlot::Mines, 3) => {
+                    self.mines.toggle_rules();
+                    CLICK_CHANGED
+                }
+                (AppSlot::Mines, 4) => {
                     self.active_app = AppSlot::Desktop;
                     CLICK_CHANGED
                 }
@@ -552,6 +650,13 @@ impl WmState {
                     CLICK_NOOP
                 }
             }
+            AppSlot::Mines => {
+                if mines::key_window(&mut self.mines, code) {
+                    CLICK_CHANGED
+                } else {
+                    CLICK_NOOP
+                }
+            }
             AppSlot::Desktop => CLICK_NOOP,
         }
     }
@@ -590,9 +695,11 @@ fn fmt_title_right(
     hour: u8,
     min: u8,
     sec: u8,
+    compact: bool,
 ) -> &str {
     let mut pos = 0;
-    for &b in b"TESTER  VM-" {
+    let prefix: &[u8] = if compact { b"VM-" } else { b"TESTER  VM-" };
+    for &b in prefix {
         buf[pos] = b;
         pos += 1;
     }
@@ -600,21 +707,24 @@ fn fmt_title_right(
     buf[pos + 1] = b'0' + (session_id % 10) as u8;
     pos += 2;
     buf[pos] = b' ';
-    buf[pos + 1] = b' ';
-    pos += 2;
+    pos += 1;
 
-    buf[pos] = b'0' + ((year / 1000) % 10) as u8;
-    buf[pos + 1] = b'0' + ((year / 100) % 10) as u8;
-    buf[pos + 2] = b'0' + ((year / 10) % 10) as u8;
-    buf[pos + 3] = b'0' + (year % 10) as u8;
-    buf[pos + 4] = b'-';
-    buf[pos + 5] = b'0' + (month / 10) % 10;
-    buf[pos + 6] = b'0' + (month % 10);
-    buf[pos + 7] = b'-';
-    buf[pos + 8] = b'0' + (day / 10) % 10;
-    buf[pos + 9] = b'0' + (day % 10);
-    buf[pos + 10] = b' ';
-    pos += 11;
+    if !compact {
+        buf[pos] = b' ';
+        pos += 1;
+        buf[pos] = b'0' + ((year / 1000) % 10) as u8;
+        buf[pos + 1] = b'0' + ((year / 100) % 10) as u8;
+        buf[pos + 2] = b'0' + ((year / 10) % 10) as u8;
+        buf[pos + 3] = b'0' + (year % 10) as u8;
+        buf[pos + 4] = b'-';
+        buf[pos + 5] = b'0' + (month / 10) % 10;
+        buf[pos + 6] = b'0' + (month % 10);
+        buf[pos + 7] = b'-';
+        buf[pos + 8] = b'0' + (day / 10) % 10;
+        buf[pos + 9] = b'0' + (day % 10);
+        buf[pos + 10] = b' ';
+        pos += 11;
+    }
 
     buf[pos] = b'0' + (hour / 10) % 10;
     buf[pos + 1] = b'0' + (hour % 10);

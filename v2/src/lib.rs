@@ -5,22 +5,26 @@ pub mod code;
 pub mod fb;
 pub mod files;
 pub mod font;
+pub mod mine_sm;
+pub mod mines;
 pub mod system;
 pub mod wm;
 
 use core::cell::UnsafeCell;
-use fb::{Framebuffer, SCREEN_H, SCREEN_W};
-use files::MAX_TEXT_BYTES;
+use fb::{Framebuffer, DEFAULT_H, DEFAULT_W, MAX_DIM, MAX_PIXELS};
+use files::{MAX_CONTEXT_BYTES, MAX_TEXT_BYTES};
 use wm::{AppSlot, WmState};
 
-const FB_PIXELS: usize = SCREEN_W * SCREEN_H;
+#[cfg(not(target_arch = "wasm32"))]
+const FB_PIXELS: usize = MAX_PIXELS;
 
 /// Single-threaded Wasm guest state container.
 ///
-/// On `wasm32`, the 3.52 MiB framebuffer, the 3.52 MiB RGBA8888 network mount
-/// staging buffer, and the 16 KiB text/code staging buffer reside above
-/// `__heap_base` in linear memory (`160` pages = 10 MiB total), keeping the
-/// `.wasm` binary ~36 KB with zero static pixel arrays.
+/// On `wasm32`, the framebuffer, the RGBA8888 network mount staging buffer,
+/// the 16 KiB text/code staging buffer, and the 4 KiB context staging buffer
+/// reside above `__heap_base` in linear memory, grown on demand inside
+/// `app_init(width, height)` for the session's locked resolution
+/// (from `360x800` up to `1920x1080`).
 struct GuestMemory {
     #[cfg(not(target_arch = "wasm32"))]
     pixels: UnsafeCell<core::mem::MaybeUninit<[u32; FB_PIXELS]>>,
@@ -28,6 +32,8 @@ struct GuestMemory {
     staging: UnsafeCell<core::mem::MaybeUninit<[u32; FB_PIXELS]>>,
     #[cfg(not(target_arch = "wasm32"))]
     text_staging: UnsafeCell<[u8; MAX_TEXT_BYTES]>,
+    #[cfg(not(target_arch = "wasm32"))]
+    context_staging: UnsafeCell<[u8; MAX_CONTEXT_BYTES]>,
     name_scratch: UnsafeCell<[u8; 64]>,
     wm: UnsafeCell<WmState>,
 }
@@ -41,6 +47,8 @@ static GUEST: GuestMemory = GuestMemory {
     staging: UnsafeCell::new(core::mem::MaybeUninit::uninit()),
     #[cfg(not(target_arch = "wasm32"))]
     text_staging: UnsafeCell::new([0; MAX_TEXT_BYTES]),
+    #[cfg(not(target_arch = "wasm32"))]
+    context_staging: UnsafeCell::new([0; MAX_CONTEXT_BYTES]),
     name_scratch: UnsafeCell::new([0; 64]),
     wm: UnsafeCell::new(WmState::new()),
 };
@@ -51,15 +59,30 @@ extern "C" {
 }
 
 #[cfg(target_arch = "wasm32")]
-const WASM_MIN_PAGES: usize = 160; // 160 * 64 KiB = 10 MiB reserved linear memory
+#[inline]
+unsafe fn session_pixels() -> usize {
+    let wm = &*GUEST.wm.get();
+    let w = wm.width.clamp(1, MAX_DIM) as usize;
+    let h = wm.height.clamp(1, MAX_DIM) as usize;
+    (w * h).min(MAX_PIXELS)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[inline]
+unsafe fn ensure_wasm_memory(px_count: usize) {
+    let base = (&raw const __heap_base as usize + 15) & !15;
+    let needed_bytes = base + px_count * 4 * 2 + MAX_TEXT_BYTES + MAX_CONTEXT_BYTES + 65536;
+    let needed_pages = (needed_bytes + 65535) / 65536;
+    let cur = core::arch::wasm32::memory_size(0);
+    if cur < needed_pages {
+        let _ = core::arch::wasm32::memory_grow(0, needed_pages - cur);
+    }
+}
 
 #[cfg(target_arch = "wasm32")]
 #[inline]
 unsafe fn fb_base_ptr() -> *mut u32 {
-    let cur = core::arch::wasm32::memory_size(0);
-    if cur < WASM_MIN_PAGES {
-        let _ = core::arch::wasm32::memory_grow(0, WASM_MIN_PAGES - cur);
-    }
+    ensure_wasm_memory(session_pixels());
     let base = (&raw const __heap_base as usize + 15) & !15;
     base as *mut u32
 }
@@ -67,13 +90,21 @@ unsafe fn fb_base_ptr() -> *mut u32 {
 #[cfg(target_arch = "wasm32")]
 #[inline]
 unsafe fn staging_base_ptr() -> *mut u32 {
-    fb_base_ptr().add(FB_PIXELS)
+    let n = session_pixels();
+    fb_base_ptr().add(n)
 }
 
 #[cfg(target_arch = "wasm32")]
 #[inline]
 unsafe fn text_staging_base_ptr() -> *mut u8 {
-    staging_base_ptr().add(FB_PIXELS) as *mut u8
+    let n = session_pixels();
+    staging_base_ptr().add(n) as *mut u8
+}
+
+#[cfg(target_arch = "wasm32")]
+#[inline]
+unsafe fn context_staging_base_ptr() -> *mut u8 {
+    text_staging_base_ptr().add(MAX_TEXT_BYTES)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -94,70 +125,90 @@ unsafe fn text_staging_base_ptr() -> *mut u8 {
     (*GUEST.text_staging.get()).as_mut_ptr()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+#[inline]
+unsafe fn context_staging_base_ptr() -> *mut u8 {
+    (*GUEST.context_staging.get()).as_mut_ptr()
+}
+
 #[cfg(target_arch = "wasm32")]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     core::arch::wasm32::unreachable()
 }
 
-fn with_state<R>(f: impl FnOnce(&mut WmState, &mut Framebuffer, &[u32], &[u8]) -> R) -> R {
+fn with_state<R>(
+    f: impl FnOnce(&mut WmState, &mut Framebuffer, &[u32], &[u8], &[u8]) -> R,
+) -> R {
     unsafe {
         let wm = &mut *GUEST.wm.get();
+        let w = wm.width.clamp(1, MAX_DIM);
+        let h = wm.height.clamp(1, MAX_DIM);
+        let n_px = ((w as usize) * (h as usize)).min(MAX_PIXELS);
         let px_ptr = fb_base_ptr();
         let st_ptr = staging_base_ptr();
         let txt_ptr = text_staging_base_ptr();
-        let w = wm.width.clamp(1, SCREEN_W as i32);
-        let h = wm.height.clamp(1, SCREEN_H as i32);
-        let px = core::slice::from_raw_parts_mut(px_ptr, (w as usize) * (h as usize));
-        let st = core::slice::from_raw_parts(st_ptr, FB_PIXELS);
+        let ctx_ptr = context_staging_base_ptr();
+        let px = core::slice::from_raw_parts_mut(px_ptr, n_px);
+        let st = core::slice::from_raw_parts(st_ptr, n_px);
         let txt = core::slice::from_raw_parts(txt_ptr, MAX_TEXT_BYTES);
+        let ctx = core::slice::from_raw_parts(ctx_ptr, MAX_CONTEXT_BYTES);
         let mut fb = Framebuffer::new(px, w, h);
-        f(wm, &mut fb, st, txt)
+        f(wm, &mut fb, st, txt, ctx)
     }
 }
 
 #[no_mangle]
 pub extern "C" fn app_init(width: i32, height: i32) -> i32 {
-    let w = if width <= 0 || width > SCREEN_W as i32 {
-        SCREEN_W as i32
+    let mut w = if width <= 0 || width > MAX_DIM {
+        DEFAULT_W
     } else {
         width
     };
-    let h = if height <= 0 || height > SCREEN_H as i32 {
-        SCREEN_H as i32
+    let mut h = if height <= 0 || height > MAX_DIM {
+        DEFAULT_H
     } else {
         height
     };
-    with_state(|wm, fb, st, txt| {
+    if (w as usize) * (h as usize) > MAX_PIXELS {
+        w = DEFAULT_W;
+        h = DEFAULT_H;
+    }
+    unsafe {
+        let wm = &mut *GUEST.wm.get();
+        wm.width = w;
+        wm.height = h;
+    }
+    with_state(|wm, fb, st, txt, ctx| {
         wm.init(w, h, wm.session_id);
-        wm.render(fb, st, txt);
+        wm.render(fb, st, txt, ctx);
         1
     })
 }
 
 #[no_mangle]
 pub extern "C" fn app_set_session(session_id: u32) {
-    with_state(|wm, fb, st, txt| {
+    with_state(|wm, fb, st, txt, ctx| {
         wm.session_id = if session_id > 0 { session_id } else { 1 };
         if wm.ready {
-            wm.render(fb, st, txt);
+            wm.render(fb, st, txt, ctx);
         }
     });
 }
 
 #[no_mangle]
 pub extern "C" fn app_render() {
-    with_state(|wm, fb, st, txt| {
-        wm.render(fb, st, txt);
+    with_state(|wm, fb, st, txt, ctx| {
+        wm.render(fb, st, txt, ctx);
     });
 }
 
 #[no_mangle]
 pub extern "C" fn app_click(x: i32, y: i32) -> i32 {
-    with_state(|wm, fb, st, txt| {
+    with_state(|wm, fb, st, txt, ctx| {
         let rc = wm.click(x, y);
         if rc != 0 {
-            wm.render(fb, st, txt);
+            wm.render(fb, st, txt, ctx);
         }
         rc
     })
@@ -165,10 +216,10 @@ pub extern "C" fn app_click(x: i32, y: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn app_key(key: i32) -> i32 {
-    with_state(|wm, fb, st, txt| {
+    with_state(|wm, fb, st, txt, ctx| {
         let rc = wm.key(key);
         if rc != 0 {
-            wm.render(fb, st, txt);
+            wm.render(fb, st, txt, ctx);
         }
         rc
     })
@@ -218,21 +269,21 @@ pub extern "C" fn app_set_utc(
 
 #[no_mangle]
 pub extern "C" fn app_tick() -> i32 {
-    with_state(|wm, fb, st, txt| {
+    with_state(|wm, fb, st, txt, ctx| {
         if !wm.ready || wm.test_pattern {
             return 0;
         }
-        wm.render(fb, st, txt);
+        wm.render(fb, st, txt, ctx);
         1
     })
 }
 
 #[no_mangle]
 pub extern "C" fn app_record_snapshot() -> u32 {
-    with_state(|wm, fb, st, txt| {
+    with_state(|wm, fb, st, txt, ctx| {
         wm.snapshot_seq = wm.snapshot_seq.wrapping_add(1);
         wm.system.snapshots_taken = wm.snapshot_seq;
-        wm.render(fb, st, txt);
+        wm.render(fb, st, txt, ctx);
         wm.last_fb_hash
     })
 }
@@ -272,6 +323,11 @@ pub extern "C" fn app_mount_text_ptr() -> *mut u8 {
 }
 
 #[no_mangle]
+pub extern "C" fn app_mount_context_ptr() -> *mut u8 {
+    unsafe { context_staging_base_ptr() }
+}
+
+#[no_mangle]
 pub extern "C" fn app_mount_pending_idx() -> i32 {
     unsafe { (*GUEST.wm.get()).files.pending_fetch_idx }
 }
@@ -280,12 +336,12 @@ pub extern "C" fn app_mount_pending_idx() -> i32 {
 /// `w * h * 4` bytes into `app_mount_staging_ptr()`.
 #[no_mangle]
 pub extern "C" fn app_mount_commit_rgba(idx: i32, w: i32, h: i32) {
-    with_state(|wm, fb, st, txt| {
-        let clamped_w = w.clamp(0, SCREEN_W as i32);
-        let clamped_h = h.clamp(0, SCREEN_H as i32);
+    with_state(|wm, fb, st, txt, ctx| {
+        let clamped_w = w.clamp(0, wm.width);
+        let clamped_h = h.clamp(0, wm.height);
         wm.files.complete_stage(idx, clamped_w, clamped_h);
         if wm.ready {
-            wm.render(fb, st, txt);
+            wm.render(fb, st, txt, ctx);
         }
     });
 }
@@ -294,10 +350,22 @@ pub extern "C" fn app_mount_commit_rgba(idx: i32, w: i32, h: i32) {
 /// `byte_len` UTF-8 bytes into `app_mount_text_ptr()`.
 #[no_mangle]
 pub extern "C" fn app_mount_commit_text(idx: i32, byte_len: usize) {
-    with_state(|wm, fb, st, txt| {
+    with_state(|wm, fb, st, txt, ctx| {
         wm.files.complete_stage_text(idx, byte_len);
         if wm.ready {
-            wm.render(fb, st, txt);
+            wm.render(fb, st, txt, ctx);
+        }
+    });
+}
+
+/// Called by `host.js` once it has decoded an enriched `.context.xml` file and written
+/// `byte_len` UTF-8 bytes (`KEY=VALUE\n` format) into `app_mount_context_ptr()`.
+#[no_mangle]
+pub extern "C" fn app_mount_commit_context(idx: i32, byte_len: usize) {
+    with_state(|wm, fb, st, txt, ctx| {
+        wm.files.complete_stage_context(idx, byte_len);
+        if wm.ready {
+            wm.render(fb, st, txt, ctx);
         }
     });
 }
@@ -326,6 +394,7 @@ pub extern "C" fn app_active_page() -> i32 {
             AppSlot::System => wm.system.section as i32,
             AppSlot::Calc => 0,
             AppSlot::Files => wm.files.active_file_idx().map(|i| i as i32).unwrap_or(-1),
+            AppSlot::Mines => wm.mines.board.seed as i32,
         }
     }
 }
@@ -352,14 +421,14 @@ pub extern "C" fn app_selected() -> i32 {
 
 #[no_mangle]
 pub extern "C" fn app_count() -> i32 {
-    3 // 3 bundled apps: System, Calc, Files
+    4 // 4 bundled apps: System, Calc, Files, Mines
 }
 
 #[no_mangle]
 pub extern "C" fn app_set_test_pattern(enabled: i32) {
-    with_state(|wm, fb, st, txt| {
+    with_state(|wm, fb, st, txt, ctx| {
         wm.test_pattern = enabled != 0;
-        wm.render(fb, st, txt);
+        wm.render(fb, st, txt, ctx);
     });
 }
 
@@ -433,7 +502,7 @@ mod tests {
 
         // Simulate `host.js` writing a 1280x688 RGBA8888 image into staging memory
         unsafe {
-            let st = core::slice::from_raw_parts_mut(app_mount_staging_ptr() as *mut u32, FB_PIXELS);
+            let st = core::slice::from_raw_parts_mut(app_mount_staging_ptr() as *mut u32, 1280 * 720);
             st.fill(rgb(0x12, 0x77, 0xaa));
         }
         app_mount_commit_rgba(0, 1280, 688);
@@ -457,14 +526,18 @@ mod tests {
         let files_code_hash = app_fb_hash();
         assert_ne!(files_code_hash, files_preview0_hash);
 
-        // 6. Switch to `~/WALLPAPERS` via `FILES -> ~/WALLPAPERS` (item 0), then `SET AS WALLPAPER` (item 2)
+        // 6. Switch to `~/WALLPAPERS` via Left Panel click (or we can navigate to Wallpapers), then `SET AS WALLPAPER` (item 3)
+        // First return to `~/` by clicking row 0 (`../`)
+        assert_eq!(app_click(100, TITLE_H + 76 + 10), CLICK_CHANGED);
+        assert_eq!(app_active_page(), -1);
+        // Click row 0 (`wallpapers/`) to open `~/WALLPAPERS` (active_page = 0)
+        assert_eq!(app_click(100, TITLE_H + 76 + 10), CLICK_CHANGED);
+        assert_eq!(app_active_page(), 0);
+
         let files_menu_x = wm::MENU_X0 + 20;
         assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
-        assert_eq!(app_click(files_menu_x, TITLE_H + 16), CLICK_CHANGED);
-        assert_eq!(app_active_page(), 0);
-        assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
         assert_eq!(
-            app_click(files_menu_x, TITLE_H + 16 + 2 * wm::MENU_ITEM_H),
+            app_click(files_menu_x, TITLE_H + 16 + 3 * wm::MENU_ITEM_H),
             CLICK_CHANGED
         );
         assert_eq!(app_selected(), AppSlot::Desktop as i32);
@@ -479,11 +552,105 @@ mod tests {
         // 7. Verify diagnostic test pattern channel & orientation contract
         app_set_test_pattern(1);
         let ptr = app_framebuffer();
-        let px = unsafe { core::slice::from_raw_parts(ptr as *const u32, FB_PIXELS) };
+        let px = unsafe { core::slice::from_raw_parts(ptr as *const u32, 1280 * 720) };
         assert_eq!(px[8 * 1280 + 8], rgb(0, 0, 0));
         assert_eq!(px[50 * 1280 + 100], rgb(255, 0, 0));
         assert_eq!(px[50 * 1280 + 900], rgb(0, 255, 0));
         assert_eq!(px[500 * 1280 + 100], rgb(0, 0, 255));
         assert_eq!(px[(720 - 20) * 1280 + (1280 - 20)], rgb(255, 0, 255));
+
+        // 8. Verify per-session resolution constraint for mobile portrait (390x844) and 1080p (1920x1080)
+        assert_eq!(app_init(390, 844), 1);
+        assert_eq!(app_width(), 390);
+        assert_eq!(app_height(), 844);
+        assert_eq!(app_click(16, 16), CLICK_CHANGED);
+        assert_eq!(app_click(icon_x, DOCK_Y + DOCK_ICON_H / 2), CLICK_CHANGED);
+        assert_eq!(app_selected(), AppSlot::System as i32);
+
+        assert_eq!(app_init(1920, 1080), 1);
+        assert_eq!(app_width(), 1920);
+        assert_eq!(app_height(), 1080);
+    }
+
+    #[test]
+    fn test_github_mount_and_context_staging_and_key_paging() {
+        app_set_session(1);
+        assert_eq!(app_init(1280, 720), 1);
+
+        app_mount_clear();
+        let name_buf = unsafe { core::slice::from_raw_parts_mut(app_mount_name_buf(), 64) };
+
+        // Mount a GitHub file: "github/lib.rs"
+        let f_gh = b"github/lib.rs";
+        name_buf[..f_gh.len()].copy_from_slice(f_gh);
+        let gh_idx = app_mount_add(f_gh.len(), 4096);
+        assert_eq!(gh_idx, 0);
+
+        // Switch to Files app
+        let icon_x = DOCK_X + DOCK_ICON_W / 2;
+        assert_eq!(app_click(16, 16), CLICK_CHANGED); // Open dock
+        assert_eq!(
+            app_click(icon_x, dock_icon_y(2) + DOCK_ICON_H / 2),
+            CLICK_CHANGED
+        );
+        assert_eq!(app_selected(), AppSlot::Files as i32);
+        assert_eq!(app_active_page(), -1); // At HomeRoot
+
+        // Navigate to GITHUB via menu (FILES -> GITHUB (GH://), item 1)
+        let files_menu_x = wm::MENU_X0 + 20;
+        assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
+        assert_eq!(
+            app_click(files_menu_x, TITLE_H + 16 + wm::MENU_ITEM_H),
+            CLICK_CHANGED
+        );
+        assert_eq!(app_active_page(), 0); // Active file is github/lib.rs (index 0)
+        assert_eq!(app_mount_pending_idx(), 0);
+
+        // Stage Rust source code into text buffer
+        let rs_code = b"//! Mines State Machine\npub struct BoardState {\n    pub seed: u64,\n}\n";
+        unsafe {
+            let txt = core::slice::from_raw_parts_mut(app_mount_text_ptr(), MAX_TEXT_BYTES);
+            txt[..rs_code.len()].copy_from_slice(rs_code);
+        }
+        app_mount_commit_text(0, rs_code.len());
+        assert_eq!(app_mount_pending_idx(), -1);
+        let raw_hash = app_fb_hash();
+
+        // Stage wire context into context buffer
+        let ctx_wire = b"SCOPE=gh://jpeckenpaugh/mines-sm (main)\nRUNTIME=Rust (#![no_std])\nROLE=Core Bitboard State Machine\nIMPORTS=core::ops\nEXPORTS=BoardState\nDEPENDENTS=v2/src/mines.rs\nINVARIANTS=SplitMix64\nSUMMARY=Deterministic 8x8 mines state machine.\nARCHITECTURE=Pure kernel.\n";
+        unsafe {
+            let ctx = core::slice::from_raw_parts_mut(app_mount_context_ptr(), MAX_CONTEXT_BYTES);
+            ctx[..ctx_wire.len()].copy_from_slice(ctx_wire);
+        }
+        app_mount_commit_context(0, ctx_wire.len());
+
+        // Toggle context mode via key 33 (Tab / I)
+        assert_eq!(app_key(33), CLICK_CHANGED);
+        let ctx_hash = app_fb_hash();
+        assert_ne!(ctx_hash, raw_hash);
+
+        // Toggle back to raw mode via key 33
+        assert_eq!(app_key(33), CLICK_CHANGED);
+        assert_eq!(app_fb_hash(), raw_hash);
+
+        // Toggle via menu item 2 (TOGGLE CONTEXT)
+        assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
+        assert_eq!(
+            app_click(files_menu_x, TITLE_H + 16 + 2 * wm::MENU_ITEM_H),
+            CLICK_CHANGED
+        );
+        assert_eq!(app_fb_hash(), ctx_hash);
+
+        // Toggle back via menu item 2
+        assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
+        assert_eq!(
+            app_click(files_menu_x, TITLE_H + 16 + 2 * wm::MENU_ITEM_H),
+            CLICK_CHANGED
+        );
+        assert_eq!(app_fb_hash(), raw_hash);
+
+        // Test paging keys: PageDown (35) and PageUp (34)
+        assert_eq!(app_key(35), CLICK_CHANGED); // scroll chunk down
+        assert_eq!(app_key(34), CLICK_CHANGED); // scroll chunk up
     }
 }

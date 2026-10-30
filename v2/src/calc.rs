@@ -19,15 +19,48 @@ pub const KEY_CLEAR: i32 = 25;
 pub const KEY_BACK: i32 = 26;
 pub const KEY_DOT: i32 = 27;
 
-// Layout inside the 1280 x 688 maximized client surface
-const PAD_X: i32 = 280;
-const BW: i32 = 171;
-const BH: i32 = 84;
-const GAP: i32 = 12;
-const GRID_W: i32 = 4 * BW + 3 * GAP; // 720px wide centered keypad
-const DISP_Y: i32 = 56;
-const DISP_H: i32 = 96;
-const KEY_Y: i32 = 176;
+struct CalcGeom {
+    pad_x: i32,
+    bw: i32,
+    bh: i32,
+    gap: i32,
+    grid_w: i32,
+    disp_y: i32,
+    disp_h: i32,
+    key_y: i32,
+}
+
+fn calc_geom(client_w: i32, client_h: i32) -> CalcGeom {
+    let gap = if client_w < 500 || client_h < 450 { 8 } else { 12 };
+    let max_grid_w = (client_w - 32).clamp(240, 720);
+    let bw = ((max_grid_w - 3 * gap) / 4).max(48);
+    let grid_w = 4 * bw + 3 * gap;
+    let pad_x = ((client_w - grid_w) / 2).max(8);
+
+    let disp_h = if client_h < 450 {
+        52
+    } else if client_h < 600 {
+        72
+    } else {
+        96
+    };
+    let avail_h = (client_h - disp_h - 32).max(200);
+    let bh = ((avail_h - 4 * gap) / 5).clamp(32, 92);
+    let total_h = disp_h + 20 + 5 * bh + 4 * gap;
+    let disp_y = ((client_h - total_h) / 2).max(12);
+    let key_y = disp_y + disp_h + 20;
+
+    CalcGeom {
+        pad_x,
+        bw,
+        bh,
+        gap,
+        grid_w,
+        disp_y,
+        disp_h,
+        key_y,
+    }
+}
 
 struct Btn {
     col: i32,
@@ -232,9 +265,10 @@ pub fn key_window(app: &mut CalcApp, key: i32) -> bool {
     }
 }
 
-pub fn click_window(app: &mut CalcApp, cx: i32, cy: i32) -> bool {
+pub fn click_window(app: &mut CalcApp, cx: i32, cy: i32, client_w: i32, client_h: i32) -> bool {
+    let g = calc_geom(client_w, client_h);
     for b in &BUTTONS {
-        let (bx, by, bw, bh) = btn_rect(b);
+        let (bx, by, bw, bh) = btn_rect(&g, b);
         if cx >= bx && cx < bx + bw && cy >= by && cy < by + bh {
             return key_window(app, b.key);
         }
@@ -245,31 +279,53 @@ pub fn click_window(app: &mut CalcApp, cx: i32, cy: i32) -> bool {
 pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
     // 1. Single flat window surface
     fb.clear(rgb(0x0b, 0x10, 0x16));
+    let g = calc_geom(fb.w, fb.h);
 
     // 2. Readout line (pending operator on left, value right-aligned, 2px underline)
+    let op_scale = if g.disp_h < 64 { 3 } else { 4 };
     if app.pending != 0 && !app.error {
         let op_buf = [app.pending];
         let op_str = core::str::from_utf8(&op_buf).unwrap_or("");
-        draw_str(fb, PAD_X + 8, DISP_Y + 26, op_str, 4, rgb(0x2d, 0xd4, 0xbf));
+        draw_str(
+            fb,
+            g.pad_x + 8,
+            g.disp_y + (g.disp_h - 7 * op_scale) / 2,
+            op_str,
+            op_scale,
+            rgb(0x2d, 0xd4, 0xbf),
+        );
     }
 
     let mut disp_buf = [0u8; 24];
     let disp_str = app.format_display(&mut disp_buf);
-    let scale = 6;
+    let scale = if g.grid_w < 360 || g.disp_h < 64 {
+        4
+    } else if g.grid_w < 520 {
+        5
+    } else {
+        6
+    };
     let tw = text_width(disp_str, scale);
     draw_str(
         fb,
-        PAD_X + GRID_W - tw,
-        DISP_Y + 18,
+        g.pad_x + g.grid_w - tw,
+        g.disp_y + (g.disp_h - 7 * scale) / 2,
         disp_str,
         scale,
         rgb(0xf0, 0xf6, 0xfc),
     );
-    fb.fill(PAD_X, DISP_Y + DISP_H - 2, GRID_W, 2, rgb(0x2d, 0xd4, 0xbf));
+    fb.fill(
+        g.pad_x,
+        g.disp_y + g.disp_h - 2,
+        g.grid_w,
+        2,
+        rgb(0x2d, 0xd4, 0xbf),
+    );
 
     // 3. Flat 18-key grid
+    let btn_scale = if g.bh < 48 { 2 } else { 3 };
     for b in &BUTTONS {
-        let (bx, by, bw, bh) = btn_rect(b);
+        let (bx, by, bw, bh) = btn_rect(&g, b);
         let bg = match b.key {
             KEY_CLEAR => rgb(0x2e, 0x17, 0x1d),
             KEY_EQ => rgb(0x10, 0x34, 0x37),
@@ -278,7 +334,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
         };
         fb.fill(bx, by, bw, bh, bg);
         fb.border(bx, by, bw, bh, 1, rgb(0x24, 0x32, 0x40));
-        draw_str_centered(fb, bx, by, bw, bh, b.label, 3, rgb(0xe6, 0xf1, 0xf8));
+        draw_str_centered(fb, bx, by, bw, bh, b.label, btn_scale, rgb(0xe6, 0xf1, 0xf8));
     }
 }
 
@@ -319,11 +375,11 @@ pub fn draw_dock_tile(
     draw_str_centered(fb, x, y + 42, w, 16, clamped, 1, rgb(0x2d, 0xd4, 0xbf));
 }
 
-fn btn_rect(b: &Btn) -> (i32, i32, i32, i32) {
-    let x = PAD_X + b.col * (BW + GAP);
-    let y = KEY_Y + b.row * (BH + GAP);
-    let w = b.cspan * BW + (b.cspan - 1) * GAP;
-    let h = b.rspan * BH + (b.rspan - 1) * GAP;
+fn btn_rect(g: &CalcGeom, b: &Btn) -> (i32, i32, i32, i32) {
+    let x = g.pad_x + b.col * (g.bw + g.gap);
+    let y = g.key_y + b.row * (g.bh + g.gap);
+    let w = b.cspan * g.bw + (b.cspan - 1) * g.gap;
+    let h = b.rspan * g.bh + (b.rspan - 1) * g.gap;
     (x, y, w, h)
 }
 

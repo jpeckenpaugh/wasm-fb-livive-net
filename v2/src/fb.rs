@@ -3,8 +3,10 @@
 //! Byte order in memory is R,G,B,A (what HTML Canvas ImageData expects).
 //! On little-endian wasm32, a `u32` word is `0xAABBGGRR`, which [`rgba`] builds.
 
-pub const SCREEN_W: usize = 1280;
-pub const SCREEN_H: usize = 720;
+pub const DEFAULT_W: i32 = 1280;
+pub const DEFAULT_H: i32 = 720;
+pub const MAX_DIM: i32 = 1920;
+pub const MAX_PIXELS: usize = 1920 * 1080; // 2,073,600 px (supports 1080p landscape & portrait)
 
 #[inline]
 pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> u32 {

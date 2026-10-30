@@ -18,6 +18,9 @@ pub enum CodeLang {
     Html,
     Xml,
     Css,
+    Rust,
+    Toml,
+    Markdown,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -92,6 +95,23 @@ const TY_C: &[&[u8]] = &[
 
 const KW_JSON: &[&[u8]] = &[b"true", b"false", b"null"];
 
+const KW_RS: &[&[u8]] = &[
+    b"fn", b"let", b"mut", b"pub", b"struct", b"enum", b"impl", b"trait", b"for",
+    b"in", b"match", b"if", b"else", b"while", b"loop", b"return", b"break",
+    b"continue", b"use", b"mod", b"crate", b"self", b"Self", b"as", b"const",
+    b"static", b"type", b"where", b"unsafe", b"async", b"await", b"move", b"ref",
+    b"true", b"false",
+];
+
+const TY_RS: &[&[u8]] = &[
+    b"u8", b"u16", b"u32", b"u64", b"u128", b"usize",
+    b"i8", b"i16", b"i32", b"i64", b"i128", b"isize",
+    b"f32", b"f64", b"bool", b"char", b"str", b"Option", b"Some", b"None",
+    b"Result", b"Ok", b"Err", b"String", b"Vec",
+];
+
+const KW_TOML: &[&[u8]] = &[b"true", b"false"];
+
 pub fn lang_for_filename(name: &str) -> CodeLang {
     let bytes = name.as_bytes();
     let mut dot = None;
@@ -116,6 +136,9 @@ pub fn lang_for_filename(name: &str) -> CodeLang {
         b"html" | b"htm" => CodeLang::Html,
         b"xml" | b"svg" => CodeLang::Xml,
         b"css" => CodeLang::Css,
+        b"rs" => CodeLang::Rust,
+        b"toml" => CodeLang::Toml,
+        b"md" | b"markdown" => CodeLang::Markdown,
         _ => CodeLang::Plain,
     }
 }
@@ -173,9 +196,11 @@ pub fn tokenize_line(lang: CodeLang, line: &[u8], out: &mut [CodeToken]) -> usiz
     match lang {
         CodeLang::Html | CodeLang::Xml => lex_markup(line, out),
         CodeLang::Css => lex_css(line, out),
-        CodeLang::C | CodeLang::Js | CodeLang::Ts | CodeLang::Py | CodeLang::Json => {
+        CodeLang::Rust | CodeLang::C | CodeLang::Js | CodeLang::Ts | CodeLang::Py | CodeLang::Json => {
             lex_clike(lang, line, out)
         }
+        CodeLang::Toml => lex_toml(line, out),
+        CodeLang::Markdown => lex_markdown(line, out),
         CodeLang::Plain => {
             let mut n = 0;
             emit(out, &mut n, 0, line.len(), TokenKind::Plain);
@@ -192,7 +217,7 @@ fn lex_clike(lang: CodeLang, s: &[u8], out: &mut [CodeToken]) -> usize {
     let mut i = 0;
 
     while i < n {
-        if lang == CodeLang::C && s[i] == b'#' {
+        if (lang == CodeLang::C || lang == CodeLang::Rust) && s[i] == b'#' {
             emit(out, &mut count, i, n - i, TokenKind::Preproc);
             break;
         }
@@ -294,6 +319,15 @@ fn lex_clike(lang: CodeLang, s: &[u8], out: &mut [CodeToken]) -> usize {
                 }
                 CodeLang::Json => {
                     if word_in(w, KW_JSON) {
+                        TokenKind::Keyword
+                    } else {
+                        TokenKind::Plain
+                    }
+                }
+                CodeLang::Rust => {
+                    if word_in(w, TY_RS) {
+                        TokenKind::Type
+                    } else if word_in(w, KW_RS) {
                         TokenKind::Keyword
                     } else {
                         TokenKind::Plain
@@ -528,6 +562,164 @@ fn lex_css(s: &[u8], out: &mut [CodeToken]) -> usize {
     count
 }
 
+fn lex_toml(s: &[u8], out: &mut [CodeToken]) -> usize {
+    let n = s.len();
+    let mut count = 0;
+    let mut i = 0;
+
+    // Check for comment
+    while i < n {
+        if s[i] == b'#' {
+            emit(out, &mut count, i, n - i, TokenKind::Comment);
+            break;
+        }
+        if s[i] == b'[' {
+            // Section header like [package] or [[bin]]
+            let start = i;
+            while i < n && s[i] != b'#' {
+                i += 1;
+            }
+            emit(out, &mut count, start, i - start, TokenKind::Tag);
+            continue;
+        }
+        if s[i] == b'"' || s[i] == b'\'' {
+            let quote = s[i];
+            let mut end = i + 1;
+            while end < n && s[end] != quote {
+                if s[end] == b'\\' {
+                    end += 1;
+                }
+                end += 1;
+            }
+            if end < n {
+                end += 1;
+            }
+            emit(out, &mut count, i, end - i, TokenKind::String);
+            i = end;
+            continue;
+        }
+        if s[i].is_ascii_digit() {
+            let mut end = i;
+            while end < n && (s[end].is_ascii_alphanumeric() || s[end] == b'.' || s[end] == b'-') {
+                end += 1;
+            }
+            emit(out, &mut count, i, end - i, TokenKind::Number);
+            i = end;
+            continue;
+        }
+        if is_word_start(s[i]) {
+            let mut end = i;
+            while end < n && (is_word_char(s[end]) || s[end] == b'-') {
+                end += 1;
+            }
+            let w = &s[i..end];
+            // Check if followed by '=' (key)
+            let mut probe = end;
+            while probe < n && s[probe] == b' ' {
+                probe += 1;
+            }
+            let is_key = probe < n && s[probe] == b'=';
+            let kind = if word_in(w, KW_TOML) {
+                TokenKind::Keyword
+            } else if is_key {
+                TokenKind::Attr
+            } else {
+                TokenKind::Plain
+            };
+            emit(out, &mut count, i, end - i, kind);
+            i = end;
+            continue;
+        }
+        let c = s[i];
+        let is_punct = matches!(c, b'=' | b'{' | b'}' | b'[' | b']' | b',' | b'.');
+        emit(
+            out,
+            &mut count,
+            i,
+            1,
+            if is_punct {
+                TokenKind::Punct
+            } else {
+                TokenKind::Plain
+            },
+        );
+        i += 1;
+    }
+    count
+}
+
+fn lex_markdown(s: &[u8], out: &mut [CodeToken]) -> usize {
+    let n = s.len();
+    if n == 0 {
+        return 0;
+    }
+    let mut count = 0;
+
+    // Heading: starts with '#'
+    let mut trimmed_start = 0;
+    while trimmed_start < n && s[trimmed_start] == b' ' {
+        trimmed_start += 1;
+    }
+    if trimmed_start < n && s[trimmed_start] == b'#' {
+        emit(out, &mut count, 0, n, TokenKind::Tag);
+        return count;
+    }
+    // Blockquote or list item bullet
+    if trimmed_start < n && (s[trimmed_start] == b'>' || ((s[trimmed_start] == b'-' || s[trimmed_start] == b'*') && trimmed_start + 1 < n && s[trimmed_start + 1] == b' ')) {
+        emit(out, &mut count, 0, trimmed_start + 1, TokenKind::Keyword);
+        if trimmed_start + 1 < n {
+            emit(out, &mut count, trimmed_start + 1, n - (trimmed_start + 1), TokenKind::Plain);
+        }
+        return count;
+    }
+
+    let mut i = 0;
+    while i < n {
+        if s[i] == b'`' {
+            let mut end = i + 1;
+            while end < n && s[end] != b'`' {
+                end += 1;
+            }
+            if end < n {
+                end += 1;
+            }
+            emit(out, &mut count, i, end - i, TokenKind::Attr);
+            i = end;
+            continue;
+        }
+        if s[i] == b'[' {
+            // Potential link text [text](url)
+            let mut end = i + 1;
+            while end < n && s[end] != b']' {
+                end += 1;
+            }
+            if end < n {
+                end += 1;
+                emit(out, &mut count, i, end - i, TokenKind::Keyword);
+                i = end;
+                if i < n && s[i] == b'(' {
+                    let mut uend = i + 1;
+                    while uend < n && s[uend] != b')' {
+                        uend += 1;
+                    }
+                    if uend < n {
+                        uend += 1;
+                    }
+                    emit(out, &mut count, i, uend - i, TokenKind::String);
+                    i = uend;
+                }
+                continue;
+            }
+        }
+        let start = i;
+        while i < n && s[i] != b'`' && s[i] != b'[' {
+            i += 1;
+        }
+        emit(out, &mut count, start, i - start, TokenKind::Plain);
+    }
+    count
+}
+
 fn color_for(kind: TokenKind) -> u32 {
     match kind {
         TokenKind::Plain => rgb(0xe4, 0xec, 0xf2),
@@ -576,13 +768,13 @@ pub fn draw_code_preview(
     lang: CodeLang,
     scroll_line: usize,
 ) {
-    let scale = 2;
-    let char_adv = 6 * scale; // 12px per character at scale 2
-    let line_h = 20;
-    let pad_top = 20;
-    let gutter_w = 56;
-    let text_x = x + gutter_w + 16;
-    let max_cols = ((w - gutter_w - 28).max(0) / char_adv) as usize;
+    let scale = if w < 520 { 1 } else { 2 };
+    let char_adv = 6 * scale; // 6px at scale 1, 12px at scale 2
+    let line_h = if scale == 1 { 12 } else { 20 };
+    let pad_top = if h < 450 { 12 } else { 20 };
+    let gutter_w = if scale == 1 { 34 } else { 56 };
+    let text_x = x + gutter_w + (if scale == 1 { 10 } else { 16 });
+    let max_cols = ((w - gutter_w - 20).max(0) / char_adv) as usize;
     let visible_lines = ((h - 2 * pad_top).max(0) / line_h) as usize;
 
     // Subtle gutter divider line
@@ -672,4 +864,24 @@ fn fmt_line_no(buf: &mut [u8; 8], mut val: u32) -> &str {
         pos += 1;
     }
     core::str::from_utf8(&buf[..pos]).unwrap_or("")
+}
+
+/// Helper to count the total number of lines in a text slice for chunk paging.
+pub fn count_total_lines(text: &[u8]) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+    let mut count = 0;
+    let mut i = 0;
+    let n = text.len();
+    while i < n {
+        if text[i] == b'\n' {
+            count += 1;
+        }
+        i += 1;
+    }
+    if text[n - 1] != b'\n' {
+        count += 1;
+    }
+    count
 }

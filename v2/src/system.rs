@@ -71,61 +71,88 @@ impl SystemApp {
     }
 }
 
-pub fn draw_window(fb: &mut Framebuffer, app: &SystemApp) {
+pub fn draw_window(fb: &mut Framebuffer, app: &SystemApp, session_w: i32, session_h: i32) {
     match app.section {
-        SystemSection::About => draw_about(fb, app),
+        SystemSection::About => draw_about(fb, app, session_w, session_h),
         SystemSection::Locale => draw_locale(fb, app),
         SystemSection::Fonts => draw_fonts(fb),
     }
 }
 
-fn draw_about(fb: &mut Framebuffer, app: &SystemApp) {
+fn layout_margins(fb_w: i32, fb_h: i32) -> (i32, i32, i32, i32, i32) {
+    let x0 = if fb_w >= 1100 {
+        120
+    } else if fb_w >= 640 {
+        40
+    } else {
+        16
+    };
+    let w = (fb_w - 2 * x0).max(200);
+    let val_off = if fb_w >= 900 {
+        280
+    } else if fb_w >= 600 {
+        200
+    } else {
+        124
+    };
+    let y0 = if fb_h >= 600 { 64 } else { 20 };
+    let row_h = if fb_h >= 600 {
+        52
+    } else if fb_h >= 400 {
+        38
+    } else {
+        30
+    };
+    (x0, w, val_off, y0, row_h)
+}
+
+fn draw_about(fb: &mut Framebuffer, app: &SystemApp, session_w: i32, session_h: i32) {
     fb.clear(rgb(0x0b, 0x10, 0x16));
 
-    let x0 = 160;
-    let w = fb.w - 2 * x0;
-    let y0 = 96;
+    let (x0, w, val_off, y0, row_h) = layout_margins(fb.w, fb.h);
+    let head_scale = if fb.w < 480 { 2 } else { 3 };
 
-    draw_str(fb, x0, y0, "ABOUT", 3, rgb(0xf0, 0xf6, 0xfc));
-    fb.fill(x0, y0 + 36, w, 2, rgb(0x2d, 0xd4, 0xbf));
+    draw_str(fb, x0, y0, "ABOUT", head_scale, rgb(0xf0, 0xf6, 0xfc));
+    fb.fill(x0, y0 + 12 * head_scale, w, 2, rgb(0x2d, 0xd4, 0xbf));
 
-    let rows_y = y0 + 68;
-    let row_h = 56;
+    let rows_y = y0 + 12 * head_scale + 24;
 
-    draw_row(fb, x0, rows_y, w, "VERSION", PKG_VERSION);
-    draw_row(fb, x0, rows_y + row_h, w, "TARGET", TARGET_TRIPLE);
-    draw_row(fb, x0, rows_y + row_h * 2, w, "PROFILE", BUILD_PROFILE);
-    draw_row(fb, x0, rows_y + row_h * 3, w, "COMPILER", RUSTC_VER);
-    draw_row(fb, x0, rows_y + row_h * 4, w, "SOURCE FNV1A-64", SRC_HASH);
-    draw_row(
-        fb,
-        x0,
-        rows_y + row_h * 5,
-        w,
-        "FRAMEBUFFER",
-        "1280X720 RGBA8888 (3,686,400 B)",
-    );
+    draw_row(fb, x0, rows_y, w, val_off, "VERSION", PKG_VERSION);
+    draw_row(fb, x0, rows_y + row_h, w, val_off, "TARGET", TARGET_TRIPLE);
+    draw_row(fb, x0, rows_y + row_h * 2, w, val_off, "PROFILE", BUILD_PROFILE);
+    draw_row(fb, x0, rows_y + row_h * 3, w, val_off, "COMPILER", RUSTC_VER);
+    draw_row(fb, x0, rows_y + row_h * 4, w, val_off, "SOURCE FNV1A", SRC_HASH);
+
+    let mut fb_buf = [b' '; 48];
+    let fb_str = fmt_fb_spec(&mut fb_buf, session_w as u32, session_h as u32);
+    draw_row(fb, x0, rows_y + row_h * 5, w, val_off, "FRAMEBUFFER", fb_str);
 
     let mut snap_buf = [b' '; 16];
     let snap_str = fmt_u32(&mut snap_buf, app.snapshots_taken);
-    draw_row(fb, x0, rows_y + row_h * 6, w, "SNAPSHOTS", snap_str);
+    draw_row(fb, x0, rows_y + row_h * 6, w, val_off, "SNAPSHOTS", snap_str);
 }
 
 fn draw_locale(fb: &mut Framebuffer, app: &SystemApp) {
     fb.clear(rgb(0x0b, 0x10, 0x16));
 
-    let x0 = 160;
-    let w = fb.w - 2 * x0;
-    let y0 = 96;
+    let (x0, w, val_off, y0, row_h) = layout_margins(fb.w, fb.h);
+    let head_scale = if fb.w < 480 { 2 } else { 3 };
 
-    draw_str(fb, x0, y0, "LOCALE", 3, rgb(0xf0, 0xf6, 0xfc));
-    fb.fill(x0, y0 + 36, w, 2, rgb(0x2d, 0xd4, 0xbf));
+    draw_str(fb, x0, y0, "LOCALE", head_scale, rgb(0xf0, 0xf6, 0xfc));
+    fb.fill(x0, y0 + 12 * head_scale, w, 2, rgb(0x2d, 0xd4, 0xbf));
 
-    let rows_y = y0 + 68;
-    let row_h = 56;
+    let rows_y = y0 + 12 * head_scale + 24;
 
-    draw_row(fb, x0, rows_y, w, "LANGUAGE", "en-US");
-    draw_row(fb, x0, rows_y + row_h, w, "CHARACTER SET", "ASCII / BASIC LATIN (U+0020..U+007E)");
+    draw_row(fb, x0, rows_y, w, val_off, "LANGUAGE", "en-US");
+    draw_row(
+        fb,
+        x0,
+        rows_y + row_h,
+        w,
+        val_off,
+        "CHARSET",
+        "ASCII / BASIC LATIN (U+0020..U+007E)",
+    );
 
     let mut utc_buf = [b' '; 24];
     let utc_str = fmt_datetime(
@@ -137,49 +164,83 @@ fn draw_locale(fb: &mut Framebuffer, app: &SystemApp) {
         app.utc_min,
         app.utc_sec,
     );
-    draw_row(fb, x0, rows_y + row_h * 2, w, "UTC TIME", utc_str);
+    draw_row(fb, x0, rows_y + row_h * 2, w, val_off, "UTC TIME", utc_str);
 
     let mut tz_buf = [b' '; 24];
     let tz_str = fmt_tz_offset(&mut tz_buf, app.tz_offset_min);
-    draw_row(fb, x0, rows_y + row_h * 3, w, "UTC OFFSET", tz_str);
+    draw_row(fb, x0, rows_y + row_h * 3, w, val_off, "UTC OFFSET", tz_str);
 }
 
 fn draw_fonts(fb: &mut Framebuffer) {
     fb.clear(rgb(0x0b, 0x10, 0x16));
 
-    let x0 = 160;
-    let w = fb.w - 2 * x0;
+    let (x0, w, _, _, _) = layout_margins(fb.w, fb.h);
+    let val_off = if fb.w >= 800 {
+        220
+    } else if fb.w >= 540 {
+        140
+    } else {
+        92
+    };
     let label_col = rgb(0x7b, 0x8b, 0x98);
     let val_col = rgb(0xe6, 0xf1, 0xf8);
     let accent = rgb(0x2d, 0xd4, 0xbf);
     let rule_col = rgb(0x18, 0x22, 0x2d);
+    let compact = fb.h < 520 || fb.w < 540;
+    let body_scale = if fb.w < 480 { 1 } else { 2 };
+    let head_scale = if compact { 2 } else { 3 };
 
-    let y0 = 44;
-    draw_str(fb, x0, y0, FIVESEVEN_US_LATIN.id, 3, rgb(0xf0, 0xf6, 0xfc));
-    draw_str(fb, x0 + 320, y0 + 7, FIVESEVEN_US_LATIN.range_label, 2, label_col);
-    fb.fill(x0, y0 + 36, w, 2, accent);
+    let y0 = if compact { 16 } else { 36 };
+    draw_str(fb, x0, y0, FIVESEVEN_US_LATIN.id, head_scale, rgb(0xf0, 0xf6, 0xfc));
+    if fb.w >= 640 {
+        draw_str(
+            fb,
+            x0 + 320,
+            y0 + 7,
+            FIVESEVEN_US_LATIN.range_label,
+            2,
+            label_col,
+        );
+    }
+    fb.fill(x0, y0 + 12 * head_scale, w, 2, accent);
 
-    // 1. Character Set (all 95 printable glyphs at 2x)
-    let y_cs = 100;
-    draw_str(fb, x0, y_cs, "UPPER", 2, label_col);
-    draw_str(fb, x0 + 220, y_cs, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 2, val_col);
-
-    draw_str(fb, x0, y_cs + 28, "LOWER", 2, label_col);
-    draw_str(fb, x0 + 220, y_cs + 28, "abcdefghijklmnopqrstuvwxyz", 2, val_col);
-
-    draw_str(fb, x0, y_cs + 56, "SYMBOLS", 2, label_col);
+    // 1. Character Set
+    let y_cs = y0 + 12 * head_scale + (if compact { 12 } else { 24 });
+    let cs_step = if compact { 18 } else { 26 };
+    draw_str(fb, x0, y_cs, "UPPER", body_scale, label_col);
     draw_str(
         fb,
-        x0 + 220,
-        y_cs + 56,
-        "0123456789 .,:-/()+=!?<>[]{}@#$%^&*~_|\\;\"'`",
-        2,
+        x0 + val_off,
+        y_cs,
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        body_scale,
         val_col,
     );
-    fb.fill(x0, y_cs + 84, w, 1, rule_col);
+
+    draw_str(fb, x0, y_cs + cs_step, "LOWER", body_scale, label_col);
+    draw_str(
+        fb,
+        x0 + val_off,
+        y_cs + cs_step,
+        "abcdefghijklmnopqrstuvwxyz",
+        body_scale,
+        val_col,
+    );
+
+    draw_str(fb, x0, y_cs + cs_step * 2, "SYMBOLS", body_scale, label_col);
+    draw_str(
+        fb,
+        x0 + val_off,
+        y_cs + cs_step * 2,
+        "0123456789 .,:-/()+=!?<>[]{}@#$%",
+        body_scale,
+        val_col,
+    );
+    let div1_y = y_cs + cs_step * 3;
+    fb.fill(x0, div1_y, w, 1, rule_col);
 
     // 2. Scale Ladder (1x .. 5x)
-    let mut y_scale = 202;
+    let mut y_scale = div1_y + (if compact { 10 } else { 18 });
     let scales: [(i32, &str); 5] = [
         (1, "1X (5X7)"),
         (2, "2X (10X14)"),
@@ -187,16 +248,22 @@ fn draw_fonts(fb: &mut Framebuffer) {
         (4, "4X (20X28)"),
         (5, "5X (25X35)"),
     ];
+    let scale_gap = if compact { 8 } else { 14 };
     for &(sc, label) in &scales {
+        if y_scale + 7 * sc > fb.h - 80 && compact && sc > 3 {
+            break;
+        }
         let row_h = (7 * sc).max(14);
-        draw_str(fb, x0, y_scale + (row_h - 14) / 2, label, 2, label_col);
-        draw_str(fb, x0 + 220, y_scale, "FiveSeven 0123456789", sc, val_col);
-        y_scale += row_h + 16;
+        draw_str(fb, x0, y_scale + (row_h - 7 * body_scale) / 2, label, body_scale, label_col);
+        draw_str(fb, x0 + val_off, y_scale, "FiveSeven 0123", sc, val_col);
+        y_scale += row_h + scale_gap;
     }
-    fb.fill(x0, y_scale - 4, w, 1, rule_col);
+    fb.fill(x0, y_scale - 2, w, 1, rule_col);
 
-    // 3. Style Transforms (Regular, Bold, Italic, Matrix, Underline) at 3x
-    let y_style = y_scale + 12;
+    // 3. Style Transforms (Regular, Bold, Italic, Matrix, Underline)
+    let y_style = y_scale + (if compact { 8 } else { 12 });
+    let style_sc = if compact { 2 } else { 3 };
+    let style_step = if compact { 24 } else { 36 };
     let styles: [(FontStyle, &str); 5] = [
         (FontStyle::Regular,   "REGULAR"),
         (FontStyle::Bold,      "BOLD"),
@@ -205,31 +272,39 @@ fn draw_fonts(fb: &mut Framebuffer) {
         (FontStyle::Underline, "UNDERLINE"),
     ];
     for (idx, &(style, name)) in styles.iter().enumerate() {
-        let ry = y_style + (idx as i32) * 38;
-        draw_str(fb, x0, ry + 4, name, 2, label_col);
+        let ry = y_style + (idx as i32) * style_step;
+        if ry + 7 * style_sc > fb.h {
+            break;
+        }
+        draw_str(fb, x0, ry + 2, name, body_scale, label_col);
         draw_str_styled(
             fb,
-            x0 + 220,
+            x0 + val_off,
             ry,
             "Pack my box with five dozen jugs",
-            3,
+            style_sc,
             style,
             val_col,
         );
     }
 }
 
-fn draw_row(fb: &mut Framebuffer, x: i32, y: i32, w: i32, key: &str, val: &str) {
-    draw_str(fb, x, y, key, 2, rgb(0x7b, 0x8b, 0x98));
+fn draw_row(fb: &mut Framebuffer, x: i32, y: i32, w: i32, val_off: i32, key: &str, val: &str) {
+    if y + 20 > fb.h {
+        return;
+    }
+    let scale = if w < 420 { 1 } else { 2 };
+    let char_w = 6 * scale;
+    draw_str(fb, x, y, key, scale, rgb(0x7b, 0x8b, 0x98));
 
-    let max_chars = ((w - 320) / 12).max(8) as usize;
+    let max_chars = ((w - val_off) / char_w).max(6) as usize;
     let v_clamped = if val.len() > max_chars {
         &val[..max_chars]
     } else {
         val
     };
-    draw_str(fb, x + 320, y, v_clamped, 2, rgb(0xe6, 0xf1, 0xf8));
-    fb.fill(x, y + 32, w, 1, rgb(0x18, 0x22, 0x2d));
+    draw_str(fb, x + val_off, y, v_clamped, scale, rgb(0xe6, 0xf1, 0xf8));
+    fb.fill(x, y + 12 * scale + 6, w, 1, rgb(0x18, 0x22, 0x2d));
 }
 
 pub fn draw_desktop_backdrop(fb: &mut Framebuffer) {
@@ -286,10 +361,32 @@ pub fn draw_dock_tile(
     );
 }
 
-fn fmt_u32(buf: &mut [u8; 16], mut val: u32) -> &str {
+fn fmt_fb_spec(buf: &mut [u8; 48], w: u32, h: u32) -> &str {
+    let mut pos = 0;
+    pos = write_u32(buf, pos, w);
+    buf[pos] = b'X';
+    pos += 1;
+    pos = write_u32(buf, pos, h);
+    for &b in b" RGBA8888 (" {
+        buf[pos] = b;
+        pos += 1;
+    }
+    let bytes = w.saturating_mul(h).saturating_mul(4);
+    pos = write_u32(buf, pos, bytes);
+    for &b in b" B)" {
+        buf[pos] = b;
+        pos += 1;
+    }
+    core::str::from_utf8(&buf[..pos]).unwrap_or("")
+}
+
+fn write_u32(buf: &mut [u8], mut pos: usize, mut val: u32) -> usize {
     if val == 0 {
-        buf[0] = b'0';
-        return core::str::from_utf8(&buf[..1]).unwrap_or("0");
+        if pos < buf.len() {
+            buf[pos] = b'0';
+            pos += 1;
+        }
+        return pos;
     }
     let mut tmp = [0u8; 10];
     let mut n = 0;
@@ -298,12 +395,16 @@ fn fmt_u32(buf: &mut [u8; 16], mut val: u32) -> &str {
         val /= 10;
         n += 1;
     }
-    let mut pos = 0;
-    while n > 0 {
+    while n > 0 && pos < buf.len() {
         n -= 1;
         buf[pos] = tmp[n];
         pos += 1;
     }
+    pos
+}
+
+fn fmt_u32(buf: &mut [u8; 16], val: u32) -> &str {
+    let pos = write_u32(buf, 0, val);
     core::str::from_utf8(&buf[..pos]).unwrap_or("0")
 }
 
