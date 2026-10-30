@@ -1,36 +1,41 @@
-// demo module: no dependencies
-const state = { count: 0, items: ["clock", "calc", "calendar"] };
+// TaskBoard client module: filters, renders, and toggles project tasks.
+const API_BASE = '/api/v1/projects';
 
-export function render(el, items = state.items) {
-  el.innerHTML = items.map((name) => `<li>${name}</li>`).join("");
-  return items.length;
-}
-
-export function summarize(items = state.items) {
-  // a deliberately long line so the viewer has something to scroll sideways: the total slot count across every registered application
-  return items.reduce((total, name) => total + name.length, 0);
-}
-
-function tick(delta) {
-  state.count += delta;
-  if (state.count > 100) {
-    state.count = 0;
-    return "reset";
+export class TaskBoard {
+  constructor(rootEl, projectId) {
+    this.root = rootEl;
+    this.projectId = projectId;
+    this.items = [];
+    this.filter = 'open';
   }
-  return "running";
-}
 
-const el = document.querySelector("#list");
-if (el) {
-  render(el);
-  state.count += 1;
-}
+  async refresh() {
+    const res = await fetch(`${API_BASE}/${this.projectId}/tasks`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    this.items = payload.tasks || [];
+    this.render();
+    return this.items.length;
+  }
 
-/* A few more statements so the file is taller than the
- * preview window and the vertical scrollbar appears. */
-for (let i = 0; i < 12; i++) {
-  tick(i % 3);
-}
+  visibleItems() {
+    if (this.filter === 'all') return this.items;
+    const wantDone = this.filter === 'done';
+    return this.items.filter((task) => Boolean(task.completed) === wantDone);
+  }
 
-const status = tick(1);
-console.log(status, state.count);
+  toggleTask(taskId) {
+    for (const item of this.items) {
+      if (item.id === taskId) {
+        item.completed = !item.completed;
+        break;
+      }
+    }
+    this.render();
+  }
+
+  render() {
+    const rows = this.visibleItems();
+    this.root.dataset.count = String(rows.length);
+  }
+}

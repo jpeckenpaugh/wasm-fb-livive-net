@@ -1,52 +1,36 @@
-/* palette */
+/* Minimal dark surface stylesheet for Orbit Workspace cards and layout. */
 :root {
-  --bg: #0c1015;
-  --fg: #e4ecf2;
-  --line: #2a3644;
-  --accent: #4cc2ff;
+  --bg: #0d1218;
+  --panel: #141c24;
+  --border: #243240;
+  --text: #e6eef6;
+  --muted: #8b9cac;
+  --accent: #2dd4bf;
 }
 
-.app {
+body {
+  margin: 0;
   background: var(--bg);
-  color: var(--fg);
-  padding: 24px;
-  font-family: monospace;
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
-.app header {
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
-  margin-bottom: 18px;
-}
-
-.list > li {
-  margin: 6px 0;
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-
-.list > li:hover {
-  background: rgba(76, 194, 255, 0.12);
-}
-
-.list > li.selected {
-  outline: 2px solid var(--accent);
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
 }
 
 .card {
-  border: 1px solid var(--line);
-  padding: 12px;
-  margin: 10px 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 20px;
 }
 
 .card h2 {
-  margin: 0 0 6px;
-  font-size: 14px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-@media (max-width: 640px) {
-  .app { padding: 8px; }
-  .card { padding: 8px; }
+  margin: 0 0 8px 0;
+  color: var(--accent);
 }

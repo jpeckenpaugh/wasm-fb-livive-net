@@ -41,5 +41,7 @@ FROM nginx:1.29-alpine AS serve
 COPY --from=build /src/build/media_browser.mjs /usr/share/nginx/html/build/
 COPY --from=build /src/build/media_browser.wasm /usr/share/nginx/html/build/
 COPY --from=build /src/build/v2/appliance.wasm /usr/share/nginx/html/v2/build/
+COPY assets /usr/share/nginx/html/assets/
+COPY demo /usr/share/nginx/html/demo/
 COPY web /usr/share/nginx/html/
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf

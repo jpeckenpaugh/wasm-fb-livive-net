@@ -29,6 +29,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src/wm.rs");
     println!("cargo:rerun-if-changed=src/system.rs");
     println!("cargo:rerun-if-changed=src/calc.rs");
+    println!("cargo:rerun-if-changed=src/files.rs");
     println!("cargo:rerun-if-changed=src/fb.rs");
     println!("cargo:rerun-if-changed=src/font.rs");
 
@@ -46,6 +47,7 @@ fn main() {
         "src/wm.rs",
         "src/system.rs",
         "src/calc.rs",
+        "src/files.rs",
     ] {
         if let Ok(bytes) = std::fs::read(path) {
             combined.extend_from_slice(bytes.as_slice());

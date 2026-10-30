@@ -51,8 +51,10 @@ $(V2_WASM_OUT): $(wildcard v2/Cargo.toml v2/build.rs v2/src/*.rs)
 	@mkdir -p $(dir $@)
 	cargo build --manifest-path v2/Cargo.toml --target wasm32-unknown-unknown --release
 	cp v2/target/wasm32-unknown-unknown/release/appliance.wasm $@
-	@mkdir -p web/v2/build
+	@mkdir -p web/v2/build web/assets web/demo
 	@cp $@ web/v2/build/appliance.wasm
+	@cp assets/*.png web/assets/
+	@cp demo/* web/demo/
 	@ls -l $@ | awk '{printf "v2 wasm: %d bytes\n", $$5}'
 
 test-v2:
@@ -173,4 +175,4 @@ serve:
 	docker compose up --build serve
 
 clean:
-	rm -rf $(BUILD) build-debug web/v2/build v2/target
+	rm -rf $(BUILD) build-debug web/v2/build web/assets web/demo v2/target

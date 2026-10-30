@@ -1,9 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <title>wasm-fb</title>
-  <updated>2026-10-29T12:00:00Z</updated>
+  <title>Orbit Service Status &amp; Releases</title>
+  <link href="https://status.example.com/feed.xml" rel="self"/>
+  <updated>2026-10-30T12:00:00Z</updated>
+
   <entry>
-    <title>Framebuffer demo</title>
-    <id>urn:uuid:1</id>
+    <id>tag:status.example.com,2026:release-2.4.0</id>
+    <title>v2.4.0 — Cart reservations and instant totals</title>
+    <updated>2026-10-30T09:30:00Z</updated>
+    <summary>Adds optimistic stock holds and sub-millisecond tax rounding.</summary>
+  </entry>
+
+  <entry>
+    <id>tag:status.example.com,2026:release-2.3.2</id>
+    <title>v2.3.2 — Webhook signature rotation</title>
+    <updated>2026-10-18T16:15:00Z</updated>
+    <summary>Supports dual-header HMAC verification during key rollover windows.</summary>
+  </entry>
+
+  <entry>
+    <id>tag:status.example.com,2026:release-2.3.0</id>
+    <title>v2.3.0 — Multi-region read replicas</title>
+    <updated>2026-10-04T11:00:00Z</updated>
+    <summary>Routes catalog search queries to the nearest edge replica.</summary>
   </entry>
 </feed>

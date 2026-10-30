@@ -1,17 +1,33 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>wasm-fb demo</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body class="app">
-    <!-- the guest draws every pixel -->
-    <h1 id="title">Hello, wasm</h1>
-    <ul class="list">
-      <li>framebuffer</li>
-      <li>input bridge</li>
-    </ul>
-    <script src="app.js"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orbit Workspace</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Orbit Workspace</h1>
+    <nav>
+      <a href="#board" class="active">Board</a>
+      <a href="#releases">Releases</a>
+      <a href="#settings">Settings</a>
+    </nav>
+  </header>
+
+  <main id="board" class="grid">
+    <section class="card" data-lane="todo">
+      <h2>Backlog</h2>
+      <p>Audit rate-limit headers on public catalog endpoints.</p>
+    </section>
+
+    <section class="card" data-lane="active">
+      <h2>In Progress</h2>
+      <p>Add idempotency keys to checkout session creation.</p>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
 </html>

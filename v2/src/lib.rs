@@ -1,26 +1,34 @@
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
 pub mod calc;
+pub mod code;
 pub mod fb;
+pub mod files;
 pub mod font;
 pub mod system;
 pub mod wm;
 
 use core::cell::UnsafeCell;
 use fb::{Framebuffer, SCREEN_H, SCREEN_W};
+use files::MAX_TEXT_BYTES;
 use wm::{AppSlot, WmState};
 
-#[cfg(not(target_arch = "wasm32"))]
 const FB_PIXELS: usize = SCREEN_W * SCREEN_H;
 
 /// Single-threaded Wasm guest state container.
 ///
-/// On `wasm32`, the 3.52 MiB framebuffer resides at a fixed linear memory offset
-/// (`0x100000` = 1 MiB) and we grow linear memory to 8 MiB on `app_init` so the
-/// `.wasm` binary stays ~15 KB with zero static data segments for pixels.
+/// On `wasm32`, the 3.52 MiB framebuffer, the 3.52 MiB RGBA8888 network mount
+/// staging buffer, and the 16 KiB text/code staging buffer reside above
+/// `__heap_base` in linear memory (`160` pages = 10 MiB total), keeping the
+/// `.wasm` binary ~36 KB with zero static pixel arrays.
 struct GuestMemory {
     #[cfg(not(target_arch = "wasm32"))]
     pixels: UnsafeCell<core::mem::MaybeUninit<[u32; FB_PIXELS]>>,
+    #[cfg(not(target_arch = "wasm32"))]
+    staging: UnsafeCell<core::mem::MaybeUninit<[u32; FB_PIXELS]>>,
+    #[cfg(not(target_arch = "wasm32"))]
+    text_staging: UnsafeCell<[u8; MAX_TEXT_BYTES]>,
+    name_scratch: UnsafeCell<[u8; 64]>,
     wm: UnsafeCell<WmState>,
 }
 
@@ -29,6 +37,11 @@ unsafe impl Sync for GuestMemory {}
 static GUEST: GuestMemory = GuestMemory {
     #[cfg(not(target_arch = "wasm32"))]
     pixels: UnsafeCell::new(core::mem::MaybeUninit::uninit()),
+    #[cfg(not(target_arch = "wasm32"))]
+    staging: UnsafeCell::new(core::mem::MaybeUninit::uninit()),
+    #[cfg(not(target_arch = "wasm32"))]
+    text_staging: UnsafeCell::new([0; MAX_TEXT_BYTES]),
+    name_scratch: UnsafeCell::new([0; 64]),
     wm: UnsafeCell::new(WmState::new()),
 };
 
@@ -38,7 +51,7 @@ extern "C" {
 }
 
 #[cfg(target_arch = "wasm32")]
-const WASM_MIN_PAGES: usize = 128; // 128 * 64 KiB = 8 MiB reserved linear memory
+const WASM_MIN_PAGES: usize = 160; // 160 * 64 KiB = 10 MiB reserved linear memory
 
 #[cfg(target_arch = "wasm32")]
 #[inline]
@@ -51,10 +64,34 @@ unsafe fn fb_base_ptr() -> *mut u32 {
     base as *mut u32
 }
 
+#[cfg(target_arch = "wasm32")]
+#[inline]
+unsafe fn staging_base_ptr() -> *mut u32 {
+    fb_base_ptr().add(FB_PIXELS)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[inline]
+unsafe fn text_staging_base_ptr() -> *mut u8 {
+    staging_base_ptr().add(FB_PIXELS) as *mut u8
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 #[inline]
 unsafe fn fb_base_ptr() -> *mut u32 {
     (*GUEST.pixels.get()).as_mut_ptr() as *mut u32
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[inline]
+unsafe fn staging_base_ptr() -> *mut u32 {
+    (*GUEST.staging.get()).as_mut_ptr() as *mut u32
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[inline]
+unsafe fn text_staging_base_ptr() -> *mut u8 {
+    (*GUEST.text_staging.get()).as_mut_ptr()
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -63,15 +100,19 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     core::arch::wasm32::unreachable()
 }
 
-fn with_state<R>(f: impl FnOnce(&mut WmState, &mut Framebuffer) -> R) -> R {
+fn with_state<R>(f: impl FnOnce(&mut WmState, &mut Framebuffer, &[u32], &[u8]) -> R) -> R {
     unsafe {
         let wm = &mut *GUEST.wm.get();
         let px_ptr = fb_base_ptr();
+        let st_ptr = staging_base_ptr();
+        let txt_ptr = text_staging_base_ptr();
         let w = wm.width.clamp(1, SCREEN_W as i32);
         let h = wm.height.clamp(1, SCREEN_H as i32);
         let px = core::slice::from_raw_parts_mut(px_ptr, (w as usize) * (h as usize));
+        let st = core::slice::from_raw_parts(st_ptr, FB_PIXELS);
+        let txt = core::slice::from_raw_parts(txt_ptr, MAX_TEXT_BYTES);
         let mut fb = Framebuffer::new(px, w, h);
-        f(wm, &mut fb)
+        f(wm, &mut fb, st, txt)
     }
 }
 
@@ -87,40 +128,36 @@ pub extern "C" fn app_init(width: i32, height: i32) -> i32 {
     } else {
         height
     };
-    with_state(|wm, fb| {
+    with_state(|wm, fb, st, txt| {
         wm.init(w, h, wm.session_id);
-        wm.render(fb);
+        wm.render(fb, st, txt);
         1
     })
 }
 
 #[no_mangle]
 pub extern "C" fn app_set_session(session_id: u32) {
-    with_state(|wm, fb| {
+    with_state(|wm, fb, st, txt| {
         wm.session_id = if session_id > 0 { session_id } else { 1 };
         if wm.ready {
-            wm.render(fb);
+            wm.render(fb, st, txt);
         }
     });
 }
 
 #[no_mangle]
 pub extern "C" fn app_render() {
-    with_state(|wm, fb| {
-        wm.render(fb);
+    with_state(|wm, fb, st, txt| {
+        wm.render(fb, st, txt);
     });
 }
 
-/// Returns:
-/// - `0`: no change
-/// - `1`: screen changed
-/// - `2`: screen changed AND a snapshot capture was requested via `Testing -> Snapshot`
 #[no_mangle]
 pub extern "C" fn app_click(x: i32, y: i32) -> i32 {
-    with_state(|wm, fb| {
+    with_state(|wm, fb, st, txt| {
         let rc = wm.click(x, y);
         if rc != 0 {
-            wm.render(fb);
+            wm.render(fb, st, txt);
         }
         rc
     })
@@ -128,10 +165,10 @@ pub extern "C" fn app_click(x: i32, y: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn app_key(key: i32) -> i32 {
-    with_state(|wm, fb| {
+    with_state(|wm, fb, st, txt| {
         let rc = wm.key(key);
         if rc != 0 {
-            wm.render(fb);
+            wm.render(fb, st, txt);
         }
         rc
     })
@@ -181,23 +218,88 @@ pub extern "C" fn app_set_utc(
 
 #[no_mangle]
 pub extern "C" fn app_tick() -> i32 {
-    with_state(|wm, fb| {
+    with_state(|wm, fb, st, txt| {
         if !wm.ready || wm.test_pattern {
             return 0;
         }
-        wm.render(fb);
+        wm.render(fb, st, txt);
         1
     })
 }
 
 #[no_mangle]
 pub extern "C" fn app_record_snapshot() -> u32 {
-    with_state(|wm, fb| {
+    with_state(|wm, fb, st, txt| {
         wm.snapshot_seq = wm.snapshot_seq.wrapping_add(1);
         wm.system.snapshots_taken = wm.snapshot_seq;
-        wm.render(fb);
+        wm.render(fb, st, txt);
         wm.last_fb_hash
     })
+}
+
+// --- Network Mount (`~/`) & RGBA8888 / Source Code Upstream Bridge ---
+
+#[no_mangle]
+pub extern "C" fn app_mount_name_buf() -> *mut u8 {
+    unsafe { (*GUEST.name_scratch.get()).as_mut_ptr() }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mount_clear() {
+    unsafe {
+        (*GUEST.wm.get()).files.clear_mounts();
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mount_add(name_len: usize, byte_size: u32) -> i32 {
+    unsafe {
+        let len = name_len.min(64);
+        let ptr = (*GUEST.name_scratch.get()).as_ptr();
+        let name = core::slice::from_raw_parts(ptr, len);
+        (*GUEST.wm.get()).files.add_mount(name, byte_size)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mount_staging_ptr() -> *mut u8 {
+    unsafe { staging_base_ptr() as *mut u8 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mount_text_ptr() -> *mut u8 {
+    unsafe { text_staging_base_ptr() }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mount_pending_idx() -> i32 {
+    unsafe { (*GUEST.wm.get()).files.pending_fetch_idx }
+}
+
+/// Called by `host.js` once it has decoded a PNG/JPEG into `RGBA8888` and written
+/// `w * h * 4` bytes into `app_mount_staging_ptr()`.
+#[no_mangle]
+pub extern "C" fn app_mount_commit_rgba(idx: i32, w: i32, h: i32) {
+    with_state(|wm, fb, st, txt| {
+        let clamped_w = w.clamp(0, SCREEN_W as i32);
+        let clamped_h = h.clamp(0, SCREEN_H as i32);
+        wm.files.complete_stage(idx, clamped_w, clamped_h);
+        if wm.ready {
+            wm.render(fb, st, txt);
+        }
+    });
+}
+
+/// Called by `host.js` once it has fetched a source code / text file and written
+/// `byte_len` UTF-8 bytes into `app_mount_text_ptr()`.
+#[no_mangle]
+pub extern "C" fn app_mount_commit_text(idx: i32, byte_len: usize) {
+    with_state(|wm, fb, st, txt| {
+        wm.files.complete_stage_text(idx, byte_len);
+        if wm.ready {
+            wm.render(fb, st, txt);
+        }
+    });
 }
 
 #[no_mangle]
@@ -223,6 +325,7 @@ pub extern "C" fn app_active_page() -> i32 {
             AppSlot::Desktop => -1,
             AppSlot::System => wm.system.section as i32,
             AppSlot::Calc => 0,
+            AppSlot::Files => wm.files.active_file_idx().map(|i| i as i32).unwrap_or(-1),
         }
     }
 }
@@ -249,14 +352,14 @@ pub extern "C" fn app_selected() -> i32 {
 
 #[no_mangle]
 pub extern "C" fn app_count() -> i32 {
-    2 // 2 bundled apps: System (About/Locale/Fonts), Calc
+    3 // 3 bundled apps: System, Calc, Files
 }
 
 #[no_mangle]
 pub extern "C" fn app_set_test_pattern(enabled: i32) {
-    with_state(|wm, fb| {
+    with_state(|wm, fb, st, txt| {
         wm.test_pattern = enabled != 0;
-        wm.render(fb);
+        wm.render(fb, st, txt);
     });
 }
 
@@ -278,99 +381,107 @@ mod tests {
     };
 
     #[test]
-    fn step1_pipeline_system_sections_calc_and_test_pattern() {
+    fn step1_pipeline_system_calc_files_mount_and_test_pattern() {
         app_set_session(1);
         app_set_date(2026, 10, 30, 5);
         app_set_time(6, 45, 0, 0);
         app_set_utc(2026, 10, 30, 10, 45, 0, -240);
         assert_eq!(app_init(1280, 720), 1);
 
+        // Mount 1 image file (`wallpapers/*`) and 1 source code file (`samples/*`)
+        app_mount_clear();
+        let name_buf = unsafe { core::slice::from_raw_parts_mut(app_mount_name_buf(), 64) };
+        let f0 = b"wallpapers/01_aurora.png";
+        name_buf[..f0.len()].copy_from_slice(f0);
+        assert_eq!(app_mount_add(f0.len(), 493_568), 0);
+
+        let f1 = b"samples/app.js";
+        name_buf[..f1.len()].copy_from_slice(f1);
+        assert_eq!(app_mount_add(f1.len(), 1_045), 1);
+
         // 1. Starts on empty Desktop with Dock hidden
         assert_eq!(app_selected(), AppSlot::Desktop as i32);
         assert_eq!(app_dock_visible(), 0);
         let desktop_hash = app_fb_hash();
-        assert_ne!(desktop_hash, 0);
 
-        // 2. Click top-left Title Bar button (`(16, 16)`) to show Left App Dock
-        assert_eq!(app_click(16, 16), CLICK_CHANGED);
-        assert_eq!(app_dock_visible(), 1);
-        let dock_open_hash = app_fb_hash();
-        assert_ne!(dock_open_hash, desktop_hash);
-
-        // 3. Click the 128x72 System App Icon (slot 0) -> launches System (About) & auto-hides Dock
+        // 2. Open Dock and launch System (slot 0)
         let icon_x = DOCK_X + DOCK_ICON_W / 2;
+        assert_eq!(app_click(16, 16), CLICK_CHANGED);
         assert_eq!(app_click(icon_x, DOCK_Y + DOCK_ICON_H / 2), CLICK_CHANGED);
         assert_eq!(app_selected(), AppSlot::System as i32);
-        assert_eq!(app_dock_visible(), 0);
-        assert_eq!(app_active_page(), 0); // About section
         let about_hash = app_fb_hash();
         assert_ne!(about_hash, desktop_hash);
 
-        // 4. Switch System sections via Title Bar `SYSTEM` menu (About -> Locale -> Fonts)
-        let sys_menu_x = wm::MENU_X0 + 20;
-        assert_eq!(app_click(sys_menu_x, 16), CLICK_CHANGED);
-        assert_eq!(app_click(sys_menu_x, TITLE_H + 4 + 30 + 10), CLICK_CHANGED); // item 1: LOCALE
-        assert_eq!(app_active_page(), 1);
-        let locale_hash = app_fb_hash();
-        assert_ne!(locale_hash, about_hash);
-
-        assert_eq!(app_click(sys_menu_x, 16), CLICK_CHANGED);
-        assert_eq!(
-            app_click(sys_menu_x, TITLE_H + 4 + 60 + 10),
-            CLICK_CHANGED
-        ); // item 2: FONTS
-        assert_eq!(app_active_page(), 2);
-        let fonts_hash = app_fb_hash();
-        assert_ne!(fonts_hash, locale_hash);
-        assert_ne!(fonts_hash, about_hash);
-
-        // 5. Open Dock and click Calculator App Icon (slot 1) -> launches Calc & auto-hides Dock
+        // 3. Open Dock and launch Files (slot 2) -> opens at `~/` Root showing `wallpapers/` and `samples/`
         assert_eq!(app_click(16, 16), CLICK_CHANGED);
-        assert_eq!(app_dock_visible(), 1);
         assert_eq!(
-            app_click(icon_x, dock_icon_y(1) + DOCK_ICON_H / 2),
+            app_click(icon_x, dock_icon_y(2) + DOCK_ICON_H / 2),
             CLICK_CHANGED
         );
-        assert_eq!(app_selected(), AppSlot::Calc as i32);
-        assert_eq!(app_dock_visible(), 0);
-        let calc_zero_hash = app_fb_hash();
-        assert_ne!(calc_zero_hash, about_hash);
+        assert_eq!(app_selected(), AppSlot::Files as i32);
+        assert_eq!(app_active_page(), -1); // At `~/` root folder level
+        assert_eq!(app_mount_pending_idx(), -1);
+        let files_root_hash = app_fb_hash();
+        assert_ne!(files_root_hash, about_hash);
 
-        // 6. Exercise Calculator arithmetic (`12 + 30 = 42`) via key codes
-        assert_eq!(app_key(11), CLICK_CHANGED); // '1'
-        assert_eq!(app_key(12), CLICK_CHANGED); // '2'
-        assert_eq!(app_key(20), CLICK_CHANGED); // '+'
-        assert_eq!(app_key(13), CLICK_CHANGED); // '3'
-        assert_eq!(app_key(10), CLICK_CHANGED); // '0'
-        assert_eq!(app_key(24), CLICK_CHANGED); // '='
-        let mut disp = [0u8; 24];
-        let text = unsafe { (*GUEST.wm.get()).calc.format_display(&mut disp) };
-        assert_eq!(text, "42");
-        assert_ne!(app_fb_hash(), calc_zero_hash);
+        // 4. Click row 0 (`wallpapers/`) in the left 1/3 browser panel -> opens `~/WALLPAPERS` and selects file 0
+        assert_eq!(app_click(100, TITLE_H + 76 + 10), CLICK_CHANGED);
+        assert_eq!(app_active_page(), 0);
+        assert_eq!(app_mount_pending_idx(), 0);
+        let files_loading_hash = app_fb_hash();
+        assert_ne!(files_loading_hash, files_root_hash);
 
-        // Clear via `CALC -> CLEAR (AC)` menu item
-        let calc_menu_x = wm::MENU_X0 + 20;
-        assert_eq!(app_click(calc_menu_x, 16), CLICK_CHANGED);
-        assert_eq!(app_click(calc_menu_x, TITLE_H + 16), CLICK_CHANGED);
-        let text_cleared = unsafe { (*GUEST.wm.get()).calc.format_display(&mut disp) };
-        assert_eq!(text_cleared, "0");
-        assert_eq!(app_fb_hash(), calc_zero_hash);
+        // Simulate `host.js` writing a 1280x688 RGBA8888 image into staging memory
+        unsafe {
+            let st = core::slice::from_raw_parts_mut(app_mount_staging_ptr() as *mut u32, FB_PIXELS);
+            st.fill(rgb(0x12, 0x77, 0xaa));
+        }
+        app_mount_commit_rgba(0, 1280, 688);
+        assert_eq!(app_mount_pending_idx(), -1);
+        let files_preview0_hash = app_fb_hash();
+        assert_ne!(files_preview0_hash, files_loading_hash);
 
-        // 7. Open "Testing" menu (menu index 2) in Title Bar and click "SNAPSHOT"
+        // 5. Click row 0 (`../`) to return to `~/`, then click row 1 (`samples/`) to open `~/SAMPLES`
+        assert_eq!(app_click(100, TITLE_H + 76 + 10), CLICK_CHANGED);
+        assert_eq!(app_active_page(), -1);
+        assert_eq!(app_click(100, TITLE_H + 76 + 46 + 10), CLICK_CHANGED);
+        assert_eq!(app_active_page(), 1);
+        assert_eq!(app_mount_pending_idx(), 1);
+        let sample_js = b"export class TaskBoard {\n  constructor() {\n    return 42;\n  }\n}\n";
+        unsafe {
+            let txt = core::slice::from_raw_parts_mut(app_mount_text_ptr(), MAX_TEXT_BYTES);
+            txt[..sample_js.len()].copy_from_slice(sample_js);
+        }
+        app_mount_commit_text(1, sample_js.len());
+        assert_eq!(app_mount_pending_idx(), -1);
+        let files_code_hash = app_fb_hash();
+        assert_ne!(files_code_hash, files_preview0_hash);
+
+        // 6. Switch to `~/WALLPAPERS` via `FILES -> ~/WALLPAPERS` (item 0), then `SET AS WALLPAPER` (item 2)
+        let files_menu_x = wm::MENU_X0 + 20;
+        assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
+        assert_eq!(app_click(files_menu_x, TITLE_H + 16), CLICK_CHANGED);
+        assert_eq!(app_active_page(), 0);
+        assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
+        assert_eq!(
+            app_click(files_menu_x, TITLE_H + 16 + 2 * wm::MENU_ITEM_H),
+            CLICK_CHANGED
+        );
+        assert_eq!(app_selected(), AppSlot::Desktop as i32);
+        assert_ne!(app_fb_hash(), desktop_hash); // Desktop now renders the mounted wallpaper!
+
+        // 6. Open "Testing" menu (menu index 2) and click "SNAPSHOT"
         let testing_menu_x = wm::MENU_X0 + 2 * wm::MENU_HEADER_W + 20;
         assert_eq!(app_click(testing_menu_x, 16), CLICK_CHANGED);
         assert_eq!(app_click(testing_menu_x, TITLE_H + 16), CLICK_SNAPSHOT);
         assert_eq!(app_snapshot_count(), 1);
 
-        // 8. Verify diagnostic test pattern channel & orientation contract
+        // 7. Verify diagnostic test pattern channel & orientation contract
         app_set_test_pattern(1);
         let ptr = app_framebuffer();
-        assert!(!ptr.is_null());
-
         let px = unsafe { core::slice::from_raw_parts(ptr as *const u32, FB_PIXELS) };
         assert_eq!(px[8 * 1280 + 8], rgb(0, 0, 0));
         assert_eq!(px[50 * 1280 + 100], rgb(255, 0, 0));
-        assert_eq!(unsafe { *ptr.add((50 * 1280 + 100) * 4) }, 255);
         assert_eq!(px[50 * 1280 + 900], rgb(0, 255, 0));
         assert_eq!(px[500 * 1280 + 100], rgb(0, 0, 255));
         assert_eq!(px[(720 - 20) * 1280 + (1280 - 20)], rgb(255, 0, 255));

@@ -122,4 +122,65 @@ impl<'a> Framebuffer<'a> {
         }
         h
     }
+
+    /// Blit a tightly packed `sw x sh` `u32` (RGBA8888) buffer at `(x, y)`.
+    pub fn blit(&mut self, x: i32, y: i32, src: &[u32], sw: i32, sh: i32) {
+        if sw <= 0 || sh <= 0 {
+            return;
+        }
+        let x0 = x.max(0);
+        let y0 = y.max(0);
+        let x1 = (x + sw).min(self.w);
+        let y1 = (y + sh).min(self.h);
+        if x0 >= x1 || y0 >= y1 {
+            return;
+        }
+        let copy_w = (x1 - x0) as usize;
+        for row in y0..y1 {
+            let sy = (row - y) as usize;
+            let sx = (x0 - x) as usize;
+            let src_off = sy * (sw as usize) + sx;
+            let dst_off = (row as usize) * self.stride + (x0 as usize);
+            if src_off + copy_w <= src.len() && dst_off + copy_w <= self.px.len() {
+                self.px[dst_off..dst_off + copy_w]
+                    .copy_from_slice(&src[src_off..src_off + copy_w]);
+            }
+        }
+    }
+
+    /// Nearest-neighbor scaled blit of a `sw x sh` `u32` buffer into `(x, y, dw, dh)`.
+    pub fn blit_scaled(
+        &mut self,
+        x: i32,
+        y: i32,
+        dw: i32,
+        dh: i32,
+        src: &[u32],
+        sw: i32,
+        sh: i32,
+    ) {
+        if dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0 {
+            return;
+        }
+        let x0 = x.max(0);
+        let y0 = y.max(0);
+        let x1 = (x + dw).min(self.w);
+        let y1 = (y + dh).min(self.h);
+        if x0 >= x1 || y0 >= y1 {
+            return;
+        }
+        for row in y0..y1 {
+            let sy = (((row - y) as i64 * sh as i64) / dh as i64).clamp(0, (sh - 1) as i64) as usize;
+            let src_row = sy * (sw as usize);
+            let dst_row = (row as usize) * self.stride;
+            for col in x0..x1 {
+                let sx =
+                    (((col - x) as i64 * sw as i64) / dw as i64).clamp(0, (sw - 1) as i64) as usize;
+                let s_idx = src_row + sx;
+                if s_idx < src.len() {
+                    self.px[dst_row + (col as usize)] = src[s_idx];
+                }
+            }
+        }
+    }
 }

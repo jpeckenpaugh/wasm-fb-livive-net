@@ -2,17 +2,18 @@
 //!
 //! 1. 32px Title Bar (`y: 0..32`):
 //!    - Top-left App Dock button (`x: 0..44`)
-//!    - Context menus (`SYSTEM`/`CALC`, `VIEW`, `TESTING`)
+//!    - Context menus (`SYSTEM`/`CALC`/`FILES`, `VIEW`, `TESTING`)
 //!    - Right-aligned User, Session, and Date/Time (`TESTER · VM-01 · 2026-10-30 07:12:00`)
 //! 2. Left Overlay App Dock:
 //!    - `128x72` App Icons (1/10th of `1280x720`) stacked vertically on the left edge
-//!      (`SYSTEM` and `CALC`), rendered on top of the active window without displacing it,
+//!      (`SYSTEM`, `CALC`, `FILES`), rendered on top of the active window without displacing it,
 //!      auto-hiding when clicked.
 //! 3. Maximized Client Window (`1280 x 688`):
 //!    - Flat surface directly below the Title Bar.
 
 use crate::calc::{self, CalcApp};
 use crate::fb::{rgb, Framebuffer};
+use crate::files::{self, FilesApp};
 use crate::font::draw_str;
 use crate::system::{self, SystemApp, SystemSection};
 
@@ -25,7 +26,7 @@ pub const DOCK_ICON_H: i32 = 72;
 pub const DOCK_GAP: i32 = 12;
 pub const DOCK_X: i32 = 12;
 pub const DOCK_Y: i32 = TITLE_H + 12;
-pub const APP_COUNT: usize = 2; // 0 = System, 1 = Calc
+pub const APP_COUNT: usize = 3; // 0 = System, 1 = Calc, 2 = Files
 
 #[inline]
 pub const fn dock_icon_y(slot_idx: usize) -> i32 {
@@ -49,6 +50,7 @@ pub enum AppSlot {
     Desktop = 0,
     System = 1,
     Calc = 2,
+    Files = 3,
 }
 
 pub struct WmState {
@@ -70,6 +72,7 @@ pub struct WmState {
     pub day: u8,
     pub system: SystemApp,
     pub calc: CalcApp,
+    pub files: FilesApp,
 }
 
 impl WmState {
@@ -93,6 +96,7 @@ impl WmState {
             day: 30,
             system: SystemApp::new(),
             calc: CalcApp::new(),
+            files: FilesApp::new(),
         }
     }
 
@@ -107,6 +111,7 @@ impl WmState {
         self.snapshot_seq = 0;
         self.system = SystemApp::new();
         self.calc = CalcApp::new();
+        self.files = FilesApp::new();
         self.ready = true;
     }
 
@@ -115,6 +120,7 @@ impl WmState {
             0 => match self.active_app {
                 AppSlot::Desktop | AppSlot::System => "SYSTEM",
                 AppSlot::Calc => "CALC",
+                AppSlot::Files => "FILES",
             },
             1 => "VIEW",
             2 => "TESTING",
@@ -128,6 +134,12 @@ impl WmState {
                 AppSlot::Desktop => &["ABOUT", "LOCALE", "FONTS"],
                 AppSlot::System => &["ABOUT", "LOCALE", "FONTS", "CLOSE WINDOW"],
                 AppSlot::Calc => &["CLEAR (AC)", "CLOSE WINDOW"],
+                AppSlot::Files => &[
+                    "~/WALLPAPERS",
+                    "~/SAMPLES",
+                    "SET AS WALLPAPER",
+                    "CLOSE WINDOW",
+                ],
             },
             1 => &["TOGGLE DOCK", "TEST PATTERN"],
             2 => &["SNAPSHOT"],
@@ -135,7 +147,7 @@ impl WmState {
         }
     }
 
-    pub fn render(&mut self, fb: &mut Framebuffer) {
+    pub fn render(&mut self, fb: &mut Framebuffer, staged_px: &[u32], staged_text: &[u8]) {
         if !self.ready {
             return;
         }
@@ -150,9 +162,30 @@ impl WmState {
             let client_h = (fb.h - TITLE_H).max(0);
             let mut client_fb = fb.sub_rows(TITLE_H, client_h);
             match self.active_app {
-                AppSlot::Desktop => system::draw_desktop_backdrop(&mut client_fb),
+                AppSlot::Desktop => {
+                    if self.files.wallpaper_active
+                        && self.files.staged_idx == self.files.wallpaper_idx
+                        && self.files.staged_w > 0
+                        && self.files.staged_h > 0
+                    {
+                        client_fb.blit_scaled(
+                            0,
+                            0,
+                            client_fb.w,
+                            client_fb.h,
+                            staged_px,
+                            self.files.staged_w,
+                            self.files.staged_h,
+                        );
+                    } else {
+                        system::draw_desktop_backdrop(&mut client_fb);
+                    }
+                }
                 AppSlot::System => system::draw_window(&mut client_fb, &self.system),
                 AppSlot::Calc => calc::draw_window(&mut client_fb, &self.calc),
+                AppSlot::Files => {
+                    files::draw_window(&mut client_fb, &self.files, staged_px, staged_text)
+                }
             }
         }
 
@@ -254,6 +287,19 @@ impl WmState {
             DOCK_ICON_H,
             self.active_app == AppSlot::Calc,
         );
+
+        // Tile 2: Files (`~/` network mount)
+        let y2 = dock_icon_y(2);
+        fb.shade(DOCK_X - 4, y2 - 4, DOCK_ICON_W + 8, DOCK_ICON_H + 8, 64);
+        files::draw_dock_tile(
+            fb,
+            &self.files,
+            DOCK_X,
+            y2,
+            DOCK_ICON_W,
+            DOCK_ICON_H,
+            self.active_app == AppSlot::Files,
+        );
     }
 
     fn draw_dropdown_menu(&self, fb: &mut Framebuffer, menu_idx: usize) {
@@ -348,7 +394,11 @@ impl WmState {
                 if y >= iy && y < iy + DOCK_ICON_H {
                     self.active_app = match slot {
                         0 => AppSlot::System,
-                        _ => AppSlot::Calc,
+                        1 => AppSlot::Calc,
+                        _ => {
+                            self.files.ensure_selected_staged();
+                            AppSlot::Files
+                        }
                     };
                     self.dock_visible = false;
                     return CLICK_CHANGED;
@@ -367,13 +417,19 @@ impl WmState {
                     CLICK_NOOP
                 }
             }
+            AppSlot::Files => {
+                if files::click_window(&mut self.files, cx, cy) {
+                    CLICK_CHANGED
+                } else {
+                    CLICK_NOOP
+                }
+            }
             _ => CLICK_NOOP,
         }
     }
 
     fn execute_menu_item(&mut self, menu_idx: usize, item_idx: usize) -> i32 {
         match (menu_idx, item_idx) {
-            // Menu 0: `SYSTEM` (About / Locale / Fonts / Close) or `CALC` (Clear / Close)
             (0, idx) => match (self.active_app, idx) {
                 (AppSlot::Desktop | AppSlot::System, 0..=2) => {
                     self.active_app = AppSlot::System;
@@ -390,6 +446,29 @@ impl WmState {
                     CLICK_CHANGED
                 }
                 (AppSlot::Calc, 1) => {
+                    self.active_app = AppSlot::Desktop;
+                    CLICK_CHANGED
+                }
+                (AppSlot::Files, 0) => {
+                    self.files.open_subfolder(files::FolderLevel::Wallpapers);
+                    CLICK_CHANGED
+                }
+                (AppSlot::Files, 1) => {
+                    self.files.open_subfolder(files::FolderLevel::Samples);
+                    CLICK_CHANGED
+                }
+                (AppSlot::Files, 2) => {
+                    if let Some(sel) = self.files.active_file_idx() {
+                        if self.files.entries[sel].is_image() {
+                            self.files.wallpaper_active = true;
+                            self.files.wallpaper_idx = sel as i32;
+                            self.files.ensure_selected_staged();
+                            self.active_app = AppSlot::Desktop;
+                        }
+                    }
+                    CLICK_CHANGED
+                }
+                (AppSlot::Files, 3) => {
                     self.active_app = AppSlot::Desktop;
                     CLICK_CHANGED
                 }
@@ -461,6 +540,13 @@ impl WmState {
             },
             AppSlot::Calc => {
                 if calc::key_window(&mut self.calc, code) {
+                    CLICK_CHANGED
+                } else {
+                    CLICK_NOOP
+                }
+            }
+            AppSlot::Files => {
+                if files::key_window(&mut self.files, code) {
                     CLICK_CHANGED
                 } else {
                     CLICK_NOOP

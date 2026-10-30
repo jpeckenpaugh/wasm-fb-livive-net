@@ -1,16 +1,41 @@
-/* v2 Host Controller: Pure WebAssembly.instantiate() bridge (zero Emscripten glue).
+/* v2 Host Controller: Pure WebAssembly.instantiate() bridge + CDN/RGBA8888 Upstream.
  *
  * Responsibilities:
  * - Fetch and compile `build/appliance.wasm` once into a shared WebAssembly.Module.
  * - Instantiate isolated guests (`vm-01`, `vm-02`, ...), each with its own linear memory.
+ * - Act as the `~/` Network Share & Codec Upstream: mount `/assets/*.png` into each guest,
+ *   and on demand fetch + decode PNGs using the browser's native image decoder into raw
+ *   `1280 x 688` RGBA8888 arrays written directly into Wasm linear memory.
  * - Forward pointer clicks and keyboard events into the guest Window Manager.
- * - Capture pixel-exact RGBA8888 snapshots + FNV-1a hashes (via `Testing -> Capture Snapshot`,
- *   the host `📷 snapshot` button, `▶ run step 1`, or `window.__appliance.snapshot(id)`).
+ * - Capture pixel-exact RGBA8888 snapshots + FNV-1a hashes.
  */
 
 const W = 1280;
 const H = 720;
+const CLIENT_H = 688; // 720 - 32px Title Bar
 const FB_BYTES = W * H * 4;
+
+/* Network mount catalog (`~/wallpapers/*` and `~/samples/*`) served by the JS Hypervisor */
+const DEFAULT_MOUNTS = [
+  { name: 'wallpapers/01_aurora.png',  url: '../assets/01_aurora.png',  bytes: 493568, kind: 'image' },
+  { name: 'wallpapers/02_rings.png',   url: '../assets/02_rings.png',   bytes: 389120, kind: 'image' },
+  { name: 'wallpapers/03_checker.png', url: '../assets/03_checker.png', bytes: 90112,  kind: 'image' },
+  { name: 'wallpapers/04_dunes.png',   url: '../assets/04_dunes.png',   bytes: 11264,  kind: 'image' },
+  { name: 'wallpapers/05_orbits.png',  url: '../assets/05_orbits.png',  bytes: 158720, kind: 'image' },
+  { name: 'samples/app.js',            url: '../demo/app.js',           bytes: 1045,   kind: 'code' },
+  { name: 'samples/data.json',         url: '../demo/data.json',        bytes: 527,    kind: 'code' },
+  { name: 'samples/feed.xml',          url: '../demo/feed.xml',         bytes: 1051,   kind: 'code' },
+  { name: 'samples/hello.c',           url: '../demo/hello.c',          bytes: 755,    kind: 'code' },
+  { name: 'samples/page.html',         url: '../demo/page.html',        bytes: 851,    kind: 'code' },
+  { name: 'samples/script.py',         url: '../demo/script.py',        bytes: 935,    kind: 'code' },
+  { name: 'samples/style.css',         url: '../demo/style.css',        bytes: 655,    kind: 'code' },
+  { name: 'samples/types.ts',          url: '../demo/types.ts',         bytes: 700,    kind: 'code' },
+];
+
+/* Host-level decoded RGBA8888 and UTF-8 text caches shared across guests */
+const decodedRgbaCache = new Map();
+const fetchedTextCache = new Map();
+const textEncoder = new TextEncoder();
 
 const KEY_CODES = {
   ArrowLeft: 1,
@@ -23,6 +48,8 @@ const KEY_CODES = {
   Escape: 25, c: 25, C: 25,
   Backspace: 26,
   '.': 27, ',': 27,
+  ArrowUp: 50,
+  ArrowDown: 51,
 };
 
 const KiB = 1024;
@@ -81,6 +108,7 @@ const selectionLabel = (guest) => {
     return `system (${sec})`;
   }
   if (sel === 2) return 'calc';
+  if (sel === 3) return 'files';
   return 'desktop';
 };
 
@@ -100,6 +128,112 @@ function loadWasmModule() {
       });
   }
   return wasmModulePromise;
+}
+
+/* Upstream CDN Fetch + Native Browser Image Decode -> RGBA8888 Uint8ClampedArray */
+async function fetchAndDecodeRgba(urlStr, targetW, targetH) {
+  const key = `${urlStr}@${targetW}x${targetH}`;
+  if (decodedRgbaCache.has(key)) {
+    return decodedRgbaCache.get(key);
+  }
+  const url = new URL(urlStr, import.meta.url);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${url}`);
+  const blob = await response.blob();
+  const bitmap = await createImageBitmap(blob);
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width = targetW;
+  offscreen.height = targetH;
+  const ctx = offscreen.getContext('2d', { alpha: false });
+
+  // Center-crop (cover) the source image into targetW x targetH
+  const scale = Math.max(targetW / bitmap.width, targetH / bitmap.height);
+  const dw = bitmap.width * scale;
+  const dh = bitmap.height * scale;
+  const dx = (targetW - dw) / 2;
+  const dy = (targetH - dh) / 2;
+  ctx.drawImage(bitmap, dx, dy, dw, dh);
+  bitmap.close();
+
+  const rgba = ctx.getImageData(0, 0, targetW, targetH).data;
+  const result = { width: targetW, height: targetH, rgba };
+  decodedRgbaCache.set(key, result);
+  return result;
+}
+
+async function fetchTextBytes(urlStr) {
+  if (fetchedTextCache.has(urlStr)) {
+    return fetchedTextCache.get(urlStr);
+  }
+  const url = new URL(urlStr, import.meta.url);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${url}`);
+  const text = await response.text();
+  const encoded = textEncoder.encode(text).subarray(0, 16384);
+  fetchedTextCache.set(urlStr, encoded);
+  return encoded;
+}
+
+function mountCatalogIntoGuest(guest, mounts = DEFAULT_MOUNTS) {
+  const { exports } = guest;
+  if (!exports || !exports.app_mount_clear) return;
+  exports.app_mount_clear();
+  guest.mounts = mounts.slice();
+
+  const namePtr = exports.app_mount_name_buf();
+  for (const item of guest.mounts) {
+    const encoded = textEncoder.encode(item.name).subarray(0, 64);
+    const mem = new Uint8Array(exports.memory.buffer);
+    mem.set(encoded, namePtr);
+    exports.app_mount_add(encoded.length, item.bytes || 0);
+  }
+}
+
+async function servicePendingMountFetch(guest) {
+  if (!guest || !guest.exports || !guest.exports.app_mount_pending_idx) return;
+  const idx = guest.exports.app_mount_pending_idx();
+  if (idx < 0 || !guest.mounts || idx >= guest.mounts.length) return;
+
+  const item = guest.mounts[idx];
+  const isImage = item.kind === 'image' || /\.(png|jpe?g)$/i.test(item.name);
+  try {
+    if (isImage) {
+      setStatus(`${guest.name} · decoding ~/${item.name} → RGBA8888…`, true);
+      const decoded = await fetchAndDecodeRgba(item.url, W, CLIENT_H);
+      if (guest.disposed || !guest.exports) return;
+
+      const stagingPtr = guest.exports.app_mount_staging_ptr();
+      const mem = new Uint8Array(guest.exports.memory.buffer);
+      mem.set(decoded.rgba, stagingPtr);
+
+      const t0 = performance.now();
+      guest.exports.app_mount_commit_rgba(idx, decoded.width, decoded.height);
+      const t1 = performance.now();
+      guest.blitToCanvas(t0, t1);
+      setStatus(
+        `${guest.name} · staged ${item.name} (${decoded.width}×${decoded.height} RGBA8888)`,
+        true,
+      );
+    } else {
+      setStatus(`${guest.name} · fetching ~/${item.name}…`, true);
+      const bytes = await fetchTextBytes(item.url);
+      if (guest.disposed || !guest.exports) return;
+
+      const textPtr = guest.exports.app_mount_text_ptr();
+      const mem = new Uint8Array(guest.exports.memory.buffer);
+      mem.set(bytes, textPtr);
+
+      const t0 = performance.now();
+      guest.exports.app_mount_commit_text(idx, bytes.byteLength);
+      const t1 = performance.now();
+      guest.blitToCanvas(t0, t1);
+      setStatus(`${guest.name} · staged ${item.name} (${bytes.byteLength} B UTF-8)`, true);
+    }
+  } catch (error) {
+    console.error(error);
+    setStatus(`${guest.name} · failed to stage ${item.name}`);
+  }
 }
 
 function setStatus(text, ok = false) {
@@ -331,6 +465,7 @@ async function createGuest() {
     id,
     name: `vm-${String(id).padStart(2, '0')}`,
     exports: null,
+    mounts: [],
     frames: 0,
     boot: 0,
     heapBytes: 0,
@@ -374,6 +509,9 @@ async function createGuest() {
     syncWallClock(vm);
     if (!exports.app_init(W, H)) throw new Error('app_init() returned 0');
 
+    // Mount the 5 network wallpapers and 8 code samples into `~/` at runtime
+    mountCatalogIntoGuest(vm, DEFAULT_MOUNTS);
+
     vm.boot = performance.now() - startedAt;
     const ctx = vm.canvas.getContext('2d', { alpha: false });
     const image = ctx.createImageData(W, H);
@@ -415,6 +553,7 @@ async function createGuest() {
         } else {
           setStatus(`${vm.name} · ${selectionLabel(vm)} · ${fmtHex32(vm.fbHash)}`, true);
         }
+        servicePendingMountFetch(vm);
       }
       return rc;
     };
@@ -444,16 +583,21 @@ async function createGuest() {
       if (rc !== 0) {
         blitToCanvas(t0, t1);
         setStatus(`${vm.name} · ${selectionLabel(vm)} · ${fmtHex32(vm.fbHash)}`, true);
+        servicePendingMountFetch(vm);
       }
     });
 
+    vm.blitToCanvas = blitToCanvas;
     vm.render = render;
     vm.clickLogical = clickLogical;
     vm.setPattern = setPattern;
 
     render();
     if (patternToggle.checked) setPattern(true);
-    setStatus(`${vm.name} · booted in ${fmtMs(vm.boot)} · click top-left dock button`, true);
+    setStatus(
+      `${vm.name} · booted in ${fmtMs(vm.boot)} · ${vm.mounts.length} files mounted in ~/`,
+      true,
+    );
     pumpClock();
     return vm;
   } catch (error) {
@@ -479,11 +623,6 @@ snapButton.addEventListener('click', () => {
   if (guest) captureSnapshot(guest, false);
 });
 
-/* Automated Step 1 Pipeline:
- * 1. Click top-left Dock button (16, 16) to open the Left App Dock
- * 2. Click the 128x72 About App Icon (86, 100) to launch About (auto-hides dock)
- * 3. Capture environment snapshot
- */
 step1Button.addEventListener('click', () => {
   const guest = guests.find((candidate) => candidate.id === activeId);
   if (!guest || !guest.clickLogical) return;
@@ -539,6 +678,13 @@ window.__appliance = {
       fbHash: guest.fbHash,
       fbHashHex: fmtHex32(guest.fbHash),
     };
+  },
+  mount: (id, mounts) => {
+    const guest = guests.find((candidate) => candidate.id === id) || guests[0];
+    if (!guest) return false;
+    mountCatalogIntoGuest(guest, mounts);
+    guest.render();
+    return true;
   },
   snapshot: (id) => {
     const guest = guests.find((candidate) => candidate.id === id) || guests[0];

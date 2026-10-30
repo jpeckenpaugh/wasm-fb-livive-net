@@ -3,6 +3,8 @@ build-*/
 out/
 v2/target/
 web/v2/build/
+web/assets/
+web/demo/
 .DS_Store
 *.o
 __pycache__/

@@ -37,8 +37,10 @@ jobs:
       - name: Assemble static site
         run: |
           set -eu
-          mkdir -p site/build site/v2/build
+          mkdir -p site/build site/v2/build site/assets site/demo
           cp -R web/. site/
+          cp assets/*.png site/assets/
+          cp demo/* site/demo/
           cp wasm-out/media_browser.mjs wasm-out/media_browser.wasm site/build/
           cp wasm-out/v2/appliance.wasm site/v2/build/
           printf 'wasm-fb.livive.net\n' > site/CNAME

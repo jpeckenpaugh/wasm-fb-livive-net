@@ -1,8 +1,20 @@
 {
-  "name": "wasm-fb",
-  "version": 1,
-  "apps": ["clock", "calculator", "calendar"],
-  "preview": { "width": 1280, "height": 720 },
-  "ok": true,
-  "ratio": 0.5
+  "project": "orbit-checkout",
+  "version": "2.4.0",
+  "environment": "staging",
+  "features": {
+    "expressPay": true,
+    "savedCarts": true,
+    "guestCheckout": false
+  },
+  "endpoints": [
+    { "name": "catalog",  "path": "/api/v1/catalog",  "timeoutMs": 1200 },
+    { "name": "cart",     "path": "/api/v1/cart",     "timeoutMs": 1500 },
+    { "name": "checkout", "path": "/api/v1/checkout", "timeoutMs": 3000 }
+  ],
+  "limits": {
+    "maxItemsPerOrder": 25,
+    "freeShippingCents": 7500,
+    "retryAttempts": 3
+  }
 }
