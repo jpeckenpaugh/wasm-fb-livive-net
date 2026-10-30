@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<context-index scope="~/wallpapers" ref="local" generator="deepseek-v4.1-flash">
+  <file name="01_aurora.png" runtime="Image/PNG" role="Desktop Wallpaper">
+    <graph>
+      <imports>assets/01_aurora.png</imports>
+      <exports>RGBA8888 1280x720 bitmapped wallpaper</exports>
+      <dependents>v2/src/wm.rs (Desktop Background), Files App Wallpaper Switcher</dependents>
+      <invariants>Native 1280x720 aspect ratio; 32-bit RGBA; uncorrupted PNG container</invariants>
+    </graph>
+    <summary>
+      Vibrant northern lights and glacial polar nightscape palette. High dynamic range color transitions
+      with deep emerald and sapphire gradients over dark mountainous horizons.
+    </summary>
+    <architecture>
+      Provides a high-contrast natural desktop wallpaper theme for the wasm-fb framebuffer window manager,
+      decoded into RGBA8888 by host.js and blitted directly to background buffer layers.
+    </architecture>
+  </file>
+  <file name="02_dune.png" runtime="Image/PNG" role="Desktop Wallpaper">
+    <graph>
+      <imports>assets/02_rings.png, assets/04_dunes.png</imports>
+      <exports>RGBA8888 1280x720 bitmapped wallpaper</exports>
+      <dependents>v2/src/wm.rs (Desktop Background), Files App Wallpaper Switcher</dependents>
+      <invariants>Native 1280x720 aspect ratio; 32-bit RGBA; uncorrupted PNG container</invariants>
+    </graph>
+    <summary>
+      Warm golden sand dunes, sweeping wind-carved crests, and warm amber twilight gradients. Delivers
+      soft contrast suitable for bright daytime operating environments.
+    </summary>
+    <architecture>
+      Provides an earth-toned panoramic backdrop for the desktop environment, rendered on demand to
+      prevent memory bloat within the WebAssembly linear heap.
+    </architecture>
+  </file>
+  <file name="03_neon.png" runtime="Image/PNG" role="Desktop Wallpaper">
+    <graph>
+      <imports>assets/03_checker.png</imports>
+      <exports>RGBA8888 1280x720 bitmapped wallpaper</exports>
+      <dependents>v2/src/wm.rs (Desktop Background), Files App Wallpaper Switcher</dependents>
+      <invariants>Native 1280x720 aspect ratio; 32-bit RGBA; uncorrupted PNG container</invariants>
+    </graph>
+    <summary>
+      Vivid synthwave grid and electric cyberpunk neon accents. High-saturation magenta and cyan geometry
+      optimized for retro terminal aesthetics and high-contrast window framing.
+    </summary>
+    <architecture>
+      Serves as the high-energy synthetic theme option for the window manager, pairing with dark slate
+      window frames to ensure maximum application surface legibility.
+    </architecture>
+  </file>
+  <file name="04_cyber.png" runtime="Image/PNG" role="Desktop Wallpaper">
+    <graph>
+      <imports>assets/04_dunes.png</imports>
+      <exports>RGBA8888 1280x720 bitmapped wallpaper</exports>
+      <dependents>v2/src/wm.rs (Desktop Background), Files App Wallpaper Switcher</dependents>
+      <invariants>Native 1280x720 aspect ratio; 32-bit RGBA; uncorrupted PNG container</invariants>
+    </graph>
+    <summary>
+      Industrial dark tech matrix featuring intricate circuit traces, low-key indigo illumination, and
+      minimalist engineering silhouettes.
+    </summary>
+    <architecture>
+      Acts as an unobtrusive, distraction-free backdrop designed specifically for deep focus and multi-window
+      code inspection workflows within the wasm appliance.
+    </architecture>
+  </file>
+  <file name="05_orbits.png" runtime="Image/PNG" role="Desktop Wallpaper">
+    <graph>
+      <imports>assets/05_orbits.png</imports>
+      <exports>RGBA8888 1280x720 bitmapped wallpaper</exports>
+      <dependents>v2/src/wm.rs (Desktop Background), Files App Wallpaper Switcher</dependents>
+      <invariants>Native 1280x720 aspect ratio; 32-bit RGBA; uncorrupted PNG container</invariants>
+    </graph>
+    <summary>
+      Deep space cosmological visualization featuring celestial orbital mechanics, elliptical ring trajectories,
+      and starlight dispersion over cosmic void backdrops.
+    </summary>
+    <architecture>
+      Default flagship desktop wallpaper for wasm-fb v2, demonstrating high color depth and seamless integration
+      with translucent window borders and top bar styling.
+    </architecture>
+  </file>
+  <file name="02_rings.png" runtime="Image/PNG" role="Desktop Wallpaper">
+    <graph>
+      <imports>assets/02_rings.png</imports>
+      <exports>RGBA8888 1280x720 bitmapped wallpaper</exports>
+      <dependents>v2/src/wm.rs (Desktop Background), Files App Wallpaper Switcher</dependents>
+      <invariants>Native 1280x720 aspect ratio; 32-bit RGBA; uncorrupted PNG container</invariants>
+    </graph>
+    <summary>
+      Geometric planetary rings and radiant atmospheric curvature in deep sapphire and twilight tones.
+    </summary>
+    <architecture>
+      Standard celestial wallpaper backdrop for wasm-fb v2, supporting on-demand host decoding and window blitting.
+    </architecture>
+  </file>
+  <file name="03_checker.png" runtime="Image/PNG" role="Desktop Wallpaper">
+    <graph>
+      <imports>assets/03_checker.png</imports>
+      <exports>RGBA8888 1280x720 bitmapped wallpaper</exports>
+      <dependents>v2/src/wm.rs (Desktop Background), Files App Wallpaper Switcher</dependents>
+      <invariants>Native 1280x720 aspect ratio; 32-bit RGBA; uncorrupted PNG container</invariants>
+    </graph>
+    <summary>
+      Perspective checkerboard plane extending toward a retro horizon with vibrant neon illumination.
+    </summary>
+    <architecture>
+      Retro synthwave wallpaper option providing distinct depth lines and high visual contrast for desktop applications.
+    </architecture>
+  </file>
+  <file name="04_dunes.png" runtime="Image/PNG" role="Desktop Wallpaper">
+    <graph>
+      <imports>assets/04_dunes.png</imports>
+      <exports>RGBA8888 1280x720 bitmapped wallpaper</exports>
+      <dependents>v2/src/wm.rs (Desktop Background), Files App Wallpaper Switcher</dependents>
+      <invariants>Native 1280x720 aspect ratio; 32-bit RGBA; uncorrupted PNG container</invariants>
+    </graph>
+    <summary>
+      Minimalist desert dunes landscape with warm amber and bronze ridges under soft twilight.
+    </summary>
+    <architecture>
+      Warm atmospheric wallpaper option, decoded on demand by the host hypervisor and blitted directly to linear memory.
+    </architecture>
+  </file>
+</context-index>

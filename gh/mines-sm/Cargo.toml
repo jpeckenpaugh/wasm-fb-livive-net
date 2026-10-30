@@ -1,0 +1,11 @@
+[package]
+name = "mines-sm"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Minimalist, allocation-free 8x8 Minesweeper bitboard state machine with RL observation tensors"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]

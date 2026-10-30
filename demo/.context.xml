@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<context-index scope="~/samples" ref="local" generator="deepseek-v4.1-flash">
+  <file name="app.js" runtime="JavaScript (ES6 Modules)" role="Interactive UI Controller">
+    <graph>
+      <imports>DOM API, Fetch API (/api/v1/projects)</imports>
+      <exports>TaskBoard class (refresh, visibleItems, toggleTask, render)</exports>
+      <dependents>demo/page.html, demo/style.css</dependents>
+      <invariants>Pure module; non-destructive local filtering; dataset count synchronization</invariants>
+    </graph>
+    <summary>
+      Implements an asynchronous TaskBoard controller class managing project tasks, filtering
+      by status (all, open, done), toggling task completion state, and synchronizing root DOM dataset attributes.
+    </summary>
+    <architecture>
+      Serves as the interactive client-side logic layer for page.html, demonstrating modular ES6
+      component patterns and mock REST API integration in the sample suite.
+    </architecture>
+  </file>
+  <file name="data.json" runtime="JSON" role="Application Configuration">
+    <graph>
+      <imports>RFC 8259 JSON format</imports>
+      <exports>project, version, environment, features, endpoints, limits</exports>
+      <dependents>Client apps, deployment automation, mock API harnesses</dependents>
+      <invariants>Valid JSON schema; typed configuration values; positive integer timeout limits</invariants>
+    </graph>
+    <summary>
+      Defines staging environment settings, feature flags (expressPay, savedCarts), API route
+      definitions with millisecond timeouts, and order threshold limits for the Orbit Checkout service.
+    </summary>
+    <architecture>
+      Acts as central static configuration metadata consumed across microservices and frontend clients
+      to configure operational boundaries and feature switches.
+    </architecture>
+  </file>
+  <file name="feed.xml" runtime="XML / Atom 1.0" role="Syndication &amp; Release Feed">
+    <graph>
+      <imports>Atom 1.0 XML namespace (http://www.w3.org/2005/Atom)</imports>
+      <exports>feed metadata, release entries (v2.4.0, v2.3.2, v2.3.0)</exports>
+      <dependents>Feed readers, status dashboards, audit logging monitors</dependents>
+      <invariants>ISO-8601 timestamps; unique tag URIs; well-formed XML structure</invariants>
+    </graph>
+    <summary>
+      Publishes version release notes, architectural updates, and maintenance announcements for Orbit
+      service deployments, including stock reservations and multi-region edge replica routing.
+    </summary>
+    <architecture>
+      Provides a standardized syndication channel for downstream service discovery and changelog
+      broadcasting across distributed engineering systems.
+    </architecture>
+  </file>
+  <file name="hello.c" runtime="C (C99)" role="Order Calculation CLI">
+    <graph>
+      <imports>stddef.h, stdint.h, stdio.h</imports>
+      <exports>line_item_t struct, subtotal_cents helper, main entry point</exports>
+      <dependents>Native C compilers (gcc/clang), embedded POSIX environments</dependents>
+      <invariants>Integer-only currency arithmetic (cents); bounds-checked array traversal</invariants>
+    </graph>
+    <summary>
+      Demonstrates safe integer-based monetary calculations in C, iterating through structured cart
+      items to compute totals and print formatted dollar amounts without floating-point drift.
+    </summary>
+    <architecture>
+      Serves as a baseline low-level systems implementation of core pricing arithmetic, illustrating
+      type-safe struct definitions and integer currency semantics.
+    </architecture>
+  </file>
+  <file name="page.html" runtime="HTML5" role="Application Presentation Shell">
+    <graph>
+      <imports>demo/style.css, demo/app.js</imports>
+      <exports>Orbit Workspace DOM tree (header, nav, grid lanes, card sections)</exports>
+      <dependents>Browser rendering engine, demo/app.js client script</dependents>
+      <invariants>Valid HTML5 doctype; responsive viewport; semantic landmark tags</invariants>
+    </graph>
+    <summary>
+      Structures the visual layout of Orbit Workspace with top navigation, responsive card lanes,
+      and modular script bindings for task backlog and in-progress development workflows.
+    </summary>
+    <architecture>
+      Defines the primary markup skeleton and DOM mounting points for CSS styling and JavaScript
+      application lifecycle hydration.
+    </architecture>
+  </file>
+  <file name="script.py" runtime="Python 3" role="Rate Limiting Utility">
+    <graph>
+      <imports>dataclasses, typing (Dict, List)</imports>
+      <exports>Bucket dataclass, summarize_usage function, CLI entrypoint</exports>
+      <dependents>Backend API gateways, edge proxies, usage analytics pipelines</dependents>
+      <invariants>Sliding time window pruning; O(N) timestamp evaluation per request</invariants>
+    </graph>
+    <summary>
+      Implements an in-memory sliding-window request rate limiter using timestamp arrays, pruning
+      stale records outside window boundaries and generating client usage metrics.
+    </summary>
+    <architecture>
+      Demonstrates server-side defensive traffic management algorithms used by API gateways to
+      prevent endpoint exhaustion and enforce tier quotas.
+    </architecture>
+  </file>
+  <file name="style.css" runtime="CSS3" role="Visual Theme &amp; Component Styling">
+    <graph>
+      <imports>CSS Custom Properties (:root variables)</imports>
+      <exports>CSS tokens (--bg, --panel, --border, --accent), card and layout rules</exports>
+      <dependents>demo/page.html</dependents>
+      <invariants>BEM-style flat class hierarchies; consistent dark-mode palette; zero framework dependencies</invariants>
+    </graph>
+    <summary>
+      Provides a dark-mode design system with slate and teal accents, responsive flexbox/grid layout
+      definitions, and clean typographic hierarchies for Orbit Workspace UI components.
+    </summary>
+    <architecture>
+      Acts as the visual styling foundation for presentation markup, decoupling layout tokens and
+      color palettes from application business logic.
+    </architecture>
+  </file>
+  <file name="types.ts" runtime="TypeScript" role="Domain Model Type Definitions">
+    <graph>
+      <imports>TypeScript type system</imports>
+      <exports>OrderStatus type, LineItem, OrderSummary interfaces, computeOrderTotalCents</exports>
+      <dependents>Checkout services, payment gateways, demo/app.js (type contract)</dependents>
+      <invariants>Readonly properties; non-negative net order total guarantee</invariants>
+    </graph>
+    <summary>
+      Establishes strong static contracts for order fulfillment entities, enforcing immutability on line
+      items and providing pure pricing total functions with discount subtraction safeguards.
+    </summary>
+    <architecture>
+      Defines the shared type contracts and financial domain models that ensure runtime safety and API
+      consistency across distributed TypeScript frontend and backend modules.
+    </architecture>
+  </file>
+</context-index>

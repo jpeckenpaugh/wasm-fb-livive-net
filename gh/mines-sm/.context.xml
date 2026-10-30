@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<context-index scope="gh://jpeckenpaugh/mines-sm" ref="main" generator="deepseek-v4.1-flash">
+  <file name="lib.rs" runtime="Rust (#![no_std])" role="Core 8x8 Bitboard State Machine">
+    <graph>
+      <imports>core::ops, core::cmp (zero external crates)</imports>
+      <exports>BoardState, Rules, Action, ActionType, StepResult</exports>
+      <dependents>v2/src/mines.rs (Appliance GUI), mines.livive.net (RL Policy Harness)</dependents>
+      <invariants>SplitMix64 deterministic PRNG; Safe-First-Click relocation; 64-bit u64 masks</invariants>
+    </graph>
+    <summary>
+      Implements the allocation-free (#![no_std]) 8x8 Minesweeper state machine over flat u64
+      bitboards (mine_mask, revealed_mask, flagged_mask, detonated_mask). Board generation uses
+      an embedded SplitMix64 PRNG so any 64-bit seed produces byte-identical mine layouts across
+      native x86/ARM and wasm32 targets.
+    </summary>
+    <architecture>
+      Serves as the ground-truth simulation kernel for both the wasm-fb Mines appliance app and
+      the downstream reinforcement learning pipeline. Exposes get_observation() and
+      get_action_mask() as flat [f32; 64] tensors for direct policy network evaluation.
+    </architecture>
+  </file>
+  <file name="Cargo.toml" runtime="TOML / Cargo Manifest" role="Package &amp; Target Definition">
+    <graph>
+      <imports>Cargo workspace / crates.io conventions</imports>
+      <exports>package: mines-sm (v0.1.0, 2021 edition, MIT license)</exports>
+      <dependents>gh/mines-sm/lib.rs, downstream cargo consumers</dependents>
+      <invariants>Zero runtime dependencies; single no_std library target</invariants>
+    </graph>
+    <summary>
+      Declares the package metadata, edition, license, and library root for the mines-sm
+      crate. Pinpoints zero runtime dependencies to ensure pristine #![no_std] compilation
+      and near-instant compile times across embedded and WebAssembly targets.
+    </summary>
+    <architecture>
+      Defines the compilation boundary of the standalone Mines state machine crate, enabling
+      independent unit testing, RL agent binding, or direct vendoring into appliance environments.
+    </architecture>
+  </file>
+  <file name="README.md" runtime="Markdown / Documentation" role="Technical Specification &amp; Guide">
+    <graph>
+      <imports>Markdown specification</imports>
+      <exports>Bitboard layouts, PRNG formulas, RL observation/action tensor schemas</exports>
+      <dependents>Human operators, beta-tester AI agents, host context preview</dependents>
+      <invariants>Technical accuracy with lib.rs bitboard encodings and step semantics</invariants>
+    </graph>
+    <summary>
+      Provides technical documentation detailing the 64-bit bitboard architecture, SplitMix64
+      deterministic PRNG state cycle, game rules (classic sudden death vs shielded multi-strike),
+      and exact [f32; 64] tensor encoding for neural network observation and action masks.
+    </summary>
+    <architecture>
+      Acts as developer grounding and sub-agent research context for the Minesweeper engine,
+      bridging state machine theory with practical reinforcement learning harness integration.
+    </architecture>
+  </file>
+</context-index>
