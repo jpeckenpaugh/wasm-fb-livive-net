@@ -1,11 +1,59 @@
-//! 5x7 dot-matrix bitmap font renderer.
+//! Extensible Bitmap Font Engine (`font.rs`).
 //!
-//! Each glyph is 5 columns wide by 7 rows tall (bit 4 = leftmost pixel).
+//! Architecture for multi-locale / multi-script testing:
+//! - A [`FontSheet`] defines a character range (`first_code..=last_code`), cell
+//!   dimensions (`glyph_w x glyph_h`), and a lookup function (`glyph_rows`) that
+//!   maps a Unicode scalar (`u32`) to its row bitmasks.
+//! - [`FIVESEVEN_US_LATIN`] is the baseline 5x7 US-English / Basic Latin (`U+0020..=U+007E`)
+//!   font sheet (95 glyphs, 35 bits per glyph).
+//! - Additional language / script sheets (e.g. Latin-1 Supplement `U+00A0..=U+00FF`
+//!   for Spanish `ñ á é í ó ú ¿ ¡`, or CJK / Mandarin fixed-grid sheets) plug into
+//!   the same [`FontSheet`] registry without changing the layout or style engine.
 
 use crate::fb::Framebuffer;
 
 pub const GLYPH_W: i32 = 5;
 pub const GLYPH_H: i32 = 7;
+pub const GLYPH_COUNT: usize = 95; // U+0020..=U+007E
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FontStyle {
+    Regular = 0,
+    Bold = 1,
+    Italic = 2,
+    Matrix = 3,
+    Underline = 4,
+}
+
+/// Extensible descriptor for a character block / locale font sheet.
+pub struct FontSheet {
+    pub id: &'static str,
+    pub locale: &'static str,
+    pub range_label: &'static str,
+    pub first_code: u32,
+    pub last_code: u32,
+    pub glyph_w: u8,
+    pub glyph_h: u8,
+    pub glyph_count: usize,
+    pub lookup: fn(u32) -> Option<[u8; 7]>,
+}
+
+pub const FIVESEVEN_US_LATIN: FontSheet = FontSheet {
+    id: "FiveSeven",
+    locale: "en-US (Basic Latin)",
+    range_label: "U+0020..U+007E (95 GLYPHS)",
+    first_code: 0x0020,
+    last_code: 0x007E,
+    glyph_w: 5,
+    glyph_h: 7,
+    glyph_count: GLYPH_COUNT,
+    lookup: lookup_us_latin,
+};
+
+/// Registry of compiled-in font sheets.
+/// To test Spanish (`es-ES`, `U+00A0..U+00FF`) or Mandarin (`zh-CN`, `U+4E00..`),
+/// register an additional [`FontSheet`] entry here.
+pub const FONT_REGISTRY: &[FontSheet] = &[FIVESEVEN_US_LATIN];
 
 #[inline]
 pub const fn char_advance(scale: i32) -> i32 {
@@ -22,13 +70,25 @@ pub fn text_width(s: &str, scale: i32) -> i32 {
     }
 }
 
-pub fn draw_str(fb: &mut Framebuffer, mut x: i32, y: i32, s: &str, scale: i32, color: u32) {
+pub fn draw_str(fb: &mut Framebuffer, x: i32, y: i32, s: &str, scale: i32, color: u32) {
+    draw_str_styled(fb, x, y, s, scale, FontStyle::Regular, color);
+}
+
+pub fn draw_str_styled(
+    fb: &mut Framebuffer,
+    mut x: i32,
+    y: i32,
+    s: &str,
+    scale: i32,
+    style: FontStyle,
+    color: u32,
+) {
     if scale <= 0 {
         return;
     }
     let adv = char_advance(scale);
     for ch in s.bytes() {
-        draw_char(fb, x, y, ch, scale, color);
+        draw_char_styled(fb, x, y, ch, scale, style, color);
         x += adv;
     }
 }
@@ -51,18 +111,69 @@ pub fn draw_str_centered(
 }
 
 pub fn draw_char(fb: &mut Framebuffer, x: i32, y: i32, ch: u8, scale: i32, color: u32) {
-    let rows = glyph_rows(ch);
+    draw_char_styled(fb, x, y, ch, scale, FontStyle::Regular, color);
+}
+
+pub fn draw_char_styled(
+    fb: &mut Framebuffer,
+    x: i32,
+    y: i32,
+    ch: u8,
+    scale: i32,
+    style: FontStyle,
+    color: u32,
+) {
+    let rows = resolve_glyph(ch as u32);
+    let dot_size = match style {
+        FontStyle::Matrix if scale > 1 => scale - 1,
+        _ => scale,
+    };
+    let bold_extra = match style {
+        FontStyle::Bold => (scale / 2).max(1),
+        _ => 0,
+    };
+
     for (row_idx, &mask) in rows.iter().enumerate() {
         if mask == 0 {
             continue;
         }
         let py = y + (row_idx as i32) * scale;
+        let shear_dx = match style {
+            FontStyle::Italic => ((6 - row_idx as i32) * scale) / 3,
+            _ => 0,
+        };
         for col in 0..5 {
             if (mask & (1 << (4 - col))) != 0 {
-                fb.fill(x + col * scale, py, scale, scale, color);
+                let px = x + col * scale + shear_dx;
+                fb.fill(px, py, dot_size + bold_extra, dot_size, color);
             }
         }
     }
+
+    if style == FontStyle::Underline {
+        let ul_y = y + GLYPH_H * scale + (scale / 2).max(1);
+        fb.fill(x, ul_y, (GLYPH_W + 1) * scale, scale.max(1), color);
+    }
+}
+
+/// Walk the [`FONT_REGISTRY`] to resolve a Unicode codepoint, falling back to the
+/// replacement box `[0x1F, 0x11, ..., 0x1F]` if no registered sheet covers it.
+pub fn resolve_glyph(code: u32) -> [u8; 7] {
+    for sheet in FONT_REGISTRY {
+        if code >= sheet.first_code && code <= sheet.last_code {
+            if let Some(rows) = (sheet.lookup)(code) {
+                return rows;
+            }
+        }
+    }
+    [0x1F, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1F]
+}
+
+fn lookup_us_latin(code: u32) -> Option<[u8; 7]> {
+    if !(0x0020..=0x007E).contains(&code) {
+        return None;
+    }
+    Some(glyph_rows(code as u8))
 }
 
 const fn glyph_rows(ch: u8) -> [u8; 7] {

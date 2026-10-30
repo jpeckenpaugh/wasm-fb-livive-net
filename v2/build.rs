@@ -27,7 +27,7 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/wm.rs");
-    println!("cargo:rerun-if-changed=src/about.rs");
+    println!("cargo:rerun-if-changed=src/system.rs");
     println!("cargo:rerun-if-changed=src/calc.rs");
     println!("cargo:rerun-if-changed=src/fb.rs");
     println!("cargo:rerun-if-changed=src/font.rs");
@@ -44,7 +44,7 @@ fn main() {
         "src/fb.rs",
         "src/font.rs",
         "src/wm.rs",
-        "src/about.rs",
+        "src/system.rs",
         "src/calc.rs",
     ] {
         if let Ok(bytes) = std::fs::read(path) {

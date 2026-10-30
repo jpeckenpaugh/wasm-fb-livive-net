@@ -1,9 +1,9 @@
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
-pub mod about;
 pub mod calc;
 pub mod fb;
 pub mod font;
+pub mod system;
 pub mod wm;
 
 use core::cell::UnsafeCell;
@@ -158,6 +158,28 @@ pub extern "C" fn app_set_date(year: i32, month: i32, day: i32, _weekday: i32) {
 }
 
 #[no_mangle]
+pub extern "C" fn app_set_utc(
+    year: i32,
+    month: i32,
+    day: i32,
+    hour: i32,
+    minute: i32,
+    second: i32,
+    tz_offset_min: i32,
+) {
+    unsafe {
+        let s = &mut (*GUEST.wm.get()).system;
+        s.utc_year = (year.clamp(1970, 9999)) as u16;
+        s.utc_month = (month.clamp(1, 12)) as u8;
+        s.utc_day = (day.clamp(1, 31)) as u8;
+        s.utc_hour = (hour.clamp(0, 23)) as u8;
+        s.utc_min = (minute.clamp(0, 59)) as u8;
+        s.utc_sec = (second.clamp(0, 59)) as u8;
+        s.tz_offset_min = (tz_offset_min.clamp(-840, 840)) as i16;
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn app_tick() -> i32 {
     with_state(|wm, fb| {
         if !wm.ready || wm.test_pattern {
@@ -172,7 +194,7 @@ pub extern "C" fn app_tick() -> i32 {
 pub extern "C" fn app_record_snapshot() -> u32 {
     with_state(|wm, fb| {
         wm.snapshot_seq = wm.snapshot_seq.wrapping_add(1);
-        wm.about.snapshots_taken = wm.snapshot_seq;
+        wm.system.snapshots_taken = wm.snapshot_seq;
         wm.render(fb);
         wm.last_fb_hash
     })
@@ -199,7 +221,8 @@ pub extern "C" fn app_active_page() -> i32 {
         let wm = &*GUEST.wm.get();
         match wm.active_app {
             AppSlot::Desktop => -1,
-            AppSlot::About | AppSlot::Calc => 0,
+            AppSlot::System => wm.system.section as i32,
+            AppSlot::Calc => 0,
         }
     }
 }
@@ -226,7 +249,7 @@ pub extern "C" fn app_selected() -> i32 {
 
 #[no_mangle]
 pub extern "C" fn app_count() -> i32 {
-    2 // 2 bundled apps: About, Calc
+    2 // 2 bundled apps: System (About/Locale/Fonts), Calc
 }
 
 #[no_mangle]
@@ -255,10 +278,11 @@ mod tests {
     };
 
     #[test]
-    fn step1_pipeline_calc_and_test_pattern_contracts() {
+    fn step1_pipeline_system_sections_calc_and_test_pattern() {
         app_set_session(1);
         app_set_date(2026, 10, 30, 5);
         app_set_time(6, 45, 0, 0);
+        app_set_utc(2026, 10, 30, 10, 45, 0, -240);
         assert_eq!(app_init(1280, 720), 1);
 
         // 1. Starts on empty Desktop with Dock hidden
@@ -273,15 +297,34 @@ mod tests {
         let dock_open_hash = app_fb_hash();
         assert_ne!(dock_open_hash, desktop_hash);
 
-        // 3. Click the 128x72 About App Icon (slot 0) -> launches About & auto-hides Dock
+        // 3. Click the 128x72 System App Icon (slot 0) -> launches System (About) & auto-hides Dock
         let icon_x = DOCK_X + DOCK_ICON_W / 2;
         assert_eq!(app_click(icon_x, DOCK_Y + DOCK_ICON_H / 2), CLICK_CHANGED);
-        assert_eq!(app_selected(), AppSlot::About as i32);
+        assert_eq!(app_selected(), AppSlot::System as i32);
         assert_eq!(app_dock_visible(), 0);
+        assert_eq!(app_active_page(), 0); // About section
         let about_hash = app_fb_hash();
         assert_ne!(about_hash, desktop_hash);
 
-        // 4. Open Dock again and click Calculator App Icon (slot 1) -> launches Calc & auto-hides Dock
+        // 4. Switch System sections via Title Bar `SYSTEM` menu (About -> Locale -> Fonts)
+        let sys_menu_x = wm::MENU_X0 + 20;
+        assert_eq!(app_click(sys_menu_x, 16), CLICK_CHANGED);
+        assert_eq!(app_click(sys_menu_x, TITLE_H + 4 + 30 + 10), CLICK_CHANGED); // item 1: LOCALE
+        assert_eq!(app_active_page(), 1);
+        let locale_hash = app_fb_hash();
+        assert_ne!(locale_hash, about_hash);
+
+        assert_eq!(app_click(sys_menu_x, 16), CLICK_CHANGED);
+        assert_eq!(
+            app_click(sys_menu_x, TITLE_H + 4 + 60 + 10),
+            CLICK_CHANGED
+        ); // item 2: FONTS
+        assert_eq!(app_active_page(), 2);
+        let fonts_hash = app_fb_hash();
+        assert_ne!(fonts_hash, locale_hash);
+        assert_ne!(fonts_hash, about_hash);
+
+        // 5. Open Dock and click Calculator App Icon (slot 1) -> launches Calc & auto-hides Dock
         assert_eq!(app_click(16, 16), CLICK_CHANGED);
         assert_eq!(app_dock_visible(), 1);
         assert_eq!(
@@ -293,7 +336,7 @@ mod tests {
         let calc_zero_hash = app_fb_hash();
         assert_ne!(calc_zero_hash, about_hash);
 
-        // 5. Exercise Calculator arithmetic (`12 + 30 = 42`) via key codes
+        // 6. Exercise Calculator arithmetic (`12 + 30 = 42`) via key codes
         assert_eq!(app_key(11), CLICK_CHANGED); // '1'
         assert_eq!(app_key(12), CLICK_CHANGED); // '2'
         assert_eq!(app_key(20), CLICK_CHANGED); // '+'
@@ -313,13 +356,13 @@ mod tests {
         assert_eq!(text_cleared, "0");
         assert_eq!(app_fb_hash(), calc_zero_hash);
 
-        // 6. Open "Testing" menu (menu index 2) in Title Bar and click "SNAPSHOT"
+        // 7. Open "Testing" menu (menu index 2) in Title Bar and click "SNAPSHOT"
         let testing_menu_x = wm::MENU_X0 + 2 * wm::MENU_HEADER_W + 20;
         assert_eq!(app_click(testing_menu_x, 16), CLICK_CHANGED);
         assert_eq!(app_click(testing_menu_x, TITLE_H + 16), CLICK_SNAPSHOT);
         assert_eq!(app_snapshot_count(), 1);
 
-        // 7. Verify diagnostic test pattern channel & orientation contract
+        // 8. Verify diagnostic test pattern channel & orientation contract
         app_set_test_pattern(1);
         let ptr = app_framebuffer();
         assert!(!ptr.is_null());

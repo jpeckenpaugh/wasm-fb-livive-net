@@ -75,7 +75,11 @@ const fmtDuration = (ms) => {
 const selectionLabel = (guest) => {
   if (!guest || !guest.exports) return 'desktop';
   const sel = guest.exports.app_selected();
-  if (sel === 1) return 'about';
+  if (sel === 1) {
+    const page = guest.exports.app_active_page();
+    const sec = page === 1 ? 'locale' : page === 2 ? 'fonts' : 'about';
+    return `system (${sec})`;
+  }
   if (sel === 2) return 'calc';
   return 'desktop';
 };
@@ -136,6 +140,17 @@ function syncWallClock(guest) {
     now.getDate(),
     now.getDay(),
   );
+  if (guest.exports.app_set_utc) {
+    guest.exports.app_set_utc(
+      now.getUTCFullYear(),
+      now.getUTCMonth() + 1,
+      now.getUTCDate(),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+      now.getUTCSeconds(),
+      -now.getTimezoneOffset(),
+    );
+  }
 }
 
 function stopClock() {

@@ -2,18 +2,19 @@
 //!
 //! 1. 32px Title Bar (`y: 0..32`):
 //!    - Top-left App Dock button (`x: 0..44`)
-//!    - Context menus (`SYSTEM`/`ABOUT`/`CALC`, `VIEW`, `TESTING`)
+//!    - Context menus (`SYSTEM`/`CALC`, `VIEW`, `TESTING`)
 //!    - Right-aligned User, Session, and Date/Time (`TESTER · VM-01 · 2026-10-30 07:12:00`)
 //! 2. Left Overlay App Dock:
-//!    - `128x72` App Icons (1/10th of `1280x720`) stacked vertically on the left edge,
-//!      rendered on top of the active window without displacing it, auto-hiding when clicked.
+//!    - `128x72` App Icons (1/10th of `1280x720`) stacked vertically on the left edge
+//!      (`SYSTEM` and `CALC`), rendered on top of the active window without displacing it,
+//!      auto-hiding when clicked.
 //! 3. Maximized Client Window (`1280 x 688`):
 //!    - Flat surface directly below the Title Bar.
 
-use crate::about::{self, AboutApp};
 use crate::calc::{self, CalcApp};
 use crate::fb::{rgb, Framebuffer};
 use crate::font::draw_str;
+use crate::system::{self, SystemApp, SystemSection};
 
 pub const TITLE_H: i32 = 32;
 pub const DOCK_BTN_W: i32 = 44;
@@ -24,7 +25,7 @@ pub const DOCK_ICON_H: i32 = 72;
 pub const DOCK_GAP: i32 = 12;
 pub const DOCK_X: i32 = 12;
 pub const DOCK_Y: i32 = TITLE_H + 12;
-pub const APP_COUNT: usize = 2; // 0 = About, 1 = Calc
+pub const APP_COUNT: usize = 2; // 0 = System, 1 = Calc
 
 #[inline]
 pub const fn dock_icon_y(slot_idx: usize) -> i32 {
@@ -46,7 +47,7 @@ pub const CLICK_SNAPSHOT: i32 = 2;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AppSlot {
     Desktop = 0,
-    About = 1,
+    System = 1,
     Calc = 2,
 }
 
@@ -67,7 +68,7 @@ pub struct WmState {
     pub year: u16,
     pub month: u8,
     pub day: u8,
-    pub about: AboutApp,
+    pub system: SystemApp,
     pub calc: CalcApp,
 }
 
@@ -90,7 +91,7 @@ impl WmState {
             year: 2026,
             month: 10,
             day: 30,
-            about: AboutApp::new(),
+            system: SystemApp::new(),
             calc: CalcApp::new(),
         }
     }
@@ -104,7 +105,7 @@ impl WmState {
         self.open_menu = None;
         self.test_pattern = false;
         self.snapshot_seq = 0;
-        self.about = AboutApp::new();
+        self.system = SystemApp::new();
         self.calc = CalcApp::new();
         self.ready = true;
     }
@@ -112,8 +113,7 @@ impl WmState {
     pub fn menu_title(&self, menu_idx: usize) -> &'static str {
         match menu_idx {
             0 => match self.active_app {
-                AppSlot::Desktop => "SYSTEM",
-                AppSlot::About => "ABOUT",
+                AppSlot::Desktop | AppSlot::System => "SYSTEM",
                 AppSlot::Calc => "CALC",
             },
             1 => "VIEW",
@@ -125,8 +125,8 @@ impl WmState {
     pub fn menu_items(&self, menu_idx: usize) -> &'static [&'static str] {
         match menu_idx {
             0 => match self.active_app {
-                AppSlot::Desktop => &["OPEN ABOUT", "OPEN CALC"],
-                AppSlot::About => &["CLOSE WINDOW"],
+                AppSlot::Desktop => &["ABOUT", "LOCALE", "FONTS"],
+                AppSlot::System => &["ABOUT", "LOCALE", "FONTS", "CLOSE WINDOW"],
                 AppSlot::Calc => &["CLEAR (AC)", "CLOSE WINDOW"],
             },
             1 => &["TOGGLE DOCK", "TEST PATTERN"],
@@ -150,8 +150,8 @@ impl WmState {
             let client_h = (fb.h - TITLE_H).max(0);
             let mut client_fb = fb.sub_rows(TITLE_H, client_h);
             match self.active_app {
-                AppSlot::Desktop => about::draw_desktop_backdrop(&mut client_fb),
-                AppSlot::About => about::draw_window(&mut client_fb, &self.about),
+                AppSlot::Desktop => system::draw_desktop_backdrop(&mut client_fb),
+                AppSlot::System => system::draw_window(&mut client_fb, &self.system),
                 AppSlot::Calc => calc::draw_window(&mut client_fb, &self.calc),
             }
         }
@@ -229,16 +229,17 @@ impl WmState {
     }
 
     fn draw_left_dock(&self, fb: &mut Framebuffer) {
-        // Tile 0: About
+        // Tile 0: System (About | Locale | Fonts)
         let y0 = dock_icon_y(0);
         fb.shade(DOCK_X - 4, y0 - 4, DOCK_ICON_W + 8, DOCK_ICON_H + 8, 64);
-        about::draw_dock_tile(
+        system::draw_dock_tile(
             fb,
+            &self.system,
             DOCK_X,
             y0,
             DOCK_ICON_W,
             DOCK_ICON_H,
-            self.active_app == AppSlot::About,
+            self.active_app == AppSlot::System,
         );
 
         // Tile 1: Calculator (shows live value)
@@ -346,7 +347,7 @@ impl WmState {
                 let iy = dock_icon_y(slot);
                 if y >= iy && y < iy + DOCK_ICON_H {
                     self.active_app = match slot {
-                        0 => AppSlot::About,
+                        0 => AppSlot::System,
                         _ => AppSlot::Calc,
                     };
                     self.dock_visible = false;
@@ -372,19 +373,15 @@ impl WmState {
 
     fn execute_menu_item(&mut self, menu_idx: usize, item_idx: usize) -> i32 {
         match (menu_idx, item_idx) {
-            // Menu 0: context-dependent (`SYSTEM` / `ABOUT` / `CALC`)
+            // Menu 0: `SYSTEM` (About / Locale / Fonts / Close) or `CALC` (Clear / Close)
             (0, idx) => match (self.active_app, idx) {
-                (AppSlot::Desktop, 0) => {
-                    self.active_app = AppSlot::About;
+                (AppSlot::Desktop | AppSlot::System, 0..=2) => {
+                    self.active_app = AppSlot::System;
+                    self.system.section = SystemSection::from_index(idx);
                     self.dock_visible = false;
                     CLICK_CHANGED
                 }
-                (AppSlot::Desktop, 1) => {
-                    self.active_app = AppSlot::Calc;
-                    self.dock_visible = false;
-                    CLICK_CHANGED
-                }
-                (AppSlot::About, 0) => {
+                (AppSlot::System, 3) => {
                     self.active_app = AppSlot::Desktop;
                     CLICK_CHANGED
                 }
@@ -410,7 +407,7 @@ impl WmState {
             // Menu 2: TESTING -> SNAPSHOT
             (2, 0) => {
                 self.snapshot_seq = self.snapshot_seq.wrapping_add(1);
-                self.about.snapshots_taken = self.snapshot_seq;
+                self.system.snapshots_taken = self.snapshot_seq;
                 CLICK_SNAPSHOT
             }
             _ => CLICK_NOOP,
@@ -421,7 +418,6 @@ impl WmState {
         if !self.ready {
             return CLICK_NOOP;
         }
-        // Modal shell shortcuts take priority if a menu or dock is open
         if code == 25 {
             if self.open_menu.is_some() {
                 self.open_menu = None;
@@ -441,10 +437,37 @@ impl WmState {
             return CLICK_CHANGED;
         }
 
-        if self.active_app == AppSlot::Calc && calc::key_window(&mut self.calc, code) {
-            return CLICK_CHANGED;
+        match self.active_app {
+            AppSlot::System => match code {
+                11..=13 => {
+                    let target = SystemSection::from_index((code - 11) as usize);
+                    if self.system.section != target {
+                        self.system.section = target;
+                        return CLICK_CHANGED;
+                    }
+                    CLICK_NOOP
+                }
+                1 | 2 => {
+                    let cur = self.system.section as usize;
+                    let next = if code == 1 {
+                        (cur + 2) % 3
+                    } else {
+                        (cur + 1) % 3
+                    };
+                    self.system.section = SystemSection::from_index(next);
+                    CLICK_CHANGED
+                }
+                _ => CLICK_NOOP,
+            },
+            AppSlot::Calc => {
+                if calc::key_window(&mut self.calc, code) {
+                    CLICK_CHANGED
+                } else {
+                    CLICK_NOOP
+                }
+            }
+            AppSlot::Desktop => CLICK_NOOP,
         }
-        CLICK_NOOP
     }
 }
 
