@@ -37,13 +37,15 @@ jobs:
       - name: Assemble static site
         run: |
           set -eu
-          mkdir -p site/build
+          mkdir -p site/build site/v2/build
           cp -R web/. site/
           cp wasm-out/media_browser.mjs wasm-out/media_browser.wasm site/build/
+          cp wasm-out/v2/appliance.wasm site/v2/build/
           printf 'wasm-fb.livive.net\n' > site/CNAME
           touch site/.nojekyll
           test -s site/build/media_browser.wasm
           test -s site/build/media_browser.mjs
+          test -s site/v2/build/appliance.wasm
           find site -type f | sort
           du -sh site
 

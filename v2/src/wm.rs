@@ -1,0 +1,521 @@
+//! Minimalist Appliance Window Manager (`wm.rs`).
+//!
+//! 1. 32px Title Bar (`y: 0..32`):
+//!    - Top-left App Dock button (`x: 0..44`)
+//!    - Context menus (`SYSTEM`/`ABOUT`/`CALC`, `VIEW`, `TESTING`)
+//!    - Right-aligned User, Session, and Date/Time (`TESTER · VM-01 · 2026-10-30 07:12:00`)
+//! 2. Left Overlay App Dock:
+//!    - `128x72` App Icons (1/10th of `1280x720`) stacked vertically on the left edge,
+//!      rendered on top of the active window without displacing it, auto-hiding when clicked.
+//! 3. Maximized Client Window (`1280 x 688`):
+//!    - Flat surface directly below the Title Bar.
+
+use crate::about::{self, AboutApp};
+use crate::calc::{self, CalcApp};
+use crate::fb::{rgb, Framebuffer};
+use crate::font::draw_str;
+
+pub const TITLE_H: i32 = 32;
+pub const DOCK_BTN_W: i32 = 44;
+
+// Left App Dock geometry: 128x72 icons (1/10th of 1280x720) stacked vertically
+pub const DOCK_ICON_W: i32 = 128;
+pub const DOCK_ICON_H: i32 = 72;
+pub const DOCK_GAP: i32 = 12;
+pub const DOCK_X: i32 = 12;
+pub const DOCK_Y: i32 = TITLE_H + 12;
+pub const APP_COUNT: usize = 2; // 0 = About, 1 = Calc
+
+#[inline]
+pub const fn dock_icon_y(slot_idx: usize) -> i32 {
+    DOCK_Y + (slot_idx as i32) * (DOCK_ICON_H + DOCK_GAP)
+}
+
+// Menu Bar geometry
+pub const MENU_COUNT: usize = 3;
+pub const MENU_X0: i32 = DOCK_BTN_W + 8;
+pub const MENU_HEADER_W: i32 = 104;
+pub const MENU_DROP_W: i32 = 224;
+pub const MENU_ITEM_H: i32 = 30;
+
+// Click return codes
+pub const CLICK_NOOP: i32 = 0;
+pub const CLICK_CHANGED: i32 = 1;
+pub const CLICK_SNAPSHOT: i32 = 2;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum AppSlot {
+    Desktop = 0,
+    About = 1,
+    Calc = 2,
+}
+
+pub struct WmState {
+    pub ready: bool,
+    pub width: i32,
+    pub height: i32,
+    pub session_id: u32,
+    pub active_app: AppSlot,
+    pub dock_visible: bool,
+    pub open_menu: Option<usize>,
+    pub test_pattern: bool,
+    pub snapshot_seq: u32,
+    pub last_fb_hash: u32,
+    pub hour: u8,
+    pub minute: u8,
+    pub second: u8,
+    pub year: u16,
+    pub month: u8,
+    pub day: u8,
+    pub about: AboutApp,
+    pub calc: CalcApp,
+}
+
+impl WmState {
+    pub const fn new() -> Self {
+        Self {
+            ready: false,
+            width: 1280,
+            height: 720,
+            session_id: 1,
+            active_app: AppSlot::Desktop,
+            dock_visible: false,
+            open_menu: None,
+            test_pattern: false,
+            snapshot_seq: 0,
+            last_fb_hash: 0,
+            hour: 6,
+            minute: 45,
+            second: 0,
+            year: 2026,
+            month: 10,
+            day: 30,
+            about: AboutApp::new(),
+            calc: CalcApp::new(),
+        }
+    }
+
+    pub fn init(&mut self, w: i32, h: i32, session_id: u32) {
+        self.width = if w > 0 { w } else { 1280 };
+        self.height = if h > 0 { h } else { 720 };
+        self.session_id = if session_id > 0 { session_id } else { 1 };
+        self.active_app = AppSlot::Desktop;
+        self.dock_visible = false;
+        self.open_menu = None;
+        self.test_pattern = false;
+        self.snapshot_seq = 0;
+        self.about = AboutApp::new();
+        self.calc = CalcApp::new();
+        self.ready = true;
+    }
+
+    pub fn menu_title(&self, menu_idx: usize) -> &'static str {
+        match menu_idx {
+            0 => match self.active_app {
+                AppSlot::Desktop => "SYSTEM",
+                AppSlot::About => "ABOUT",
+                AppSlot::Calc => "CALC",
+            },
+            1 => "VIEW",
+            2 => "TESTING",
+            _ => "",
+        }
+    }
+
+    pub fn menu_items(&self, menu_idx: usize) -> &'static [&'static str] {
+        match menu_idx {
+            0 => match self.active_app {
+                AppSlot::Desktop => &["OPEN ABOUT", "OPEN CALC"],
+                AppSlot::About => &["CLOSE WINDOW"],
+                AppSlot::Calc => &["CLEAR (AC)", "CLOSE WINDOW"],
+            },
+            1 => &["TOGGLE DOCK", "TEST PATTERN"],
+            2 => &["SNAPSHOT"],
+            _ => &[],
+        }
+    }
+
+    pub fn render(&mut self, fb: &mut Framebuffer) {
+        if !self.ready {
+            return;
+        }
+        if self.test_pattern {
+            draw_test_pattern(fb);
+            self.last_fb_hash = fb.fnv1a_32();
+            return;
+        }
+
+        // 1. Maximized Client Surface (`1280 x 688`, below the 32px Title Bar)
+        {
+            let client_h = (fb.h - TITLE_H).max(0);
+            let mut client_fb = fb.sub_rows(TITLE_H, client_h);
+            match self.active_app {
+                AppSlot::Desktop => about::draw_desktop_backdrop(&mut client_fb),
+                AppSlot::About => about::draw_window(&mut client_fb, &self.about),
+                AppSlot::Calc => calc::draw_window(&mut client_fb, &self.calc),
+            }
+        }
+
+        // 2. Left Overlay App Dock (`128x72` icons stacked on the left edge)
+        if self.dock_visible {
+            self.draw_left_dock(fb);
+        }
+
+        // 3. Top Title Bar (`y: 0..32`)
+        self.draw_title_bar(fb);
+
+        // 4. Active Drop-Down Menu
+        if let Some(menu_idx) = self.open_menu {
+            self.draw_dropdown_menu(fb, menu_idx);
+        }
+
+        self.last_fb_hash = fb.fnv1a_32();
+    }
+
+    fn draw_title_bar(&self, fb: &mut Framebuffer) {
+        fb.fill(0, 0, fb.w, TITLE_H, rgb(0x0c, 0x11, 0x17));
+        fb.fill(0, TITLE_H - 1, fb.w, 1, rgb(0x22, 0x30, 0x3e));
+
+        // 1. Top-Left App Dock Button (`x: 0..DOCK_BTN_W`)
+        let btn_bg = if self.dock_visible {
+            rgb(0x2d, 0xd4, 0xbf)
+        } else {
+            rgb(0x14, 0x1d, 0x26)
+        };
+        let icon_col = if self.dock_visible {
+            rgb(0x08, 0x10, 0x14)
+        } else {
+            rgb(0x2d, 0xd4, 0xbf)
+        };
+        fb.fill(0, 0, DOCK_BTN_W, TITLE_H - 1, btn_bg);
+        fb.fill(DOCK_BTN_W - 1, 0, 1, TITLE_H - 1, rgb(0x22, 0x30, 0x3e));
+
+        for row in 0..3 {
+            let py = 9 + row * 5;
+            fb.fill(12, py, 6, 3, icon_col);
+            fb.fill(20, py, 12, 3, icon_col);
+        }
+
+        // 2. Menu Headers
+        for i in 0..MENU_COUNT {
+            let mx = MENU_X0 + (i as i32) * MENU_HEADER_W;
+            let is_open = self.open_menu == Some(i);
+            if is_open {
+                fb.fill(mx, 2, MENU_HEADER_W - 4, TITLE_H - 3, rgb(0x1b, 0x28, 0x36));
+                fb.fill(mx, TITLE_H - 3, MENU_HEADER_W - 4, 2, rgb(0x2d, 0xd4, 0xbf));
+            }
+            let fg = if is_open {
+                rgb(0xf0, 0xf6, 0xfc)
+            } else {
+                rgb(0xc8, 0xd7, 0xe2)
+            };
+            draw_str(fb, mx + 12, 9, self.menu_title(i), 2, fg);
+        }
+
+        // 3. Right Side: User, Session, and Full Timestamp shown ONCE
+        let mut right_buf = [b' '; 48];
+        let right_str = fmt_title_right(
+            &mut right_buf,
+            self.session_id,
+            self.year,
+            self.month,
+            self.day,
+            self.hour,
+            self.minute,
+            self.second,
+        );
+        let rw = crate::font::text_width(right_str, 2);
+        draw_str(fb, fb.w - rw - 14, 9, right_str, 2, rgb(0x9f, 0xb3, 0xc8));
+    }
+
+    fn draw_left_dock(&self, fb: &mut Framebuffer) {
+        // Tile 0: About
+        let y0 = dock_icon_y(0);
+        fb.shade(DOCK_X - 4, y0 - 4, DOCK_ICON_W + 8, DOCK_ICON_H + 8, 64);
+        about::draw_dock_tile(
+            fb,
+            DOCK_X,
+            y0,
+            DOCK_ICON_W,
+            DOCK_ICON_H,
+            self.active_app == AppSlot::About,
+        );
+
+        // Tile 1: Calculator (shows live value)
+        let y1 = dock_icon_y(1);
+        fb.shade(DOCK_X - 4, y1 - 4, DOCK_ICON_W + 8, DOCK_ICON_H + 8, 64);
+        calc::draw_dock_tile(
+            fb,
+            &self.calc,
+            DOCK_X,
+            y1,
+            DOCK_ICON_W,
+            DOCK_ICON_H,
+            self.active_app == AppSlot::Calc,
+        );
+    }
+
+    fn draw_dropdown_menu(&self, fb: &mut Framebuffer, menu_idx: usize) {
+        let items = self.menu_items(menu_idx);
+        if items.is_empty() {
+            return;
+        }
+        let mx = MENU_X0 + (menu_idx as i32) * MENU_HEADER_W;
+        let my = TITLE_H;
+        let mh = (items.len() as i32) * MENU_ITEM_H + 8;
+
+        fb.shade(mx + 4, my + 4, MENU_DROP_W, mh, 80);
+        fb.fill(mx, my, MENU_DROP_W, mh, rgb(0x10, 0x17, 0x20));
+        fb.border(mx, my, MENU_DROP_W, mh, 2, rgb(0x2d, 0xd4, 0xbf));
+
+        for (idx, &label) in items.iter().enumerate() {
+            let iy = my + 4 + (idx as i32) * MENU_ITEM_H;
+            if idx > 0 {
+                fb.fill(mx + 8, iy, MENU_DROP_W - 16, 1, rgb(0x1f, 0x2c, 0x38));
+            }
+            draw_str(fb, mx + 14, iy + 8, label, 2, rgb(0xd4, 0xe2, 0xea));
+        }
+    }
+
+    pub fn click(&mut self, x: i32, y: i32) -> i32 {
+        if !self.ready {
+            return CLICK_NOOP;
+        }
+
+        if self.test_pattern {
+            self.test_pattern = false;
+            return CLICK_CHANGED;
+        }
+
+        // Layer 1: Active Drop-Down Menu
+        if let Some(menu_idx) = self.open_menu {
+            let items = self.menu_items(menu_idx);
+            let mx = MENU_X0 + (menu_idx as i32) * MENU_HEADER_W;
+            let my = TITLE_H;
+            let mh = (items.len() as i32) * MENU_ITEM_H + 8;
+
+            if x >= mx && x < mx + MENU_DROP_W && y >= my && y < my + mh {
+                let rel_y = y - (my + 4);
+                if rel_y >= 0 {
+                    let item_idx = (rel_y / MENU_ITEM_H) as usize;
+                    if item_idx < items.len() {
+                        self.open_menu = None;
+                        return self.execute_menu_item(menu_idx, item_idx);
+                    }
+                }
+            }
+
+            if y >= 0 && y < TITLE_H {
+                if x >= 0 && x < DOCK_BTN_W {
+                    self.open_menu = None;
+                    self.dock_visible = !self.dock_visible;
+                    return CLICK_CHANGED;
+                }
+                for i in 0..MENU_COUNT {
+                    let hx = MENU_X0 + (i as i32) * MENU_HEADER_W;
+                    if x >= hx && x < hx + MENU_HEADER_W {
+                        self.open_menu = if i == menu_idx { None } else { Some(i) };
+                        return CLICK_CHANGED;
+                    }
+                }
+            }
+
+            self.open_menu = None;
+            return CLICK_CHANGED;
+        }
+
+        // Layer 2: Title Bar (`y < TITLE_H`)
+        if y >= 0 && y < TITLE_H {
+            if x >= 0 && x < DOCK_BTN_W {
+                self.dock_visible = !self.dock_visible;
+                return CLICK_CHANGED;
+            }
+            for i in 0..MENU_COUNT {
+                let hx = MENU_X0 + (i as i32) * MENU_HEADER_W;
+                if x >= hx && x < hx + MENU_HEADER_W {
+                    self.open_menu = Some(i);
+                    return CLICK_CHANGED;
+                }
+            }
+            return CLICK_NOOP;
+        }
+
+        // Layer 3: Left Overlay App Dock (`128x72` icons stacked vertically)
+        if self.dock_visible && x >= DOCK_X && x < DOCK_X + DOCK_ICON_W {
+            for slot in 0..APP_COUNT {
+                let iy = dock_icon_y(slot);
+                if y >= iy && y < iy + DOCK_ICON_H {
+                    self.active_app = match slot {
+                        0 => AppSlot::About,
+                        _ => AppSlot::Calc,
+                    };
+                    self.dock_visible = false;
+                    return CLICK_CHANGED;
+                }
+            }
+        }
+
+        // Layer 4: Maximized Client Window (`y >= TITLE_H`)
+        let cx = x;
+        let cy = y - TITLE_H;
+        match self.active_app {
+            AppSlot::Calc => {
+                if calc::click_window(&mut self.calc, cx, cy) {
+                    CLICK_CHANGED
+                } else {
+                    CLICK_NOOP
+                }
+            }
+            _ => CLICK_NOOP,
+        }
+    }
+
+    fn execute_menu_item(&mut self, menu_idx: usize, item_idx: usize) -> i32 {
+        match (menu_idx, item_idx) {
+            // Menu 0: context-dependent (`SYSTEM` / `ABOUT` / `CALC`)
+            (0, idx) => match (self.active_app, idx) {
+                (AppSlot::Desktop, 0) => {
+                    self.active_app = AppSlot::About;
+                    self.dock_visible = false;
+                    CLICK_CHANGED
+                }
+                (AppSlot::Desktop, 1) => {
+                    self.active_app = AppSlot::Calc;
+                    self.dock_visible = false;
+                    CLICK_CHANGED
+                }
+                (AppSlot::About, 0) => {
+                    self.active_app = AppSlot::Desktop;
+                    CLICK_CHANGED
+                }
+                (AppSlot::Calc, 0) => {
+                    self.calc.clear();
+                    CLICK_CHANGED
+                }
+                (AppSlot::Calc, 1) => {
+                    self.active_app = AppSlot::Desktop;
+                    CLICK_CHANGED
+                }
+                _ => CLICK_NOOP,
+            },
+            // Menu 1: VIEW
+            (1, 0) => {
+                self.dock_visible = !self.dock_visible;
+                CLICK_CHANGED
+            }
+            (1, 1) => {
+                self.test_pattern = !self.test_pattern;
+                CLICK_CHANGED
+            }
+            // Menu 2: TESTING -> SNAPSHOT
+            (2, 0) => {
+                self.snapshot_seq = self.snapshot_seq.wrapping_add(1);
+                self.about.snapshots_taken = self.snapshot_seq;
+                CLICK_SNAPSHOT
+            }
+            _ => CLICK_NOOP,
+        }
+    }
+
+    pub fn key(&mut self, code: i32) -> i32 {
+        if !self.ready {
+            return CLICK_NOOP;
+        }
+        // Modal shell shortcuts take priority if a menu or dock is open
+        if code == 25 {
+            if self.open_menu.is_some() {
+                self.open_menu = None;
+                return CLICK_CHANGED;
+            }
+            if self.dock_visible {
+                self.dock_visible = false;
+                return CLICK_CHANGED;
+            }
+            if self.test_pattern {
+                self.test_pattern = false;
+                return CLICK_CHANGED;
+            }
+        }
+        if code == 3 {
+            self.dock_visible = !self.dock_visible;
+            return CLICK_CHANGED;
+        }
+
+        if self.active_app == AppSlot::Calc && calc::key_window(&mut self.calc, code) {
+            return CLICK_CHANGED;
+        }
+        CLICK_NOOP
+    }
+}
+
+pub fn draw_test_pattern(fb: &mut Framebuffer) {
+    let half_w = fb.w / 2;
+    let half_h = fb.h / 2;
+
+    fb.fill(0, 0, half_w, half_h, rgb(255, 0, 0));
+    fb.fill(half_w, 0, fb.w - half_w, half_h, rgb(0, 255, 0));
+    fb.fill(0, half_h, half_w, fb.h - half_h, rgb(0, 0, 255));
+    fb.fill(
+        half_w,
+        half_h,
+        fb.w - half_w,
+        fb.h - half_h,
+        rgb(255, 255, 255),
+    );
+
+    for i in 0..fb.w {
+        fb.fill(i, (i * fb.h) / fb.w, 3, 3, rgb(255, 255, 0));
+    }
+
+    fb.fill(8, 8, 32, 32, rgb(0, 0, 0));
+    fb.fill(fb.w - 40, fb.h - 40, 32, 32, rgb(255, 0, 255));
+}
+
+#[allow(clippy::too_many_arguments)]
+fn fmt_title_right(
+    buf: &mut [u8; 48],
+    session_id: u32,
+    year: u16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    min: u8,
+    sec: u8,
+) -> &str {
+    let mut pos = 0;
+    for &b in b"TESTER  VM-" {
+        buf[pos] = b;
+        pos += 1;
+    }
+    buf[pos] = b'0' + ((session_id / 10) % 10) as u8;
+    buf[pos + 1] = b'0' + (session_id % 10) as u8;
+    pos += 2;
+    buf[pos] = b' ';
+    buf[pos + 1] = b' ';
+    pos += 2;
+
+    buf[pos] = b'0' + ((year / 1000) % 10) as u8;
+    buf[pos + 1] = b'0' + ((year / 100) % 10) as u8;
+    buf[pos + 2] = b'0' + ((year / 10) % 10) as u8;
+    buf[pos + 3] = b'0' + (year % 10) as u8;
+    buf[pos + 4] = b'-';
+    buf[pos + 5] = b'0' + (month / 10) % 10;
+    buf[pos + 6] = b'0' + (month % 10);
+    buf[pos + 7] = b'-';
+    buf[pos + 8] = b'0' + (day / 10) % 10;
+    buf[pos + 9] = b'0' + (day % 10);
+    buf[pos + 10] = b' ';
+    pos += 11;
+
+    buf[pos] = b'0' + (hour / 10) % 10;
+    buf[pos + 1] = b'0' + (hour % 10);
+    buf[pos + 2] = b':';
+    buf[pos + 3] = b'0' + (min / 10) % 10;
+    buf[pos + 4] = b'0' + (min % 10);
+    buf[pos + 5] = b':';
+    buf[pos + 6] = b'0' + (sec / 10) % 10;
+    buf[pos + 7] = b'0' + (sec % 10);
+    pos += 8;
+
+    core::str::from_utf8(&buf[..pos]).unwrap_or("")
+}

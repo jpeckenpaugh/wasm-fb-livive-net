@@ -32,6 +32,7 @@ WASM_LDFLAGS ?= \
   --no-entry
 
 WASM_OUT := $(BUILD)/media_browser.mjs
+V2_WASM_OUT := $(BUILD)/v2/appliance.wasm
 ASSETS   := $(wildcard assets/*.png assets/*.jpg assets/*.jpeg)
 
 NATIVE_COMMON := $(OBJ)/native/src/framebuffer.o
@@ -40,9 +41,22 @@ NATIVE_ASSETS := $(OBJ)/native/$(GEN)/assets_gen.o \
                  $(OBJ)/native/$(GEN)/about_gen.o \
                  $(OBJ)/native/$(GEN)/demo_gen.o
 
-.PHONY: all assets test clean debug release serve
+.PHONY: all v2 test-v2 assets test clean debug release serve
 
-all: $(WASM_OUT)
+all: $(WASM_OUT) $(V2_WASM_OUT)
+
+v2: $(V2_WASM_OUT)
+
+$(V2_WASM_OUT): $(wildcard v2/Cargo.toml v2/build.rs v2/src/*.rs)
+	@mkdir -p $(dir $@)
+	cargo build --manifest-path v2/Cargo.toml --target wasm32-unknown-unknown --release
+	cp v2/target/wasm32-unknown-unknown/release/appliance.wasm $@
+	@mkdir -p web/v2/build
+	@cp $@ web/v2/build/appliance.wasm
+	@ls -l $@ | awk '{printf "v2 wasm: %d bytes\n", $$5}'
+
+test-v2:
+	cargo test --manifest-path v2/Cargo.toml
 
 # ABOUT.md is embedded as a C string so the Preview app renders the same file
 # GitHub shows.
@@ -141,6 +155,7 @@ $(BUILD)/test_code: $(OBJ)/native/tests/test_code.o $(OBJ)/native/src/code.o \
 
 test: $(BUILD)/test_pixels $(BUILD)/test_lcd $(BUILD)/test_clock $(BUILD)/test_calc $(BUILD)/test_cal $(BUILD)/test_fm $(BUILD)/test_code
 	@for t in $^; do ./$$t; done
+	@$(MAKE) --no-print-directory test-v2
 
 # Force regeneration after editing assets/.
 assets:
@@ -158,4 +173,4 @@ serve:
 	docker compose up --build serve
 
 clean:
-	rm -rf $(BUILD) build-debug
+	rm -rf $(BUILD) build-debug web/v2/build v2/target

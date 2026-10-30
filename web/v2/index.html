@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>wasm-fb · v2 appliance</title>
+  <style>
+    :root {
+      --bg: #08090b;
+      --panel: #0d1116;
+      --panel-2: #111820;
+      --line: #1d2731;
+      --line-2: #2a3843;
+      --text: #d4e2ea;
+      --dim: #7b8b98;
+      --dimmer: #4f5d68;
+      --accent: #2dd4bf;
+      --accent-soft: #0f766e;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --screen-w: 1280px;
+      --console-w: calc(var(--screen-w) + 32px);
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      padding: 0 max(16px, calc((100% - var(--console-w)) / 2)) 40px;
+      color: var(--text);
+      font: 13px/1.45 var(--sans);
+      background-color: var(--bg);
+      background-image:
+        linear-gradient(#ffffff06 1px, transparent 1px),
+        linear-gradient(90deg, #ffffff06 1px, transparent 1px),
+        radial-gradient(120% 80% at 50% -20%, #0d2b2a55, transparent 70%);
+      background-size: 24px 24px, 24px 24px, 100% 100%;
+    }
+
+    /* ---------------------------------------------------------- top bar --- */
+    .topbar {
+      display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+      max-width: var(--console-w); margin: 0 auto; padding: 14px 15px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .chip {
+      width: 22px; height: 22px; border: 1px solid var(--accent-soft);
+      border-radius: 4px; position: relative; flex: none;
+      background:
+        linear-gradient(var(--accent), var(--accent)) center/6px 6px no-repeat,
+        repeating-linear-gradient(90deg, #2dd4bf22 0 2px, transparent 2px 5px);
+      box-shadow: 0 0 12px #2dd4bf33, inset 0 0 8px #00000088;
+    }
+    .product {
+      font: 600 13px/1 var(--mono); letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--text);
+    }
+    .product em { color: var(--accent); font-style: normal; }
+    .slash { color: var(--dimmer); font: 13px var(--mono); }
+    .workload { font: 12px var(--mono); color: var(--dim); letter-spacing: 0.04em; }
+    .nav-link {
+      font: 11px var(--mono); color: var(--accent); text-decoration: none;
+      border: 1px solid var(--accent-soft); border-radius: 4px; padding: 3px 8px;
+    }
+    .nav-link:hover { background: #2dd4bf18; }
+
+    .host-stats { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
+    .hstat { display: flex; flex-direction: column; gap: 2px; min-width: 62px; }
+    .hstat span {
+      font: 9px/1 var(--mono); letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--dimmer);
+    }
+    .hstat b { font: 500 12px/1.2 var(--mono); color: var(--text); }
+    .hstat b.live { color: var(--accent); }
+
+    /* ---------------------------------------------------------- console --- */
+    .console {
+      max-width: var(--console-w); margin: 18px auto 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 20px 60px #00000066, inset 0 1px 0 #ffffff08;
+      overflow: hidden;
+    }
+    .tabbar {
+      display: flex; align-items: flex-end; gap: 6px;
+      padding: 8px 8px 0; background: linear-gradient(#0b1015, #0d1116);
+      border-bottom: 1px solid var(--line);
+    }
+    .tabs { display: flex; align-items: flex-end; gap: 2px; overflow-x: auto; }
+    .tab-wrap { position: relative; display: flex; }
+    .tab {
+      appearance: none; cursor: pointer;
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 26px 7px 11px;
+      background: transparent; border: 1px solid transparent; border-bottom: none;
+      border-radius: 6px 6px 0 0; color: var(--dim);
+      font: 12px/1 var(--mono); letter-spacing: 0.04em;
+      position: relative; top: 1px;
+    }
+    .tab:hover { color: var(--text); background: #ffffff05; }
+    .tab-wrap.active .tab {
+      color: var(--text); background: var(--panel);
+      border-color: var(--line);
+      box-shadow: inset 0 2px 0 var(--accent);
+    }
+    .dot {
+      width: 6px; height: 6px; border-radius: 50%; flex: none;
+      background: var(--dimmer);
+    }
+    .dot.running {
+      background: var(--ok);
+      box-shadow: 0 0 0 2px #34d39922, 0 0 8px #34d39988;
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+    .tab-close {
+      appearance: none; border: 0; background: transparent; cursor: pointer;
+      position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+      width: 18px; height: 18px; border-radius: 4px;
+      color: var(--dimmer); font: 14px/1 var(--mono); padding: 0;
+    }
+    .tab-close:hover { background: #ffffff10; color: var(--warn); }
+
+    .btn-bar {
+      appearance: none; cursor: pointer; margin-left: 2px;
+      padding: 6px 12px; border-radius: 6px;
+      border: 1px dashed var(--line-2); background: transparent;
+      color: var(--dim); font: 11px/1.4 var(--mono); letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .btn-bar:hover { border-color: var(--accent-soft); color: var(--accent); }
+    .btn-bar.primary {
+      border-style: solid; border-color: var(--accent-soft); color: var(--accent);
+    }
+    .btn-bar.primary:hover { background: #2dd4bf15; }
+
+    .controls-right {
+      margin-left: auto; display: flex; align-items: center; gap: 10px;
+      padding-bottom: 6px;
+    }
+    .diag {
+      display: flex; align-items: center; gap: 6px;
+      color: var(--dimmer);
+      font: 10px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
+      cursor: pointer; user-select: none;
+    }
+    .diag input { accent-color: var(--accent); margin: 0; }
+
+    /* ------------------------------------------------------------ panels --- */
+    .panels { padding: 14px; }
+    .vm-panel[hidden] { display: none; }
+    .screen {
+      border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+      background: #000;
+      box-shadow: inset 0 0 40px #000000cc, 0 0 0 1px #00000066;
+    }
+    .screen canvas {
+      display: block; width: 100%; height: auto;
+      image-rendering: pixelated; touch-action: none; outline: none;
+      cursor: crosshair;
+    }
+    .screen canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+
+    .vm-stats {
+      display: grid; margin: 12px 0 0; padding: 0;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1px; background: var(--line); border: 1px solid var(--line);
+    }
+    .cell { background: var(--panel-2); padding: 7px 9px 8px; }
+    .cell dt {
+      margin: 0 0 3px; font: 9px/1 var(--mono); letter-spacing: 0.13em;
+      text-transform: uppercase; color: var(--dimmer);
+    }
+    .cell dd { margin: 0; font: 500 12px/1.2 var(--mono); color: var(--text); }
+    .cell dd.state { color: var(--ok); }
+    .cell dd.state::before { content: "● "; font-size: 9px; vertical-align: 1px; }
+
+    /* ------------------------------------------------ snapshot drawer --- */
+    .snapshots {
+      max-width: var(--console-w); margin: 14px auto 0;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 8px; padding: 12px 14px;
+    }
+    .snapshots[hidden] { display: none; }
+    .snap-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px; font: 11px var(--mono); color: var(--dim);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .snap-list {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 10px;
+    }
+    .snap-card {
+      background: var(--panel-2); border: 1px solid var(--line-2);
+      border-radius: 6px; padding: 8px; font: 11px/1.4 var(--mono);
+    }
+    .snap-card img {
+      display: block; width: 100%; height: auto; border-radius: 3px;
+      border: 1px solid var(--line); margin-bottom: 6px;
+      image-rendering: pixelated;
+    }
+    .snap-meta { display: flex; justify-content: space-between; color: var(--dim); }
+    .snap-meta b { color: var(--accent); }
+    .snap-dl {
+      display: inline-block; margin-top: 4px; color: var(--text);
+      text-decoration: none; font-size: 10px; border-bottom: 1px dashed var(--dimmer);
+    }
+
+    .empty {
+      padding: 56px 20px; text-align: center; color: var(--dimmer);
+      font: 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .fault {
+      padding: 48px 20px; text-align: center;
+      color: #ff9b9b; font: 12px/1.7 var(--mono);
+    }
+    .fault span { color: var(--dimmer); }
+
+    /* -------------------------------------------------------- status bar --- */
+    .statusbar {
+      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      padding: 8px 14px; border-top: 1px solid var(--line);
+      background: #0a0e12;
+      font: 10px/1.4 var(--mono); letter-spacing: 0.08em;
+      color: var(--dimmer); text-transform: uppercase;
+    }
+    .statusbar .ok { color: var(--accent); }
+    .statusbar b { color: var(--dim); font-weight: 500; }
+
+    footer.page {
+      max-width: var(--console-w); margin: 14px auto 0;
+      padding: 0 15px;
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      color: var(--dimmer); font: 11px/1.5 var(--mono);
+    }
+    kbd {
+      background: var(--panel-2); border: 1px solid var(--line-2);
+      border-bottom-width: 2px; border-radius: 3px; padding: 0 4px;
+      font: inherit; font-size: 10px; color: var(--dim);
+    }
+    @media (max-width: 620px) {
+      .host-stats { gap: 12px; }
+      .hstat { min-width: 52px; }
+      .vm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="chip" aria-hidden="true"></span>
+      <span class="product">WASM <em>APPLIANCE</em></span>
+      <span class="slash">/</span>
+      <span class="workload">v2 · rust no_std wm</span>
+      <a class="nav-link" href="../">← v1 gallery</a>
+    </div>
+    <div class="host-stats" aria-label="host statistics">
+      <div class="hstat"><span>module</span><b id="h-module">—</b></div>
+      <div class="hstat"><span>guests</span><b id="h-guests">0</b></div>
+      <div class="hstat"><span>mem reserved</span><b id="h-mem">0 B</b></div>
+      <div class="hstat"><span>blits</span><b id="h-frames">0</b></div>
+      <div class="hstat"><span>snapshots</span><b id="h-snaps">0</b></div>
+      <div class="hstat"><span>uptime</span><b id="h-uptime" class="live">00:00:00</b></div>
+    </div>
+  </header>
+
+  <main class="console">
+    <div class="tabbar">
+      <div class="tabs" id="tabs" role="tablist" aria-label="guest instances"></div>
+      <button class="btn-bar" id="new-vm" type="button">+ new guest</button>
+      <div class="controls-right">
+        <button class="btn-bar primary" id="step1-btn" type="button" title="Run automated Step 1 pipeline: Open Dock -> Launch About -> Capture Snapshot">▶ run step 1</button>
+        <button class="btn-bar" id="snap-btn" type="button" title="Capture framebuffer snapshot of active guest">📷 snapshot</button>
+        <label class="diag"><input id="pattern" type="checkbox"> diag pattern</label>
+      </div>
+    </div>
+    <div class="panels" id="panels"></div>
+    <div class="statusbar">
+      <span id="sb-left"><span class="ok">ready</span> · click top-left dock button to launch about</span>
+      <span>rgba8888 · 1280×720 · rust wasm32 · <b id="sb-copies">0</b> framebuffer copies</span>
+    </div>
+  </main>
+
+  <section class="snapshots" id="snapshots-drawer" hidden>
+    <div class="snap-head">
+      <span>captured environment snapshots (<b id="snap-count">0</b>)</span>
+      <button class="btn-bar" id="clear-snaps" type="button">clear</button>
+    </div>
+    <div class="snap-list" id="snap-list"></div>
+  </section>
+
+  <footer class="page">
+    <span>step 1 pipeline: click top-left dock icon <kbd>[≡]</kbd> → click <kbd>ABOUT</kbd> tile (auto-hides dock) → click <kbd>TESTING → CAPTURE SNAPSHOT</kbd> or press <kbd>📷 snapshot</kbd>.</span>
+  </footer>
+
+  <script type="module" src="./host.js"></script>
+</body>
+</html>

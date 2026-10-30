@@ -1,0 +1,17 @@
+[package]
+name = "appliance_v2"
+version = "0.2.0"
+edition = "2021"
+description = "Minimalist Wasm Framebuffer Window Manager & About Attestation Appliance"
+license = "MIT"
+
+[lib]
+name = "appliance"
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
