@@ -37,10 +37,11 @@ jobs:
       - name: Assemble static site
         run: |
           set -eu
-          mkdir -p site/build site/v2/build site/assets site/demo
+          mkdir -p site/build site/v2/build site/assets site/demo site/gh/mines-sm
           cp -R web/. site/
-          cp assets/*.png site/assets/
-          cp demo/* site/demo/
+          cp assets/*.png assets/.context.xml site/assets/
+          cp demo/* demo/.context.xml site/demo/
+          cp -R gh/mines-sm/. site/gh/mines-sm/
           cp wasm-out/media_browser.mjs wasm-out/media_browser.wasm site/build/
           cp wasm-out/v2/appliance.wasm site/v2/build/
           printf 'wasm-fb.livive.net\n' > site/CNAME
@@ -48,6 +49,10 @@ jobs:
           test -s site/build/media_browser.wasm
           test -s site/build/media_browser.mjs
           test -s site/v2/build/appliance.wasm
+          test -s site/gh/mines-sm/lib.rs
+          test -s site/gh/mines-sm/.context.xml
+          test -s site/assets/.context.xml
+          test -s site/demo/.context.xml
           find site -type f | sort
           du -sh site
 

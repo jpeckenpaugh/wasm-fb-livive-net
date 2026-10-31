@@ -5,6 +5,7 @@ v2/target/
 web/v2/build/
 web/assets/
 web/demo/
+web/gh/
 .DS_Store
 *.o
 __pycache__/

@@ -10,10 +10,9 @@
  * - Capture pixel-exact RGBA8888 snapshots + FNV-1a hashes.
  */
 
-const W = 1280;
-const H = 720;
-const CLIENT_H = 688; // 720 - 32px Title Bar
-const FB_BYTES = W * H * 4;
+const DEFAULT_W = 1280;
+const DEFAULT_H = 720;
+const TITLE_H = 32;
 
 /* Network mount catalog (`~/wallpapers/*` and `~/samples/*`) served by the JS Hypervisor */
 const DEFAULT_MOUNTS = [
@@ -30,11 +29,15 @@ const DEFAULT_MOUNTS = [
   { name: 'samples/script.py',         url: '../demo/script.py',        bytes: 935,    kind: 'code' },
   { name: 'samples/style.css',         url: '../demo/style.css',        bytes: 655,    kind: 'code' },
   { name: 'samples/types.ts',          url: '../demo/types.ts',         bytes: 700,    kind: 'code' },
+  { name: 'github/lib.rs',             url: '../gh/mines-sm/lib.rs',        bytes: 12638, kind: 'code' },
+  { name: 'github/Cargo.toml',         url: '../gh/mines-sm/Cargo.toml',    bytes: 229,   kind: 'code' },
+  { name: 'github/README.md',          url: '../gh/mines-sm/README.md',     bytes: 2599,  kind: 'code' },
 ];
 
-/* Host-level decoded RGBA8888 and UTF-8 text caches shared across guests */
+/* Host-level decoded RGBA8888, UTF-8 text, and parsed .context.xml caches shared across guests */
 const decodedRgbaCache = new Map();
 const fetchedTextCache = new Map();
+const contextXmlCache = new Map();
 const textEncoder = new TextEncoder();
 
 const KEY_CODES = {
@@ -48,6 +51,12 @@ const KEY_CODES = {
   Escape: 25, c: 25, C: 25,
   Backspace: 26,
   '.': 27, ',': 27,
+  f: 30, F: 30,
+  n: 31, N: 31,
+  r: 32, R: 32,
+  Tab: 33, i: 33, I: 33,
+  PageUp: 34, '[': 34,
+  PageDown: 35, ']': 35,
   ArrowUp: 50,
   ArrowDown: 51,
 };
@@ -57,11 +66,13 @@ const MiB = 1024 * KiB;
 
 const tabsEl = document.getElementById('tabs');
 const panelsEl = document.getElementById('panels');
+const resSelect = document.getElementById('vm-res');
 const newVmButton = document.getElementById('new-vm');
 const step1Button = document.getElementById('step1-btn');
 const snapButton = document.getElementById('snap-btn');
 const patternToggle = document.getElementById('pattern');
 const statusLeft = document.getElementById('sb-left');
+const statusRes = document.getElementById('sb-res');
 const statusCopies = document.getElementById('sb-copies');
 const hostModule = document.getElementById('h-module');
 const hostGuests = document.getElementById('h-guests');
@@ -109,6 +120,7 @@ const selectionLabel = (guest) => {
   }
   if (sel === 2) return 'calc';
   if (sel === 3) return 'files';
+  if (sel === 4) return 'mines';
   return 'desktop';
 };
 
@@ -190,6 +202,73 @@ function mountCatalogIntoGuest(guest, mounts = DEFAULT_MOUNTS) {
   }
 }
 
+async function fetchContextForMount(item) {
+  try {
+    const lastSlash = item.url.lastIndexOf('/');
+    const dirUrl = lastSlash !== -1 ? item.url.slice(0, lastSlash) : '.';
+    const contextUrlStr = `${dirUrl}/.context.xml`;
+    const fileName = item.name.slice(item.name.lastIndexOf('/') + 1);
+
+    let doc = contextXmlCache.get(contextUrlStr);
+    if (!doc) {
+      const url = new URL(contextUrlStr, import.meta.url);
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const xmlText = await res.text();
+      const parser = new DOMParser();
+      doc = parser.parseFromString(xmlText, 'application/xml');
+      contextXmlCache.set(contextUrlStr, doc);
+    }
+
+    const fileNode = doc.querySelector(`file[name="${CSS.escape(fileName)}"]`) ||
+      Array.from(doc.querySelectorAll('file')).find(el => el.getAttribute('name') === fileName);
+    if (!fileNode) return null;
+
+    const root = doc.documentElement;
+    const scope = root ? root.getAttribute('scope') || '' : '';
+    const ref = root ? root.getAttribute('ref') || '' : '';
+    const scopeVal = ref ? `${scope} (${ref})` : scope;
+    const generatorVal = root ? root.getAttribute('generator') || '' : '';
+
+    const runtimeVal = fileNode.getAttribute('runtime') || '';
+    const roleVal = fileNode.getAttribute('role') || '';
+
+    const graphNode = fileNode.querySelector('graph');
+    const getCleanText = (parent, tag) => {
+      if (!parent) return '';
+      const el = parent.querySelector(tag);
+      return el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    };
+
+    const importsVal = getCleanText(graphNode, 'imports');
+    const exportsVal = getCleanText(graphNode, 'exports');
+    const dependentsVal = getCleanText(graphNode, 'dependents');
+    const invariantsVal = getCleanText(graphNode, 'invariants');
+
+    const summaryVal = getCleanText(fileNode, 'summary');
+    const architectureVal = getCleanText(fileNode, 'architecture');
+
+    const lines = [
+      scopeVal ? `SCOPE=${scopeVal}` : null,
+      generatorVal ? `GENERATOR=${generatorVal}` : null,
+      runtimeVal ? `RUNTIME=${runtimeVal}` : null,
+      roleVal ? `ROLE=${roleVal}` : null,
+      importsVal ? `IMPORTS=${importsVal}` : null,
+      exportsVal ? `EXPORTS=${exportsVal}` : null,
+      dependentsVal ? `DEPENDENTS=${dependentsVal}` : null,
+      invariantsVal ? `INVARIANTS=${invariantsVal}` : null,
+      summaryVal ? `SUMMARY=${summaryVal}` : null,
+      architectureVal ? `ARCHITECTURE=${architectureVal}` : null,
+    ].filter(Boolean);
+
+    const wireText = lines.join('\n') + '\n';
+    return textEncoder.encode(wireText).subarray(0, 4096);
+  } catch (err) {
+    console.warn(`failed to fetch/parse context for ${item.name}:`, err);
+    return null;
+  }
+}
+
 async function servicePendingMountFetch(guest) {
   if (!guest || !guest.exports || !guest.exports.app_mount_pending_idx) return;
   const idx = guest.exports.app_mount_pending_idx();
@@ -200,12 +279,23 @@ async function servicePendingMountFetch(guest) {
   try {
     if (isImage) {
       setStatus(`${guest.name} · decoding ~/${item.name} → RGBA8888…`, true);
-      const decoded = await fetchAndDecodeRgba(item.url, W, CLIENT_H);
+      const clientH = Math.max(1, guest.height - TITLE_H);
+      const [decoded, contextBytes] = await Promise.all([
+        fetchAndDecodeRgba(item.url, guest.width, clientH),
+        fetchContextForMount(item),
+      ]);
       if (guest.disposed || !guest.exports) return;
 
       const stagingPtr = guest.exports.app_mount_staging_ptr();
       const mem = new Uint8Array(guest.exports.memory.buffer);
       mem.set(decoded.rgba, stagingPtr);
+
+      if (contextBytes && guest.exports.app_mount_context_ptr && guest.exports.app_mount_commit_context) {
+        const ctxPtr = guest.exports.app_mount_context_ptr();
+        const ctxMem = new Uint8Array(guest.exports.memory.buffer);
+        ctxMem.set(contextBytes, ctxPtr);
+        guest.exports.app_mount_commit_context(idx, contextBytes.byteLength);
+      }
 
       const t0 = performance.now();
       guest.exports.app_mount_commit_rgba(idx, decoded.width, decoded.height);
@@ -217,12 +307,22 @@ async function servicePendingMountFetch(guest) {
       );
     } else {
       setStatus(`${guest.name} · fetching ~/${item.name}…`, true);
-      const bytes = await fetchTextBytes(item.url);
+      const [bytes, contextBytes] = await Promise.all([
+        fetchTextBytes(item.url),
+        fetchContextForMount(item),
+      ]);
       if (guest.disposed || !guest.exports) return;
 
       const textPtr = guest.exports.app_mount_text_ptr();
       const mem = new Uint8Array(guest.exports.memory.buffer);
       mem.set(bytes, textPtr);
+
+      if (contextBytes && guest.exports.app_mount_context_ptr && guest.exports.app_mount_commit_context) {
+        const ctxPtr = guest.exports.app_mount_context_ptr();
+        const ctxMem = new Uint8Array(guest.exports.memory.buffer);
+        ctxMem.set(contextBytes, ctxPtr);
+        guest.exports.app_mount_commit_context(idx, contextBytes.byteLength);
+      }
 
       const t0 = performance.now();
       guest.exports.app_mount_commit_text(idx, bytes.byteLength);
@@ -304,8 +404,8 @@ function pumpClock() {
   clockTimer = setTimeout(pumpClock, Math.max(50, wait));
 }
 
-const PANEL_TEMPLATE = `
-  <div class="screen"><canvas tabindex="0" width="${W}" height="${H}"></canvas></div>
+const buildPanelHtml = (w, h) => `
+  <div class="screen"><canvas tabindex="0" width="${w}" height="${h}"></canvas></div>
   <dl class="vm-stats">
     <div class="cell"><dt>state</dt><dd class="state" data-stat="state">running</dd></div>
     <div class="cell"><dt>boot</dt><dd data-stat="boot">—</dd></div>
@@ -324,7 +424,7 @@ function createTab(vm) {
   wrap.innerHTML = `
     <button class="tab" role="tab" type="button" id="tab-${vm.id}"
             aria-controls="panel-${vm.id}" aria-selected="false" tabindex="-1">
-      <span class="dot running"></span><span>${vm.name}</span>
+      <span class="dot running"></span><span>${vm.name} · ${vm.width}×${vm.height}</span>
     </button>
     <button class="tab-close" type="button" aria-label="Stop ${vm.name}"
             title="Stop ${vm.name}">×</button>`;
@@ -350,6 +450,9 @@ function activate(id) {
     tab.setAttribute('aria-selected', on ? 'true' : 'false');
     tab.tabIndex = on ? 0 : -1;
     guest.panel.hidden = !on;
+    if (on && statusRes) {
+      statusRes.textContent = `${guest.width}×${guest.height}`;
+    }
   }
   pumpClock();
   updateHostStats();
@@ -447,8 +550,8 @@ function captureSnapshot(guest, alreadyRecordedInGuest = false) {
     guestId: guest.id,
     seq,
     view,
-    width: W,
-    height: H,
+    width: guest.width,
+    height: guest.height,
     hash,
     hashHex,
     timestamp: new Date().toISOString(),
@@ -459,11 +562,26 @@ function captureSnapshot(guest, alreadyRecordedInGuest = false) {
   return snap;
 }
 
-async function createGuest() {
+function parseSelectedResolution() {
+  if (!resSelect || !resSelect.value) return { width: DEFAULT_W, height: DEFAULT_H };
+  const parts = resSelect.value.split('x').map((n) => parseInt(n, 10));
+  if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
+    return { width: parts[0], height: parts[1] };
+  }
+  return { width: DEFAULT_W, height: DEFAULT_H };
+}
+
+async function createGuest(opts = {}) {
+  const chosen = parseSelectedResolution();
+  const width = opts.width || chosen.width;
+  const height = opts.height || chosen.height;
+  const fbBytes = width * height * 4;
   const id = nextId++;
   const vm = {
     id,
     name: `vm-${String(id).padStart(2, '0')}`,
+    width,
+    height,
     exports: null,
     mounts: [],
     frames: 0,
@@ -484,7 +602,7 @@ async function createGuest() {
   vm.panel.setAttribute('role', 'tabpanel');
   vm.panel.setAttribute('aria-labelledby', `tab-${id}`);
   vm.panel.hidden = true;
-  vm.panel.innerHTML = PANEL_TEMPLATE;
+  vm.panel.innerHTML = buildPanelHtml(width, height);
   panelsEl.append(vm.panel);
 
   vm.canvas = vm.panel.querySelector('canvas');
@@ -507,20 +625,20 @@ async function createGuest() {
     vm.exports = exports;
     exports.app_set_session(id);
     syncWallClock(vm);
-    if (!exports.app_init(W, H)) throw new Error('app_init() returned 0');
+    if (!exports.app_init(width, height)) throw new Error('app_init() returned 0');
 
     // Mount the 5 network wallpapers and 8 code samples into `~/` at runtime
     mountCatalogIntoGuest(vm, DEFAULT_MOUNTS);
 
     vm.boot = performance.now() - startedAt;
     const ctx = vm.canvas.getContext('2d', { alpha: false });
-    const image = ctx.createImageData(W, H);
+    const image = ctx.createImageData(width, height);
 
     const blitToCanvas = (t0, t1) => {
       const fbPtr = exports.app_framebuffer();
       const memBytes = new Uint8Array(exports.memory.buffer);
       vm.heapBytes = memBytes.byteLength;
-      image.data.set(memBytes.subarray(fbPtr, fbPtr + FB_BYTES));
+      image.data.set(memBytes.subarray(fbPtr, fbPtr + fbBytes));
       const t2 = performance.now();
       ctx.putImageData(image, 0, 0);
       const t3 = performance.now();
@@ -567,10 +685,22 @@ async function createGuest() {
       event.preventDefault();
       const rect = vm.canvas.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
-      const x = Math.floor(((event.clientX - rect.left) * W) / rect.width);
-      const y = Math.floor(((event.clientY - rect.top) * H) / rect.height);
+      const x = Math.floor(((event.clientX - rect.left) * width) / rect.width);
+      const y = Math.floor(((event.clientY - rect.top) * height) / rect.height);
       vm.canvas.focus({ preventScroll: true });
-      clickLogical(x, y);
+      const rightClick = event.button === 2 || event.ctrlKey;
+      if (rightClick && exports.app_selected() === 4) {
+        exports.app_key(30); // toggle Flag mode for this click
+        clickLogical(x, y);
+        exports.app_key(30); // restore previous mode
+        render();
+      } else {
+        clickLogical(x, y);
+      }
+    });
+
+    vm.canvas.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
     });
 
     vm.canvas.addEventListener('keydown', (event) => {
@@ -595,7 +725,7 @@ async function createGuest() {
     render();
     if (patternToggle.checked) setPattern(true);
     setStatus(
-      `${vm.name} · booted in ${fmtMs(vm.boot)} · ${vm.mounts.length} files mounted in ~/`,
+      `${vm.name} (${width}×${height}) · booted in ${fmtMs(vm.boot)} · ${vm.mounts.length} files mounted in ~/`,
       true,
     );
     pumpClock();
@@ -661,6 +791,8 @@ window.__appliance = {
   list: () => guests.map((guest) => ({
     id: guest.id,
     name: guest.name,
+    width: guest.width,
+    height: guest.height,
     view: selectionLabel(guest),
     dockVisible: guest.exports ? Boolean(guest.exports.app_dock_visible()) : false,
     renders: guest.frames,
@@ -700,7 +832,7 @@ window.__appliance = {
     return captureSnapshot(guest, false);
   },
   snapshots: () => snapshots.slice(),
-  add: () => createGuest(),
+  add: (opts) => createGuest(opts),
 };
 
 setStatus('booting v2 rust appliance…', true);

@@ -136,6 +136,13 @@
       border-style: solid; border-color: var(--accent-soft); color: var(--accent);
     }
     .btn-bar.primary:hover { background: #2dd4bf15; }
+    .res-select {
+      appearance: none; cursor: pointer; margin-left: 4px;
+      padding: 6px 10px; border-radius: 6px;
+      border: 1px solid var(--line-2); background: var(--panel-2);
+      color: var(--text); font: 11px/1.4 var(--mono); letter-spacing: 0.04em;
+    }
+    .res-select:hover, .res-select:focus { border-color: var(--accent-soft); outline: none; }
 
     .controls-right {
       margin-left: auto; display: flex; align-items: center; gap: 10px;
@@ -153,12 +160,13 @@
     .panels { padding: 14px; }
     .vm-panel[hidden] { display: none; }
     .screen {
+      display: flex; justify-content: center; align-items: center;
       border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
-      background: #000;
+      background: #050709;
       box-shadow: inset 0 0 40px #000000cc, 0 0 0 1px #00000066;
     }
     .screen canvas {
-      display: block; width: 100%; height: auto;
+      display: block; max-width: 100%; max-height: 78vh; width: auto; height: auto;
       image-rendering: pixelated; touch-action: none; outline: none;
       cursor: crosshair;
     }
@@ -271,6 +279,24 @@
   <main class="console">
     <div class="tabbar">
       <div class="tabs" id="tabs" role="tablist" aria-label="guest instances"></div>
+      <select class="res-select" id="vm-res" aria-label="New guest framebuffer resolution" title="Framebuffer resolution for + new guest (locked per session)">
+        <optgroup label="Desktop / HD (Landscape)">
+          <option value="1280x720" selected>720p · 1280×720 (16:9)</option>
+          <option value="1920x1080">1080p · 1920×1080 (16:9)</option>
+          <option value="640x480">VGA · 640×480 (4:3)</option>
+        </optgroup>
+        <optgroup label="Desktop / HD (Portrait)">
+          <option value="720x1280">720p Portrait · 720×1280</option>
+          <option value="1080x1920">1080p Portrait · 1080×1920</option>
+          <option value="480x640">VGA Portrait · 480×640</option>
+        </optgroup>
+        <optgroup label="Mobile Viewport">
+          <option value="390x844">Mobile Portrait · 390×844 (iPhone)</option>
+          <option value="844x390">Mobile Landscape · 844×390 (iPhone)</option>
+          <option value="360x800">Mobile Portrait · 360×800 (Android)</option>
+          <option value="800x360">Mobile Landscape · 800×360 (Android)</option>
+        </optgroup>
+      </select>
       <button class="btn-bar" id="new-vm" type="button">+ new guest</button>
       <div class="controls-right">
         <button class="btn-bar primary" id="step1-btn" type="button" title="Run automated Step 1 pipeline: Open Dock -> Launch About -> Capture Snapshot">▶ run step 1</button>
@@ -281,7 +307,7 @@
     <div class="panels" id="panels"></div>
     <div class="statusbar">
       <span id="sb-left"><span class="ok">ready</span> · click top-left dock button to launch about</span>
-      <span>rgba8888 · 1280×720 · rust wasm32 · <b id="sb-copies">0</b> framebuffer copies</span>
+      <span>rgba8888 · <b id="sb-res">1280×720</b> · rust wasm32 · <b id="sb-copies">0</b> framebuffer copies</span>
     </div>
   </main>
 
@@ -294,7 +320,8 @@
   </section>
 
   <footer class="page">
-    <span>step 1 pipeline: click top-left dock icon <kbd>[≡]</kbd> → click <kbd>ABOUT</kbd> tile (auto-hides dock) → click <kbd>TESTING → CAPTURE SNAPSHOT</kbd> or press <kbd>📷 snapshot</kbd>.</span>
+    <span>shortcuts: dock <kbd>[≡]</kbd> · calc <kbd>0-9 + - * / = Esc</kbd> · mines <kbd>F (flag)</kbd> <kbd>N (new)</kbd> · files <kbd>Tab / I</kbd> (context) · <kbd>[ / ]</kbd> (page).</span>
+    <span>pipeline: click dock <kbd>[≡]</kbd> → <kbd>ABOUT</kbd> → <kbd>TESTING → CAPTURE SNAPSHOT</kbd> or press <kbd>📷 snapshot</kbd>.</span>
   </footer>
 
   <script type="module" src="./host.js"></script>
