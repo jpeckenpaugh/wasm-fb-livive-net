@@ -1,19 +1,42 @@
-# Wasm Framebuffer Media Browser
+# Wasm Framebuffer Media Browser & Appliance
 
-A C application compiled to WebAssembly that owns its entire UI. Every pixel
-inside the panel is drawn by C into an RGBA8888 framebuffer in wasm linear
-memory; the page only forwards input and copies bytes into a Canvas.
+A WebAssembly application that owns its entire UI. Every pixel is drawn into an RGBA8888 framebuffer in Wasm linear memory; the page only forwards input and blits raw bytes into an HTML5 Canvas.
 
-The point is the host/guest boundary, not a browser: no DOM in the guest, no
-image decoder, no fonts, no networking, no OS emulation.
+The point is the host/guest boundary, not a browser: no DOM in the guest, no external UI frameworks, no fonts, no networking, no OS emulation.
 
 ```
-Browser host (HTML + JS)
-  ├── instance manager            web/host.js
+Browser Host (HTML + JS)
+  ├── instance manager            web/host.js & web/v2/host.js
   ├── wasm instance A ── state A ── framebuffer A ── canvas A
   ├── wasm instance B ── state B ── framebuffer B ── canvas B
-  └── input bridge: pointer / keys → _app_click / _app_key
+  └── input / codec bridge: pointer / keys / PNG decoder / TTS
 ```
+
+---
+
+## Implementations
+
+This repository includes two generations:
+
+### 1. Appliance v2 (Rust `#![no_std]` Window Manager) — Recommended
+Located in `v2/` and served at `/v2/`:
+- **Size**: **~75 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
+- **Architecture**: Bare-metal `#![no_std]` Rust (`wasm32-unknown-unknown`), dynamic resolution scaling (360×800 up to 1080p), zero-allocation 2D software rasterizer and bitmap font engine.
+- **Window Manager (`wm.rs`)**: 32px Title Bar with pull-down menus, vertical Left Overlay App Dock, and flat maximized client surfaces.
+- **Applications**:
+  - **System**: FNV-1a 64-bit build attestation (`build.rs`), performance telemetry, and test patterns.
+  - **Calculator**: Interactive desk calculator with formatted separators.
+  - **Minesweeper**: High-performance 8×8 bitboard engine with Classic/Shielded modes and RL observation tensors (`[f32; 64]`).
+  - **Files & Preview**: Two-panel finder browsing `~/wallpapers`, `~/samples`, and upstream GitHub repositories (`gh://mines-sm`). Includes **dynamic font scaling (`+`/`-`)**, **2D scrolling**, **enriched `.context.xml` knowledge graphs**, and **in-browser Text-to-Speech (TTS) narration**.
+- See [docs/v2-appliance.md](docs/v2-appliance.md) and [docs/context-and-tts.md](docs/context-and-tts.md) for full design specifications.
+
+### 2. v1 Media Browser (C99 + Emscripten)
+Located in `src/` and served at `/`:
+- **Size**: ~17.8 MiB `.wasm` binary with compiled-in raw RGBA8888 wallpaper assets.
+- **Navigation**: Horizontal bottom tile carousel (Calendar, Clock, Files, Preview, Calculator).
+- **Design Notes**: See `docs/calc.md`, `docs/clock.md`, `docs/code.md`, `docs/fonts.md`, `docs/markdown.md`.
+
+---
 
 ## Run it
 
