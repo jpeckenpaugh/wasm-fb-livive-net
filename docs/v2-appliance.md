@@ -1,6 +1,6 @@
 # Appliance v2: Minimalist `no_std` Rust Wasm Window Manager & Appliance
 
-`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **75 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, and built-in system attestation.
+`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~90 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, and built-in system attestation.
 
 ```
 Browser Host (web/v2/host.js)
@@ -9,6 +9,8 @@ Browser Host (web/v2/host.js)
   └── Single-threaded Rust Wasm Guest (v2/src/lib.rs)
         ├── Dynamic linear memory paging (__heap_base -> FB + Staging)
         ├── 32px Title Bar + Left Overlay App Dock (wm.rs)
+        ├── Input/result contract (input.rs), responsive size classes (layout.rs)
+        ├── Semantic palette and shared chrome widgets (theme.rs, ui.rs, fmt.rs)
         ├── Zero-allocation 2D Software Rasterizer & Font Engine (fb.rs, font.rs)
         └── Bundled Applications:
               ├── System (system.rs): FNV-1a build attestation, telemetry, test patterns
@@ -24,7 +26,7 @@ Browser Host (web/v2/host.js)
 
 ### 1.1 Pure `#![no_std]` on `wasm32-unknown-unknown`
 - Zero external runtime dependencies, zero standard library (`no_std`), and panic = abort.
-- Compiles down to **~75 KiB** of Wasm bytecode.
+- Compiles down to **~90 KiB** of Wasm bytecode.
 - Linear memory is dynamically grown via `memory_grow` above `__heap_base` in `app_init(width, height)` to support dynamic resolutions ranging from mobile (`360x800`) to 1080p (`1920x1080`).
 
 ### 1.2 Upstream Host Decoding vs. Zero Static Bloat
@@ -40,6 +42,15 @@ Browser Host (web/v2/host.js)
 ### 1.4 Deterministic Attestation (`build.rs`)
 - At compile time, `v2/build.rs` computes an FNV-1a 64-bit digest across the entire `v2` source tree.
 - Surfaced via the **System** app alongside target architecture, compiler version, and profile.
+
+### 1.5 Standardized UI Core
+- `theme.rs`: semantic color tokens; apps no longer carry literal palette values.
+- `layout.rs`: shared `Rect`, `SizeClass` (`Compact` / `Medium` / `Full`), and metrics helpers.
+- `ui.rs`: panel, toolbar, button, dock-tile, separator, and key/value-row widgets.
+- `fmt.rs`: the single allocation-free numeric / date / size / title formatter.
+- `input.rs`: `Key` and `InputResult`; the C ABI still returns `0..3`.
+- `wm.rs` menu labels map to `Command` values, and `WmLayout` is shared by drawing and hit testing.
+- Full-frame FNV hashing is on demand; the host samples telemetry hashes every 10 frames and always requests a fresh hash for snapshots.
 
 ---
 

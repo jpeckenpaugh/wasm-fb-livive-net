@@ -1,6 +1,6 @@
 //! Two-Panel Document Finder & Preview Application (`files.rs`).
 //!
-//! Layout inside the maximized `1280 x 688` client surface:
+//! Layout inside the maximized client surface (default `1280 x 688`):
 //! - Left 1/3 (`x: 0..426`, `w: 426`): `~/` File Browser:
 //!   - `~/wallpapers` (`wallpapers/*`)
 //!   - `~/samples` (`samples/*`)
@@ -11,9 +11,14 @@
 //!   or enriched `.context.xml` Knowledge Graph & Architectural Summary).
 
 use crate::code::{count_total_lines, draw_code_preview, is_image_filename, lang_for_filename};
-use crate::fb::{rgb, Framebuffer};
+use crate::fb::Framebuffer;
+use crate::fmt as f;
 use crate::font::{draw_str, draw_str_centered, draw_str_prop, text_width};
 use crate::icon::{draw_icon, Icon};
+use crate::input::{InputResult, Key};
+use crate::layout::{Metrics, Rect};
+use crate::theme as t;
+use crate::ui;
 
 pub const MAX_MOUNT_FILES: usize = 24;
 pub const MAX_NAME_LEN: usize = 48;
@@ -35,22 +40,16 @@ pub struct FilesGeom {
 }
 
 pub fn files_geom(client_w: i32, client_h: i32) -> FilesGeom {
+    let m = Metrics::new(client_w, client_h);
     let left_w = (client_w / 3).max(120);
     let div_x = left_w;
     let right_x = left_w + 2;
     let right_w = (client_w - right_x).max(160);
     let compact_w = left_w < 240;
-    let compact_h = client_h < 450;
     let pad_x = if compact_w { 8 } else { 24 };
-    let head_y = if compact_h { 12 } else { 24 };
-    let row_start_y = if compact_h { 48 } else { 76 };
-    let row_h = if compact_h {
-        32
-    } else if compact_w {
-        38
-    } else {
-        46
-    };
+    let head_y = m.pick(12, 16, 24);
+    let row_start_y = m.pick(48, 60, 76);
+    let row_h = m.pick(32, 38, 46);
     let row_scale = if compact_w { 1 } else { 2 };
 
     FilesGeom {
@@ -364,6 +363,12 @@ impl FilesApp {
     }
 }
 
+impl Default for FilesApp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn draw_window(
     fb: &mut Framebuffer,
     app: &FilesApp,
@@ -371,12 +376,12 @@ pub fn draw_window(
     staged_text: &[u8],
     staged_context: &[u8],
 ) {
-    fb.clear(rgb(0x0b, 0x10, 0x16));
+    fb.clear(t::BG);
     let g = files_geom(fb.w, fb.h);
 
-    let accent = rgb(0x2d, 0xd4, 0xbf);
-    let label_col = rgb(0x7b, 0x8b, 0x98);
-    let text_col = rgb(0xe6, 0xf1, 0xf8);
+    let accent = t::ACCENT;
+    let label_col = t::TEXT_DIM;
+    let text_col = t::TEXT_BODY;
 
     // --- 1. Left 1/3 Panel: Folder / File Browser ---
     let path_title = match app.level {
@@ -386,7 +391,7 @@ pub fn draw_window(
         FolderLevel::GithubRepo => "GH://MINES-SM",
     };
     let head_scale = if g.left_w < 240 { 2 } else { 3 };
-    draw_str(fb, g.pad_x, g.head_y, path_title, head_scale, rgb(0xf0, 0xf6, 0xfc));
+    draw_str(fb, g.pad_x, g.head_y, path_title, head_scale, t::TEXT);
     fb.fill(
         g.pad_x,
         g.head_y + 10 * head_scale + 2,
@@ -415,7 +420,7 @@ pub fn draw_window(
                 let selected = r == app.row_selected;
 
                 if selected {
-                    fb.fill(g.pad_x, ry, row_w, g.row_h - 4, rgb(0x13, 0x22, 0x2e));
+                    fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_SELECTED);
                     fb.fill(g.pad_x, ry, 4, g.row_h - 4, accent);
                 }
 
@@ -435,12 +440,12 @@ pub fn draw_window(
                     ry + text_pad_y,
                     fname,
                     g.row_scale,
-                    if selected { rgb(0xf0, 0xf6, 0xfc) } else { text_col },
+                    if selected { t::TEXT } else { text_col },
                 );
 
                 if show_meta {
                     let mut cnt_buf = [b' '; 16];
-                    let cnt_str = fmt_items(&mut cnt_buf, fcount);
+                    let cnt_str = f::items_str(&mut cnt_buf, fcount);
                     let cw = text_width(cnt_str, g.row_scale);
                     draw_str(
                         fb,
@@ -452,7 +457,7 @@ pub fn draw_window(
                     );
                 }
 
-                fb.fill(g.pad_x, ry + g.row_h - 4, row_w, 1, rgb(0x18, 0x22, 0x2d));
+                fb.fill(g.pad_x, ry + g.row_h - 4, row_w, 1, t::BORDER_DARK);
             }
         }
         FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
@@ -465,7 +470,7 @@ pub fn draw_window(
                 let selected = r == app.row_selected;
 
                 if selected {
-                    fb.fill(g.pad_x, ry, row_w, g.row_h - 4, rgb(0x13, 0x22, 0x2e));
+                    fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_SELECTED);
                     fb.fill(g.pad_x, ry, 4, g.row_h - 4, accent);
                 }
 
@@ -485,7 +490,7 @@ pub fn draw_window(
                         ry + text_pad_y,
                         "../",
                         g.row_scale,
-                        if selected { rgb(0xf0, 0xf6, 0xfc) } else { text_col },
+                        if selected { t::TEXT } else { text_col },
                     );
                     if show_meta {
                         let up_lbl = "UP";
@@ -531,12 +536,12 @@ pub fn draw_window(
                         ry + text_pad_y,
                         name_clamped,
                         g.row_scale,
-                        if selected { rgb(0xf0, 0xf6, 0xfc) } else { text_col },
+                        if selected { t::TEXT } else { text_col },
                     );
 
                     if show_meta {
                         let mut sz_buf = [b' '; 16];
-                        let sz_str = fmt_size(&mut sz_buf, entry.byte_size);
+                        let sz_str = f::size_str(&mut sz_buf, entry.byte_size);
                         let sw = text_width(sz_str, g.row_scale);
                         draw_str(
                             fb,
@@ -549,13 +554,13 @@ pub fn draw_window(
                     }
                 }
 
-                fb.fill(g.pad_x, ry + g.row_h - 4, row_w, 1, rgb(0x18, 0x22, 0x2d));
+                fb.fill(g.pad_x, ry + g.row_h - 4, row_w, 1, t::BORDER_DARK);
             }
         }
     }
 
     // --- 2. Vertical Split Divider ---
-    fb.fill(g.div_x, 0, 2, fb.h, rgb(0x22, 0x30, 0x3e));
+    fb.fill(g.div_x, 0, 2, fb.h, t::BORDER);
 
     // --- 3. Right 2/3 Panel: Control Bar + Preview ---
     if let Some(sel_idx) = app.active_file_idx() {
@@ -639,6 +644,67 @@ pub fn draw_window(
     }
 }
 
+struct PreviewControls {
+    mode: Rect,
+    ap: Rect,
+    am: Rect,
+    tts: Rect,
+    prev: Option<Rect>,
+    next: Option<Rect>,
+}
+
+/// One source of truth for the right-pane control bar geometry. Draw and hit
+/// testing both use this layout so they cannot drift apart.
+fn preview_controls(app: &FilesApp, g: &FilesGeom, is_image: bool) -> PreviewControls {
+    let mode_w = text_width(
+        if app.context_mode {
+            "[ RAW VIEW ]"
+        } else {
+            "[ CONTEXT ]"
+        },
+        1,
+    ) + 12;
+    let mode_x = g.right_x + g.right_w - mode_w - 12;
+
+    let ap_w = text_width("[ A+ ]", 1) + 8;
+    let am_w = text_width("[ A- ]", 1) + 8;
+    let ap_x = mode_x - ap_w - 8;
+    let am_x = ap_x - am_w - 4;
+
+    let tts_w = text_width(
+        if app.tts_active {
+            "[ \u{23f9} STOP ]"
+        } else {
+            "[ \u{25b6} TTS ]"
+        },
+        1,
+    ) + 10;
+    let tts_x = am_x - tts_w - 8;
+
+    let show_paging = !app.context_mode && !is_image && app.staged_text_idx == app.selected as i32;
+    let (prev, next) = if show_paging {
+        let next_w = text_width("[\u{25bc} NEXT]", 1) + 8;
+        let prev_w = text_width("[\u{25b2} PREV]", 1) + 8;
+        let next_x = tts_x - next_w - 8;
+        let prev_x = next_x - prev_w - 4;
+        (
+            Some(Rect::new(prev_x, 8, prev_w, 24)),
+            Some(Rect::new(next_x, 8, next_w, 24)),
+        )
+    } else {
+        (None, None)
+    };
+
+    PreviewControls {
+        mode: Rect::new(mode_x, 7, mode_w, 26),
+        ap: Rect::new(ap_x, 8, ap_w, 24),
+        am: Rect::new(am_x, 8, am_w, 24),
+        tts: Rect::new(tts_x, 8, tts_w, 24),
+        prev,
+        next,
+    }
+}
+
 fn draw_preview_control_bar(
     fb: &mut Framebuffer,
     app: &FilesApp,
@@ -646,93 +712,60 @@ fn draw_preview_control_bar(
     entry: &MountEntry,
     staged_text: &[u8],
 ) {
-    let bar_h = 40;
-    fb.fill(g.right_x, 0, g.right_w, bar_h, rgb(0x0e, 0x16, 0x20));
-    fb.fill(g.right_x, bar_h - 1, g.right_w, 1, rgb(0x22, 0x30, 0x3e));
+    ui::toolbar(fb, Rect::new(g.right_x, 0, g.right_w, 40));
 
-    let accent = rgb(0x2d, 0xd4, 0xbf);
-    let label_col = rgb(0x7b, 0x8b, 0x98);
-    let text_col = rgb(0xf0, 0xf6, 0xfc);
-
-    // Left Title
     let mut title_buf = [0u8; 64];
     let title = fmt_file_title(&mut title_buf, app.level, entry.base_name());
-    draw_str(fb, g.right_x + 12, 14, title, 1, text_col);
+    draw_str(fb, g.right_x + 12, 14, title, 1, t::TEXT);
 
-    // Right Controls
-    // 1) Mode button on far right: [ RAW VIEW ] or [ CONTEXT ]
-    let mode_btn_txt = if app.context_mode {
-        "[ RAW VIEW ]"
-    } else {
-        "[ CONTEXT ]"
-    };
-    let mode_w = text_width(mode_btn_txt, 1) + 12;
-    let mode_x = g.right_x + g.right_w - mode_w - 12;
+    let c = preview_controls(app, g, entry.is_image());
+    ui::button(
+        fb,
+        c.mode,
+        if app.context_mode {
+            "[ RAW VIEW ]"
+        } else {
+            "[ CONTEXT ]"
+        },
+        ui::Tone::Accent,
+        1,
+    );
+    ui::button(fb, c.ap, "[ A+ ]", ui::Tone::Neutral, 1);
+    ui::button(fb, c.am, "[ A- ]", ui::Tone::Neutral, 1);
+    ui::button(
+        fb,
+        c.tts,
+        if app.tts_active {
+            "[ \u{23f9} STOP ]"
+        } else {
+            "[ \u{25b6} TTS ]"
+        },
+        if app.tts_active {
+            ui::Tone::Success
+        } else {
+            ui::Tone::Neutral
+        },
+        1,
+    );
 
-    fb.fill(mode_x, 7, mode_w, 26, rgb(0x18, 0x26, 0x33));
-    fb.border(mode_x, 7, mode_w, 26, 1, accent);
-    draw_str_centered(fb, mode_x, 7, mode_w, 26, mode_btn_txt, 1, accent);
-
-    // 2) Font scale buttons: [ A- ] and [ A+ ]
-    let ap_w = text_width("[ A+ ]", 1) + 8;
-    let am_w = text_width("[ A- ]", 1) + 8;
-    let ap_x = mode_x - ap_w - 8;
-    let am_x = ap_x - am_w - 4;
-
-    fb.fill(ap_x, 8, ap_w, 24, rgb(0x14, 0x1f, 0x2a));
-    fb.border(ap_x, 8, ap_w, 24, 1, rgb(0x2e, 0x3f, 0x50));
-    draw_str_centered(fb, ap_x, 8, ap_w, 24, "[ A+ ]", 1, text_col);
-
-    fb.fill(am_x, 8, am_w, 24, rgb(0x14, 0x1f, 0x2a));
-    fb.border(am_x, 8, am_w, 24, 1, rgb(0x2e, 0x3f, 0x50));
-    draw_str_centered(fb, am_x, 8, am_w, 24, "[ A- ]", 1, text_col);
-
-    // 3) TTS button: [ ▶ TTS ] (idle) or [ ⏹ STOP ] (active)
-    let tts_btn_txt = if app.tts_active {
-        "[ ⏹ STOP ]"
-    } else {
-        "[ ▶ TTS ]"
-    };
-    let tts_w = text_width(tts_btn_txt, 1) + 10;
-    let tts_x = am_x - tts_w - 8;
-
-    let (tts_bg, tts_border, tts_fg) = if app.tts_active {
-        (rgb(0x1a, 0x2e, 0x22), rgb(0x2d, 0xd4, 0xbf), rgb(0x34, 0xd3, 0x99))
-    } else {
-        (rgb(0x14, 0x1f, 0x2a), rgb(0x2e, 0x3f, 0x50), text_col)
-    };
-    fb.fill(tts_x, 8, tts_w, 24, tts_bg);
-    fb.border(tts_x, 8, tts_w, 24, 1, tts_border);
-    draw_str_centered(fb, tts_x, 8, tts_w, 24, tts_btn_txt, 1, tts_fg);
-
-    // 4) If in raw code mode: [▼ NEXT], [▲ PREV], and range indicator 1..30 / N
-    if !app.context_mode && !entry.is_image() && app.staged_text_idx == app.selected as i32 {
+    if let (Some(prev), Some(next)) = (c.prev, c.next) {
         let total_lines = count_total_lines(&staged_text[..app.staged_text_len]);
         let start_line = app.code_scroll + 1;
         let end_line = (app.code_scroll + CODE_CHUNK_LINES).min(total_lines.max(1));
-
         let mut range_buf = [b' '; 24];
-        let range_str = fmt_line_range(&mut range_buf, start_line as u32, end_line as u32, total_lines as u32);
+        let range_str = f::line_range(
+            &mut range_buf,
+            start_line as u32,
+            end_line as u32,
+            total_lines as u32,
+        );
         let rw = text_width(range_str, 1);
-
-        let next_w = text_width("[▼ NEXT]", 1) + 8;
-        let prev_w = text_width("[▲ PREV]", 1) + 8;
-
-        let next_x = tts_x - next_w - 8;
-        let prev_x = next_x - prev_w - 4;
-        let range_x = prev_x - rw - 8;
-
+        let range_x = prev.x - rw - 8;
         if range_x > g.right_x + text_width(title, 1) + 16 {
-            draw_str(fb, range_x, 14, range_str, 1, label_col);
-
-            fb.fill(prev_x, 8, prev_w, 24, rgb(0x14, 0x1f, 0x2a));
-            fb.border(prev_x, 8, prev_w, 24, 1, rgb(0x2e, 0x3f, 0x50));
-            draw_str_centered(fb, prev_x, 8, prev_w, 24, "[▲ PREV]", 1, text_col);
-
-            fb.fill(next_x, 8, next_w, 24, rgb(0x14, 0x1f, 0x2a));
-            fb.border(next_x, 8, next_w, 24, 1, rgb(0x2e, 0x3f, 0x50));
-            draw_str_centered(fb, next_x, 8, next_w, 24, "[▼ NEXT]", 1, text_col);
+            draw_str(fb, range_x, 14, range_str, 1, t::TEXT_DIM);
         }
+        ui::button(fb, prev, "[\u{25b2} PREV]", ui::Tone::Neutral, 1);
+        ui::button(fb, next, "[\u{25bc} NEXT]", ui::Tone::Neutral, 1);
     }
 }
 
@@ -765,24 +798,6 @@ fn fmt_file_title<'a>(buf: &'a mut [u8; 64], level: FolderLevel, base_name: &str
     core::str::from_utf8(&buf[..pos]).unwrap_or("")
 }
 
-fn fmt_line_range<'a>(buf: &'a mut [u8; 24], start: u32, end: u32, total: u32) -> &'a str {
-    let mut pos = write_u32(buf, 0, start);
-    if pos + 2 < buf.len() {
-        buf[pos] = b'.';
-        buf[pos + 1] = b'.';
-        pos += 2;
-    }
-    pos = write_u32(buf, pos, end);
-    if pos + 3 < buf.len() {
-        buf[pos] = b' ';
-        buf[pos + 1] = b'/';
-        buf[pos + 2] = b' ';
-        pos += 3;
-    }
-    pos = write_u32(buf, pos, total);
-    core::str::from_utf8(&buf[..pos]).unwrap_or("")
-}
-
 fn draw_context_preview(
     fb: &mut Framebuffer,
     app: &FilesApp,
@@ -794,10 +809,10 @@ fn draw_context_preview(
     let rx = g.right_x + pad;
     let content_w = (g.right_w - 2 * pad).max(40);
 
-    let accent = rgb(0x2d, 0xd4, 0xbf);
-    let key_col = rgb(0xf5, 0x9e, 0x0b); // warm amber for KG keys
-    let label_col = rgb(0x7b, 0x8b, 0x98);
-    let text_col = rgb(0xe6, 0xf1, 0xf8);
+    let accent = t::ACCENT;
+    let key_col = t::WARNING; // warm amber for KG keys
+    let label_col = t::TEXT_DIM;
+    let text_col = t::TEXT_BODY;
 
     let scroll_px = (app.context_scroll as i32) * 14;
     let mut y = 50 - scroll_px;
@@ -818,11 +833,12 @@ fn draw_context_preview(
         if y >= 40 && y + 16 <= fb.h {
             draw_str(fb, rx, y, key, 1, key_col);
 
-            let val = find_context_field(context_data, key.as_bytes()).unwrap_or(if key == "SCOPE" {
-                entry.name_str()
-            } else {
-                "—"
-            });
+            let val =
+                find_context_field(context_data, key.as_bytes()).unwrap_or(if key == "SCOPE" {
+                    entry.name_str()
+                } else {
+                    "—"
+                });
 
             // Max characters fitting in remaining width
             let val_w = content_w - key_w;
@@ -840,7 +856,7 @@ fn draw_context_preview(
 
     y += 6;
     if y >= 40 && y < fb.h {
-        fb.fill(rx, y, content_w, 1, rgb(0x22, 0x30, 0x3e));
+        fb.fill(rx, y, content_w, 1, t::BORDER);
     }
     y += 12;
 
@@ -954,15 +970,10 @@ pub fn draw_word_wrapped_paragraph(
     y
 }
 
-fn draw_folder_summary(
-    fb: &mut Framebuffer,
-    app: &FilesApp,
-    g: &FilesGeom,
-    folder: FolderLevel,
-) {
-    let accent = rgb(0x2d, 0xd4, 0xbf);
-    let label_col = rgb(0x7b, 0x8b, 0x98);
-    let text_col = rgb(0xe6, 0xf1, 0xf8);
+fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, folder: FolderLevel) {
+    let accent = t::ACCENT;
+    let label_col = t::TEXT_DIM;
+    let text_col = t::TEXT_BODY;
 
     let pad = if g.right_w < 400 { 16 } else { 48 };
     let rx = g.right_x + pad;
@@ -981,10 +992,17 @@ fn draw_folder_summary(
 
     let head_sc = if g.right_w < 360 { 2 } else { 3 };
     let body_sc = if g.right_w < 360 { 1 } else { 2 };
-    draw_str(fb, rx, g.head_y, title, head_sc, rgb(0xf0, 0xf6, 0xfc));
-    draw_str(fb, rx, g.head_y + 10 * head_sc + 4, subtitle, body_sc, accent);
+    draw_str(fb, rx, g.head_y, title, head_sc, t::TEXT);
+    draw_str(
+        fb,
+        rx,
+        g.head_y + 10 * head_sc + 4,
+        subtitle,
+        body_sc,
+        accent,
+    );
     let rule_y = g.head_y + 10 * head_sc + 4 + 10 * body_sc + 4;
-    fb.fill(rx, rule_y, (g.right_w - 2 * pad).max(40), 1, rgb(0x22, 0x30, 0x3e));
+    fb.fill(rx, rule_y, (g.right_w - 2 * pad).max(40), 1, t::BORDER);
 
     let mut row = 0i32;
     let step = if body_sc == 1 { 22 } else { 34 };
@@ -1000,7 +1018,7 @@ fn draw_folder_summary(
         draw_str(fb, rx, ry, entry.base_name(), body_sc, text_col);
 
         let mut sz_buf = [b' '; 16];
-        let sz_str = fmt_size(&mut sz_buf, entry.byte_size);
+        let sz_str = f::size_str(&mut sz_buf, entry.byte_size);
         let sw = text_width(sz_str, body_sc);
         draw_str(
             fb,
@@ -1014,15 +1032,21 @@ fn draw_folder_summary(
     }
 }
 
-pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_h: i32) -> i32 {
+pub fn click_window(
+    app: &mut FilesApp,
+    cx: i32,
+    cy: i32,
+    client_w: i32,
+    client_h: i32,
+) -> InputResult {
     let g = files_geom(client_w, client_h);
 
-    // Left Panel clicks
+    // Left panel: folder / file browser rows.
     if cx < g.left_w && cy >= g.row_start_y {
         let row = ((cy - g.row_start_y) / g.row_h) as usize;
         let vis = app.visible_row_count();
         if row >= vis {
-            return 0;
+            return InputResult::Noop;
         }
         match app.level {
             FolderLevel::HomeRoot => {
@@ -1033,11 +1057,11 @@ pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_
                 } else {
                     FolderLevel::GithubRepo
                 };
-                return if app.open_subfolder(folder) { 1 } else { 0 };
+                return InputResult::from(app.open_subfolder(folder));
             }
             FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
                 if row == 0 {
-                    return if app.go_parent() { 1 } else { 0 };
+                    return InputResult::from(app.go_parent());
                 }
                 if let Some(gidx) = app.global_idx_for_row(app.level, row) {
                     let is_img = app.entries[gidx].is_image();
@@ -1052,95 +1076,58 @@ pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_
                     app.code_col_scroll = 0;
                     app.context_scroll = 0;
                     app.ensure_selected_staged();
-                    return if changed { 1 } else { 0 };
+                    return InputResult::from(changed);
                 }
             }
         }
     }
 
-    // Right Panel Control Bar clicks (`cy < 40`, `cx >= g.right_x`)
+    // Right panel: shared control-bar geometry.
     if cx >= g.right_x && cy < 40 {
         if let Some(sel_idx) = app.active_file_idx() {
-            let entry = &app.entries[sel_idx];
+            let c = preview_controls(app, &g, app.entries[sel_idx].is_image());
 
-            // 1. Check [ CONTEXT ] / [ RAW VIEW ] hit
-            let mode_btn_txt = if app.context_mode {
-                "[ RAW VIEW ]"
-            } else {
-                "[ CONTEXT ]"
-            };
-            let mode_w = text_width(mode_btn_txt, 1) + 12;
-            let mode_x = g.right_x + g.right_w - mode_w - 12;
-
-            if cx >= mode_x && cx < mode_x + mode_w && cy >= 7 && cy <= 33 {
+            if c.mode.contains(cx, cy) {
                 app.context_mode = !app.context_mode;
-                return 1;
+                return InputResult::Changed;
             }
-
-            // 2. Check [ A+ ] / [ A- ] hits
-            let ap_w = text_width("[ A+ ]", 1) + 8;
-            let am_w = text_width("[ A- ]", 1) + 8;
-            let ap_x = mode_x - ap_w - 8;
-            let am_x = ap_x - am_w - 4;
-
-            if cy >= 8 && cy <= 32 {
-                if cx >= ap_x && cx < ap_x + ap_w {
-                    app.font_scale = (app.font_scale + 1).min(3);
-                    return 1;
-                }
-                if cx >= am_x && cx < am_x + am_w {
-                    app.font_scale = (app.font_scale - 1).max(1);
-                    return 1;
-                }
+            if c.ap.contains(cx, cy) {
+                app.font_scale = (app.font_scale + 1).min(3);
+                return InputResult::Changed;
             }
-
-            // 3. Check TTS button hit
-            let tts_btn_txt = if app.tts_active {
-                "[ ⏹ STOP ]"
-            } else {
-                "[ ▶ TTS ]"
-            };
-            let tts_w = text_width(tts_btn_txt, 1) + 10;
-            let tts_x = am_x - tts_w - 8;
-
-            if cy >= 8 && cy <= 32 && cx >= tts_x && cx < tts_x + tts_w {
+            if c.am.contains(cx, cy) {
+                app.font_scale = (app.font_scale - 1).max(1);
+                return InputResult::Changed;
+            }
+            if c.tts.contains(cx, cy) {
                 app.tts_active = !app.tts_active;
-                return 3; // TTS click
+                return InputResult::Tts;
             }
-
-            // 4. Check [▲ PREV] / [▼ NEXT] hits (if in raw code view)
-            if !app.context_mode && !entry.is_image() && app.staged_text_idx == sel_idx as i32 {
-                let next_w = text_width("[▼ NEXT]", 1) + 8;
-                let prev_w = text_width("[▲ PREV]", 1) + 8;
-                let next_x = tts_x - next_w - 8;
-                let prev_x = next_x - prev_w - 4;
-
-                if cy >= 8 && cy <= 32 {
-                    if cx >= prev_x && cx < prev_x + prev_w {
-                        app.code_scroll = app.code_scroll.saturating_sub(CODE_CHUNK_LINES);
-                        return 1;
-                    }
-                    if cx >= next_x && cx < next_x + next_w {
-                        // Advance scroll
-                        app.code_scroll = app.code_scroll.saturating_add(CODE_CHUNK_LINES);
-                        return 1;
-                    }
+            if let Some(prev) = c.prev {
+                if prev.contains(cx, cy) {
+                    app.code_scroll = app.code_scroll.saturating_sub(CODE_CHUNK_LINES);
+                    return InputResult::Changed;
+                }
+            }
+            if let Some(next) = c.next {
+                if next.contains(cx, cy) {
+                    app.code_scroll = app.code_scroll.saturating_add(CODE_CHUNK_LINES);
+                    return InputResult::Changed;
                 }
             }
         }
     }
 
-    0
+    InputResult::Noop
 }
 
-pub fn key_window(app: &mut FilesApp, code: i32) -> bool {
+pub fn key_window(app: &mut FilesApp, key: Key) -> InputResult {
     let vis = app.visible_row_count();
     if vis == 0 {
-        return false;
+        return InputResult::Noop;
     }
-    match code {
-        // Up arrow or Left arrow selects previous row
-        50 | 1 => {
+    match key {
+        Key::Up | Key::Left => {
             app.row_selected = if app.row_selected == 0 {
                 vis - 1
             } else {
@@ -1150,72 +1137,60 @@ pub fn key_window(app: &mut FilesApp, code: i32) -> bool {
             app.code_col_scroll = 0;
             app.context_scroll = 0;
             app.ensure_selected_staged();
-            true
+            InputResult::Changed
         }
-        // Down arrow or Right arrow selects next row
-        51 | 2 => {
+        Key::Down | Key::Right => {
             app.row_selected = (app.row_selected + 1) % vis;
             app.code_scroll = 0;
             app.code_col_scroll = 0;
             app.context_scroll = 0;
             app.ensure_selected_staged();
-            true
+            InputResult::Changed
         }
-        // Backspace (26) goes up to `~/`
-        26 => app.go_parent(),
-        // Tab / I (33) toggles context mode
-        33 => {
+        Key::Backspace => InputResult::from(app.go_parent()),
+        Key::Tab => {
             app.context_mode = !app.context_mode;
-            true
+            InputResult::Changed
         }
-        // Key code 20 ('+' / '='): increase font scale
-        20 => {
+        Key::Plus => {
             app.font_scale = (app.font_scale + 1).min(3);
-            true
+            InputResult::Changed
         }
-        // Key code 21 ('-'): decrease font scale
-        21 => {
+        Key::Minus => {
             app.font_scale = (app.font_scale - 1).max(1);
-            true
+            InputResult::Changed
         }
-        // Key code 36 ('{' / Shift+Left): scroll code columns left
-        36 => {
+        Key::ScrollLeft => {
             app.code_col_scroll = app.code_col_scroll.saturating_sub(8);
-            true
+            InputResult::Changed
         }
-        // Key code 37 ('}' / Shift+Right): scroll code columns right
-        37 => {
+        Key::ScrollRight => {
             app.code_col_scroll = app.code_col_scroll.saturating_add(8);
-            true
+            InputResult::Changed
         }
-        // Key code 38 (scroll down): code scroll down by 5, context scroll down by 2
-        38 => {
+        Key::ScrollDown => {
             app.code_scroll = app.code_scroll.saturating_add(5);
             app.context_scroll = app.context_scroll.saturating_add(2);
-            true
+            InputResult::Changed
         }
-        // Key code 39 (scroll up): code scroll up by 5, context scroll up by 2
-        39 => {
+        Key::ScrollUp => {
             app.code_scroll = app.code_scroll.saturating_sub(5);
             app.context_scroll = app.context_scroll.saturating_sub(2);
-            true
+            InputResult::Changed
         }
-        // PageUp / [ (34) scrolls code chunk up
-        34 => {
+        Key::PageUp => {
             if app.code_scroll > 0 {
                 app.code_scroll = app.code_scroll.saturating_sub(CODE_CHUNK_LINES);
-                true
+                InputResult::Changed
             } else {
-                false
+                InputResult::Noop
             }
         }
-        // PageDown / ] (35) scrolls code chunk down
-        35 => {
+        Key::PageDown => {
             app.code_scroll = app.code_scroll.saturating_add(CODE_CHUNK_LINES);
-            true
+            InputResult::Changed
         }
-        // Enter (24) opens folder, goes up on `../`, or pins wallpaper on an image
-        24 => match app.level {
+        Key::Enter => match app.level {
             FolderLevel::HomeRoot => {
                 let folder = if app.row_selected == 0 {
                     FolderLevel::HomeWallpapers
@@ -1224,24 +1199,24 @@ pub fn key_window(app: &mut FilesApp, code: i32) -> bool {
                 } else {
                     FolderLevel::GithubRepo
                 };
-                app.open_subfolder(folder)
+                InputResult::from(app.open_subfolder(folder))
             }
             FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
                 if app.row_selected == 0 {
-                    return app.go_parent();
+                    return InputResult::from(app.go_parent());
                 }
                 if app.selected_is_image() {
                     if let Some(gidx) = app.active_file_idx() {
                         app.wallpaper_active = true;
                         app.wallpaper_idx = gidx as i32;
                         app.ensure_selected_staged();
-                        return true;
+                        return InputResult::Changed;
                     }
                 }
-                false
+                InputResult::Noop
             }
         },
-        _ => false,
+        _ => InputResult::Noop,
     }
 }
 
@@ -1255,90 +1230,11 @@ pub fn draw_dock_tile(
     h: i32,
     active: bool,
 ) {
-    let bg = if active {
-        rgb(0x13, 0x22, 0x2b)
-    } else {
-        rgb(0x10, 0x17, 0x20)
-    };
-    let border = if active {
-        rgb(0x2d, 0xd4, 0xbf)
-    } else {
-        rgb(0x2e, 0x3f, 0x50)
-    };
-    fb.fill(x, y, w, h, bg);
-    fb.border(x, y, w, h, 2, border);
-    fb.fill(x + 2, y + 2, w - 4, 4, rgb(0x2d, 0xd4, 0xbf));
-
-    draw_icon(fb, x + 10, y + 24, Icon::Files, 32, rgb(0x2d, 0xd4, 0xbf));
-    draw_str_prop(fb, x + 48, y + 18, "FILES", 2, rgb(0xf0, 0xf6, 0xfc));
+    ui::dock_tile(fb, Rect::new(x, y, w, h), active);
+    draw_icon(fb, x + 10, y + 24, Icon::Files, 32, t::ACCENT);
+    draw_str_prop(fb, x + 48, y + 18, "FILES", 2, t::TEXT);
 
     let mut sub_buf = [b' '; 16];
-    let sub_str = fmt_mount_count(&mut sub_buf, app.count as u32);
-    draw_str_prop(fb, x + 48, y + 42, sub_str, 1, rgb(0x2d, 0xd4, 0xbf));
-}
-
-fn fmt_items(buf: &mut [u8; 16], count: u32) -> &str {
-    let mut pos = write_u32(buf, 0, count);
-    for &b in b" ITEMS" {
-        if pos < buf.len() {
-            buf[pos] = b;
-            pos += 1;
-        }
-    }
-    core::str::from_utf8(&buf[..pos]).unwrap_or("")
-}
-
-fn fmt_size(buf: &mut [u8; 16], bytes: u32) -> &str {
-    if bytes < 1024 {
-        let mut pos = write_u32(buf, 0, bytes);
-        if pos < buf.len() {
-            buf[pos] = b'B';
-            pos += 1;
-        }
-        return core::str::from_utf8(&buf[..pos]).unwrap_or("");
-    }
-    let kib = (bytes + 512) / 1024;
-    let mut pos = write_u32(buf, 0, kib.max(1));
-    if pos < buf.len() {
-        buf[pos] = b'K';
-        pos += 1;
-    }
-    core::str::from_utf8(&buf[..pos]).unwrap_or("")
-}
-
-fn fmt_mount_count(buf: &mut [u8; 16], count: u32) -> &str {
-    let mut pos = 0;
-    for &b in b"~/ (" {
-        buf[pos] = b;
-        pos += 1;
-    }
-    pos = write_u32(buf, pos, count);
-    if pos < buf.len() {
-        buf[pos] = b')';
-        pos += 1;
-    }
-    core::str::from_utf8(&buf[..pos]).unwrap_or("~/")
-}
-
-fn write_u32(buf: &mut [u8], mut pos: usize, mut val: u32) -> usize {
-    if val == 0 {
-        if pos < buf.len() {
-            buf[pos] = b'0';
-            pos += 1;
-        }
-        return pos;
-    }
-    let mut tmp = [0u8; 10];
-    let mut n = 0;
-    while val > 0 {
-        tmp[n] = b'0' + (val % 10) as u8;
-        val /= 10;
-        n += 1;
-    }
-    while n > 0 && pos < buf.len() {
-        n -= 1;
-        buf[pos] = tmp[n];
-        pos += 1;
-    }
-    pos
+    let sub_str = f::mount_count(&mut sub_buf, app.count as u32);
+    draw_str_prop(fb, x + 48, y + 42, sub_str, 1, t::ACCENT);
 }

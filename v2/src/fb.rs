@@ -179,23 +179,14 @@ impl<'a> Framebuffer<'a> {
             let src_off = sy * (sw as usize) + sx;
             let dst_off = (row as usize) * self.stride + (x0 as usize);
             if src_off + copy_w <= src.len() && dst_off + copy_w <= self.px.len() {
-                self.px[dst_off..dst_off + copy_w]
-                    .copy_from_slice(&src[src_off..src_off + copy_w]);
+                self.px[dst_off..dst_off + copy_w].copy_from_slice(&src[src_off..src_off + copy_w]);
             }
         }
     }
 
     /// Nearest-neighbor scaled blit of a `sw x sh` `u32` buffer into `(x, y, dw, dh)`.
-    pub fn blit_scaled(
-        &mut self,
-        x: i32,
-        y: i32,
-        dw: i32,
-        dh: i32,
-        src: &[u32],
-        sw: i32,
-        sh: i32,
-    ) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn blit_scaled(&mut self, x: i32, y: i32, dw: i32, dh: i32, src: &[u32], sw: i32, sh: i32) {
         if dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0 {
             return;
         }
@@ -207,7 +198,8 @@ impl<'a> Framebuffer<'a> {
             return;
         }
         for row in y0..y1 {
-            let sy = (((row - y) as i64 * sh as i64) / dh as i64).clamp(0, (sh - 1) as i64) as usize;
+            let sy =
+                (((row - y) as i64 * sh as i64) / dh as i64).clamp(0, (sh - 1) as i64) as usize;
             let src_row = sy * (sw as usize);
             let dst_row = (row as usize) * self.stride;
             for col in x0..x1 {

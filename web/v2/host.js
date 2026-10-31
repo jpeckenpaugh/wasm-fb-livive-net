@@ -14,6 +14,11 @@ const DEFAULT_W = 1280;
 const DEFAULT_H = 720;
 const TITLE_H = 32;
 
+/* Full-frame hashing is intentionally on demand in the guest. Sampling it every
+ * N frames keeps the telemetry hash live without scanning 1080p pixels on every
+ * click. Snapshots always request a fresh hash. */
+const HASH_EVERY_N_FRAMES = 10;
+
 /* Network mount catalog (`~/wallpapers/*` and `~/samples/*`) served by the JS Hypervisor */
 const DEFAULT_MOUNTS = [
   { name: 'wallpapers/01_aurora.png',  url: '../assets/01_aurora.png',  bytes: 493568, kind: 'image' },
@@ -40,6 +45,7 @@ const fetchedTextCache = new Map();
 const contextXmlCache = new Map();
 const textEncoder = new TextEncoder();
 
+/* Flat key namespace mirrored by `v2/src/input.rs::Key`. Keep both in sync. */
 const KEY_CODES = {
   ArrowLeft: 1,
   ArrowRight: 2,
@@ -632,12 +638,15 @@ function recordSnapshotCard(snap) {
 
 function captureSnapshot(guest, alreadyRecordedInGuest = false) {
   if (!guest || !guest.exports || !guest.canvas) return null;
+  let hash;
   if (!alreadyRecordedInGuest) {
     syncWallClock(guest);
-    guest.exports.app_record_snapshot();
+    hash = guest.exports.app_record_snapshot() >>> 0;
     guest.render();
+  } else {
+    hash = guest.exports.app_fb_hash() >>> 0;
   }
-  const hash = guest.exports.app_fb_hash() >>> 0;
+  guest.fbHash = hash;
   const hashHex = fmtHex32(hash);
   const seq = guest.exports.app_snapshot_count() >>> 0;
   const view = selectionLabel(guest);
@@ -744,7 +753,9 @@ async function createGuest(opts = {}) {
       vm.last = { render: t1 - t0, blit: t2 - t1, present: t3 - t2 };
       vm.frames += 1;
       totalBlits += 1;
-      vm.fbHash = exports.app_fb_hash() >>> 0;
+      if (vm.frames === 1 || vm.frames % HASH_EVERY_N_FRAMES === 0) {
+        vm.fbHash = exports.app_fb_hash() >>> 0;
+      }
       updateGuestStats(vm);
       updateHostStats();
     };
@@ -903,6 +914,9 @@ window.__appliance = {
     const guest = guests.find((candidate) => candidate.id === id) || guests[0];
     if (!guest || !guest.clickLogical) return null;
     const rc = guest.clickLogical(x, y);
+    // Test-harness callers want the exact post-click pixel state, not the
+    // throttled telemetry sample.
+    if (guest.exports) guest.fbHash = guest.exports.app_fb_hash() >>> 0;
     return {
       rc,
       view: selectionLabel(guest),

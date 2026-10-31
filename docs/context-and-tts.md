@@ -64,7 +64,7 @@ The Right 2/3 Preview control bar (`y: 0..40`) provides interactive viewport adj
 ## 4. Text-To-Speech (TTS) Hypervisor Bridge
 
 Inside the `Files` control bar, users can click **`[ ▶ TTS ]`**:
-1. The guest marks `tts_active = true`, renders the button as `[ ■ STOP ]` in emerald green, and returns `rc = 3` (`CLICK_TTS`) from `app_click`.
+1. The guest marks `tts_active = true`, renders the button as `[ ⏹ STOP ]` in emerald green, and returns `InputResult::Tts` (`rc = 3`, `CLICK_TTS`) from `app_click`.
 2. The JS hypervisor catches `rc = 3`, reads the active context metadata (`ROLE`, `SUMMARY`, `ARCHITECTURE`) from Wasm linear memory, and synthesizes speech using the browser's native **Web Speech API (`window.speechSynthesis`)**.
 3. Clicking `[ ■ STOP ]` immediately calls `window.speechSynthesis.cancel()`.
 4. When the utterance finishes, `utterance.onend` calls `guest.exports.app_tts_set_active(0)` to reset the button state.

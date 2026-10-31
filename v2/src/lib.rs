@@ -4,17 +4,23 @@ pub mod calc;
 pub mod code;
 pub mod fb;
 pub mod files;
+pub mod fmt;
 pub mod font;
 pub mod glyph;
 pub mod icon;
+pub mod input;
+pub mod layout;
 pub mod mine_sm;
 pub mod mines;
 pub mod system;
+pub mod theme;
+pub mod ui;
 pub mod wm;
 
 use core::cell::UnsafeCell;
 use fb::{Framebuffer, DEFAULT_H, DEFAULT_W, MAX_DIM, MAX_PIXELS};
 use files::{MAX_CONTEXT_BYTES, MAX_TEXT_BYTES};
+use input::Key;
 use wm::{AppSlot, WmState};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -139,9 +145,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     core::arch::wasm32::unreachable()
 }
 
-fn with_state<R>(
-    f: impl FnOnce(&mut WmState, &mut Framebuffer, &[u32], &[u8], &[u8]) -> R,
-) -> R {
+fn with_state<R>(f: impl FnOnce(&mut WmState, &mut Framebuffer, &[u32], &[u8], &[u8]) -> R) -> R {
     unsafe {
         let wm = &mut *GUEST.wm.get();
         let w = wm.width.clamp(1, MAX_DIM);
@@ -209,21 +213,24 @@ pub extern "C" fn app_render() {
 pub extern "C" fn app_click(x: i32, y: i32) -> i32 {
     with_state(|wm, fb, st, txt, ctx| {
         let rc = wm.click(x, y);
-        if rc != 0 {
+        if rc.is_changed() {
             wm.render(fb, st, txt, ctx);
         }
-        rc
+        rc.to_i32()
     })
 }
 
 #[no_mangle]
 pub extern "C" fn app_key(key: i32) -> i32 {
+    let Some(key) = Key::from_code(key) else {
+        return 0;
+    };
     with_state(|wm, fb, st, txt, ctx| {
         let rc = wm.key(key);
-        if rc != 0 {
+        if rc.is_changed() {
             wm.render(fb, st, txt, ctx);
         }
-        rc
+        rc.to_i32()
     })
 }
 
@@ -286,7 +293,7 @@ pub extern "C" fn app_record_snapshot() -> u32 {
         wm.snapshot_seq = wm.snapshot_seq.wrapping_add(1);
         wm.system.snapshots_taken = wm.snapshot_seq;
         wm.render(fb, st, txt, ctx);
-        wm.last_fb_hash
+        fb.fnv1a_32()
     })
 }
 
@@ -374,7 +381,7 @@ pub extern "C" fn app_mount_commit_context(idx: i32, byte_len: usize) {
 
 #[no_mangle]
 pub extern "C" fn app_fb_hash() -> u32 {
-    unsafe { (*GUEST.wm.get()).last_fb_hash }
+    with_state(|wm, fb, _, _, _| if wm.ready { fb.fnv1a_32() } else { 0 })
 }
 
 #[no_mangle]
@@ -423,7 +430,7 @@ pub extern "C" fn app_selected() -> i32 {
 
 #[no_mangle]
 pub extern "C" fn app_count() -> i32 {
-    4 // 4 bundled apps: System, Calc, Files, Mines
+    AppSlot::APP_COUNT as i32
 }
 
 #[no_mangle]
@@ -519,7 +526,8 @@ mod tests {
 
         // Simulate `host.js` writing a 1280x688 RGBA8888 image into staging memory
         unsafe {
-            let st = core::slice::from_raw_parts_mut(app_mount_staging_ptr() as *mut u32, 1280 * 720);
+            let st =
+                core::slice::from_raw_parts_mut(app_mount_staging_ptr() as *mut u32, 1280 * 720);
             st.fill(rgb(0x12, 0x77, 0xaa));
         }
         app_mount_commit_rgba(0, 1280, 688);

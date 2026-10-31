@@ -6,10 +6,15 @@
 //! - Supports `ActionType::Reveal` and `ActionType::Flag`, seed cycling, and
 //!   Classic (`max_strikes: 1`) vs. Shielded (`max_strikes: 3`) rules.
 
-use crate::fb::{rgb, Framebuffer};
-use crate::font::{draw_str, draw_str_centered, draw_str_prop, text_width};
+use crate::fb::Framebuffer;
+use crate::fmt as f;
+use crate::font::{draw_str, draw_str_centered, draw_str_prop};
 use crate::icon::{draw_icon, Icon};
+use crate::input::{InputResult, Key};
+use crate::layout::{Metrics, Rect};
 use crate::mine_sm::{Action, ActionType, BoardState, Rules};
+use crate::theme as t;
+use crate::ui;
 
 pub const DEFAULT_SEED: u64 = 42;
 pub const DEFAULT_BOMBS: u8 = 10;
@@ -99,14 +104,15 @@ struct MinesGeom {
     info_x: i32,
     info_y: i32,
     info_w: i32,
-    btn_mode: (i32, i32, i32, i32),
-    btn_seed: (i32, i32, i32, i32),
-    btn_rule: (i32, i32, i32, i32),
+    btn_mode: Rect,
+    btn_seed: Rect,
+    btn_rule: Rect,
 }
 
 fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
+    let m = Metrics::new(client_w, client_h);
     let landscape = client_w >= client_h && client_w >= 600;
-    let gap = if client_w < 500 || client_h < 450 { 3 } else { 4 };
+    let gap = m.pick(3, 4, 4);
 
     if landscape {
         let max_board_h = client_h - 48;
@@ -134,9 +140,9 @@ fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
             info_x,
             info_y,
             info_w,
-            btn_mode: (info_x, btn_y0, info_w, btn_h),
-            btn_seed: (info_x, btn_y0 + btn_h + 10, info_w, btn_h),
-            btn_rule: (info_x, btn_y0 + 2 * (btn_h + 10), info_w, btn_h),
+            btn_mode: Rect::new(info_x, btn_y0, info_w, btn_h),
+            btn_seed: Rect::new(info_x, btn_y0 + btn_h + 10, info_w, btn_h),
+            btn_rule: Rect::new(info_x, btn_y0 + 2 * (btn_h + 10), info_w, btn_h),
         }
     } else {
         // Portrait / compact layout: board on top, telemetry + buttons below
@@ -165,21 +171,21 @@ fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
             info_x,
             info_y,
             info_w,
-            btn_mode: (info_x, btn_y0, half_w, btn_h),
-            btn_seed: (info_x + half_w + 8, btn_y0, info_w - half_w - 8, btn_h),
-            btn_rule: (info_x, btn_y0 + btn_h + 8, info_w, btn_h),
+            btn_mode: Rect::new(info_x, btn_y0, half_w, btn_h),
+            btn_seed: Rect::new(info_x + half_w + 8, btn_y0, info_w - half_w - 8, btn_h),
+            btn_rule: Rect::new(info_x, btn_y0 + btn_h + 8, info_w, btn_h),
         }
     }
 }
 
 pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
-    fb.clear(rgb(0x0b, 0x10, 0x16));
+    fb.clear(t::BG);
     let g = mines_geom(fb.w, fb.h);
     let b = &app.board;
 
-    let accent = rgb(0x2d, 0xd4, 0xbf);
-    let label_col = rgb(0x7b, 0x8b, 0x98);
-    let text_col = rgb(0xe6, 0xf1, 0xf8);
+    let accent = t::ACCENT;
+    let label_col = t::TEXT_DIM;
+    let text_col = t::TEXT_BODY;
 
     // --- 1. Draw the 8×8 Minesweeper Bitboard Grid ---
     let glyph_sc = if g.cell >= 54 {
@@ -204,22 +210,13 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
 
         if is_det {
             // Detonated bomb cell
-            fb.fill(cx, cy, g.cell, g.cell, rgb(0x4c, 0x14, 0x1d));
-            fb.border(cx, cy, g.cell, g.cell, 1, rgb(0xf8, 0x71, 0x71));
-            draw_str_centered(
-                fb,
-                cx,
-                cy,
-                g.cell,
-                g.cell,
-                "*",
-                glyph_sc,
-                rgb(0xff, 0xb4, 0xb4),
-            );
+            fb.fill(cx, cy, g.cell, g.cell, t::MINES_DETONATED);
+            fb.border(cx, cy, g.cell, g.cell, 1, t::DANGER);
+            draw_str_centered(fb, cx, cy, g.cell, g.cell, "*", glyph_sc, t::DANGER_SOFT);
         } else if is_rev {
             // Revealed safe cell
-            fb.fill(cx, cy, g.cell, g.cell, rgb(0x0f, 0x16, 0x1f));
-            fb.border(cx, cy, g.cell, g.cell, 1, rgb(0x1b, 0x26, 0x33));
+            fb.fill(cx, cy, g.cell, g.cell, t::GRID);
+            fb.border(cx, cy, g.cell, g.cell, 1, t::MINES_REVEALED_BORDER);
             let cnt = b.adj_counts[idx as usize];
             if cnt > 0 {
                 let digit_buf = [b'0' + cnt];
@@ -238,40 +235,22 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
         } else if b.is_terminal && is_mine {
             // Reveal remaining unflagged/flagged mines when terminal
             let bg = if is_flag {
-                rgb(0x14, 0x33, 0x2e)
+                t::MINES_TERMINAL_FLAG
             } else {
-                rgb(0x28, 0x15, 0x1d)
+                t::MINES_TERMINAL_MINE
             };
             fb.fill(cx, cy, g.cell, g.cell, bg);
-            fb.border(cx, cy, g.cell, g.cell, 1, rgb(0x5c, 0x2b, 0x35));
-            draw_str_centered(
-                fb,
-                cx,
-                cy,
-                g.cell,
-                g.cell,
-                "*",
-                glyph_sc,
-                rgb(0xf8, 0x71, 0x71),
-            );
+            fb.border(cx, cy, g.cell, g.cell, 1, t::MINES_DETONATED_BORDER);
+            draw_str_centered(fb, cx, cy, g.cell, g.cell, "*", glyph_sc, t::DANGER);
         } else if is_flag {
             // Flagged unrevealed cell
-            fb.fill(cx, cy, g.cell, g.cell, rgb(0x16, 0x26, 0x34));
-            fb.border(cx, cy, g.cell, g.cell, 2, rgb(0xf5, 0x9e, 0x0b));
-            draw_str_centered(
-                fb,
-                cx,
-                cy,
-                g.cell,
-                g.cell,
-                "F",
-                glyph_sc,
-                rgb(0xfb, 0xbf, 0x24),
-            );
+            fb.fill(cx, cy, g.cell, g.cell, t::MINES_FLAG);
+            fb.border(cx, cy, g.cell, g.cell, 2, t::WARNING);
+            draw_str_centered(fb, cx, cy, g.cell, g.cell, "F", glyph_sc, t::WARNING_BRIGHT);
         } else {
             // Hidden cell
-            fb.fill(cx, cy, g.cell, g.cell, rgb(0x16, 0x22, 0x2f));
-            fb.border(cx, cy, g.cell, g.cell, 1, rgb(0x26, 0x38, 0x4a));
+            fb.fill(cx, cy, g.cell, g.cell, t::MINES_HIDDEN);
+            fb.border(cx, cy, g.cell, g.cell, 1, t::BORDER_CONTROL);
         }
     }
 
@@ -280,23 +259,17 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     let head_sc = if compact_info { 2 } else { 3 };
     let row_sc = if compact_info { 1 } else { 2 };
 
-    draw_str(fb, g.info_x, g.info_y, "MINES 8X8", head_sc, rgb(0xf0, 0xf6, 0xfc));
+    draw_str(fb, g.info_x, g.info_y, "MINES 8X8", head_sc, t::TEXT);
     let bar_col = if b.is_terminal {
         if b.is_won {
-            rgb(0x34, 0xd3, 0x99)
+            t::SUCCESS
         } else {
-            rgb(0xf8, 0x71, 0x71)
+            t::DANGER
         }
     } else {
         accent
     };
-    fb.fill(
-        g.info_x,
-        g.info_y + 10 * head_sc + 2,
-        g.info_w,
-        2,
-        bar_col,
-    );
+    fb.fill(g.info_x, g.info_y + 10 * head_sc + 2, g.info_w, 2, bar_col);
 
     let safe_total = 64u32.saturating_sub(b.num_bombs as u32);
     let safe_rev = (b.revealed_mask & !b.mine_mask).count_ones();
@@ -305,74 +278,76 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     let mut y = g.info_y + 10 * head_sc + 14;
     let step_y = if row_sc == 1 { 16 } else { 28 };
 
-    draw_kv(fb, g.info_x, y, g.info_w, row_sc, "STATE", app.status_str(), bar_col);
+    let row = |y: i32| Rect::new(g.info_x, y, g.info_w, step_y);
+    ui::kv_row(
+        fb,
+        row(y),
+        "STATE",
+        app.status_str(),
+        row_sc,
+        label_col,
+        bar_col,
+    );
     y += step_y;
 
     let mut seed_buf = [b' '; 16];
-    let seed_str = fmt_u32(&mut seed_buf, b.seed as u32);
-    draw_kv(fb, g.info_x, y, g.info_w, row_sc, "SEED", seed_str, text_col);
+    let seed_str = f::u32_str(&mut seed_buf, b.seed as u32);
+    ui::kv_row(fb, row(y), "SEED", seed_str, row_sc, label_col, text_col);
     y += step_y;
 
     let mut safe_buf = [b' '; 16];
-    let safe_str = fmt_ratio(&mut safe_buf, safe_rev, safe_total);
-    draw_kv(fb, g.info_x, y, g.info_w, row_sc, "CLEARED", safe_str, text_col);
+    let safe_str = f::ratio_str(&mut safe_buf, safe_rev, safe_total);
+    ui::kv_row(fb, row(y), "CLEARED", safe_str, row_sc, label_col, text_col);
     y += step_y;
 
     let mut flag_buf = [b' '; 16];
-    let flag_str = fmt_ratio(&mut flag_buf, flags_placed, b.num_bombs as u32);
-    draw_kv(fb, g.info_x, y, g.info_w, row_sc, "FLAGS", flag_str, text_col);
+    let flag_str = f::ratio_str(&mut flag_buf, flags_placed, b.num_bombs as u32);
+    ui::kv_row(fb, row(y), "FLAGS", flag_str, row_sc, label_col, text_col);
     y += step_y;
 
-    if y + step_y <= g.btn_mode.1 {
+    if y + step_y <= g.btn_mode.y {
         let mut strike_buf = [b' '; 16];
-        let strike_str = fmt_ratio(&mut strike_buf, b.strikes as u32, b.rules.max_strikes as u32);
-        draw_kv(fb, g.info_x, y, g.info_w, row_sc, "STRIKES", strike_str, label_col);
+        let strike_str = f::ratio_str(
+            &mut strike_buf,
+            b.strikes as u32,
+            b.rules.max_strikes as u32,
+        );
+        ui::kv_row(
+            fb,
+            row(y),
+            "STRIKES",
+            strike_str,
+            row_sc,
+            label_col,
+            label_col,
+        );
     }
 
     // --- 3. Interactive Action Buttons ---
-    let (mx, my, mw, mh) = g.btn_mode;
-    let mode_bg = if app.flag_mode {
-        rgb(0x36, 0x26, 0x10)
-    } else {
-        rgb(0x10, 0x2c, 0x2e)
-    };
-    let mode_border = if app.flag_mode {
-        rgb(0xf5, 0x9e, 0x0b)
-    } else {
-        accent
-    };
     let mode_label = if app.flag_mode {
         "MODE: FLAG (F)"
     } else {
         "MODE: REVEAL"
     };
-    fb.fill(mx, my, mw, mh, mode_bg);
-    fb.border(mx, my, mw, mh, 1, mode_border);
-    draw_str_centered(fb, mx, my, mw, mh, mode_label, row_sc, rgb(0xf0, 0xf6, 0xfc));
-
-    let (sx, sy, sw, sh) = g.btn_seed;
-    fb.fill(sx, sy, sw, sh, rgb(0x14, 0x1d, 0x26));
-    fb.border(sx, sy, sw, sh, 1, rgb(0x26, 0x38, 0x4a));
-    draw_str_centered(
+    ui::button(
         fb,
-        sx,
-        sy,
-        sw,
-        sh,
-        "NEW SEED (N)",
+        g.btn_mode,
+        mode_label,
+        if app.flag_mode {
+            ui::Tone::Warning
+        } else {
+            ui::Tone::Accent
+        },
         row_sc,
-        rgb(0xe6, 0xf1, 0xf8),
     );
+    ui::button(fb, g.btn_seed, "NEW SEED (N)", ui::Tone::Neutral, row_sc);
 
-    let (rx, ry, rw, rh) = g.btn_rule;
     let rule_lbl = if b.rules.max_strikes > 1 {
         "RULE: SHIELDED (3 STRIKES)"
     } else {
         "RULE: CLASSIC (1 STRIKE)"
     };
-    fb.fill(rx, ry, rw, rh, rgb(0x14, 0x1d, 0x26));
-    fb.border(rx, ry, rw, rh, 1, rgb(0x26, 0x38, 0x4a));
-    draw_str_centered(fb, rx, ry, rw, rh, rule_lbl, row_sc, label_col);
+    ui::button(fb, g.btn_rule, rule_lbl, ui::Tone::Neutral, row_sc);
 }
 
 pub fn click_window(
@@ -381,15 +356,11 @@ pub fn click_window(
     cy: i32,
     client_w: i32,
     client_h: i32,
-) -> bool {
+) -> InputResult {
     let g = mines_geom(client_w, client_h);
 
     // 1. Check 8×8 grid hit
-    if cx >= g.board_x
-        && cx < g.board_x + g.grid_px
-        && cy >= g.board_y
-        && cy < g.board_y + g.grid_px
-    {
+    if Rect::new(g.board_x, g.board_y, g.grid_px, g.grid_px).contains(cx, cy) {
         let rel_x = cx - g.board_x;
         let rel_y = cy - g.board_y;
         let stride = g.cell + g.gap;
@@ -407,56 +378,45 @@ pub fn click_window(
                 ActionType::Reveal
             };
             let res = app.board.step(Action { action_type, cell });
-            return res.valid_move;
+            return InputResult::from(res.valid_move);
         }
     }
 
-    // 2. Check Mode button
-    let (mx, my, mw, mh) = g.btn_mode;
-    if cx >= mx && cx < mx + mw && cy >= my && cy < my + mh {
+    if g.btn_mode.contains(cx, cy) {
         app.toggle_mode();
-        return true;
+        return InputResult::Changed;
     }
-
-    // 3. Check New Seed button
-    let (sx, sy, sw, sh) = g.btn_seed;
-    if cx >= sx && cx < sx + sw && cy >= sy && cy < sy + sh {
+    if g.btn_seed.contains(cx, cy) {
         app.next_seed();
-        return true;
+        return InputResult::Changed;
     }
-
-    // 4. Check Rule button
-    let (rx, ry, rw, rh) = g.btn_rule;
-    if cx >= rx && cx < rx + rw && cy >= ry && cy < ry + rh {
+    if g.btn_rule.contains(cx, cy) {
         app.toggle_rules();
-        return true;
+        return InputResult::Changed;
     }
 
-    false
+    InputResult::Noop
 }
 
-pub fn key_window(app: &mut MinesApp, code: i32) -> bool {
-    match code {
-        // 'f' / 'F' (30) toggles Flag/Reveal mode
-        30 => {
+pub fn key_window(app: &mut MinesApp, key: Key) -> InputResult {
+    match key {
+        Key::Flag => {
             app.toggle_mode();
-            true
+            InputResult::Changed
         }
-        // 'n' / 'N' (31) or Enter (24) when terminal advances to next seed
-        31 => {
+        Key::NewSeed => {
             app.next_seed();
-            true
+            InputResult::Changed
         }
-        // 'r' / 'R' (32) replays current seed from scratch
-        32 => {
+        Key::Replay => {
             app.reset_seed(app.board.seed);
-            true
+            InputResult::Changed
         }
-        24 if app.board.is_terminal => {
+        Key::Enter if app.board.is_terminal => {
             app.next_seed();
-            true
+            InputResult::Changed
         }
-        _ => false,
+        _ => InputResult::Noop,
     }
 }
 
@@ -470,22 +430,9 @@ pub fn draw_dock_tile(
     h: i32,
     active: bool,
 ) {
-    let bg = if active {
-        rgb(0x13, 0x22, 0x2b)
-    } else {
-        rgb(0x10, 0x17, 0x20)
-    };
-    let border = if active {
-        rgb(0x2d, 0xd4, 0xbf)
-    } else {
-        rgb(0x2e, 0x3f, 0x50)
-    };
-    fb.fill(x, y, w, h, bg);
-    fb.border(x, y, w, h, 2, border);
-    fb.fill(x + 2, y + 2, w - 4, 4, rgb(0x2d, 0xd4, 0xbf));
-
-    draw_icon(fb, x + 10, y + 24, Icon::Games, 32, rgb(0x2d, 0xd4, 0xbf));
-    draw_str_prop(fb, x + 48, y + 18, "MINES", 2, rgb(0xf0, 0xf6, 0xfc));
+    ui::dock_tile(fb, Rect::new(x, y, w, h), active);
+    draw_icon(fb, x + 10, y + 24, Icon::Games, 32, t::ACCENT);
+    draw_str_prop(fb, x + 48, y + 18, "MINES", 2, t::TEXT);
 
     let sub = if app.board.is_terminal {
         if app.board.is_won {
@@ -496,69 +443,16 @@ pub fn draw_dock_tile(
     } else {
         "8X8 SEEDED"
     };
-    draw_str_prop(fb, x + 48, y + 42, sub, 1, rgb(0x2d, 0xd4, 0xbf));
+    draw_str_prop(fb, x + 48, y + 42, sub, 1, t::ACCENT);
 }
 
 fn count_color(cnt: u8) -> u32 {
     match cnt {
-        1 => rgb(0x38, 0xbd, 0xf8), // Sky blue
-        2 => rgb(0x34, 0xd3, 0x99), // Emerald
-        3 => rgb(0xf8, 0x71, 0x71), // Coral red
-        4 => rgb(0xc0, 0x84, 0xfc), // Purple
-        5 => rgb(0xfb, 0xbf, 0x24), // Amber
-        _ => rgb(0x2d, 0xd4, 0xbf), // Teal
+        1 => t::INFO,           // Sky blue
+        2 => t::SUCCESS,        // Emerald
+        3 => t::DANGER,         // Coral red
+        4 => t::PURPLE,         // Purple
+        5 => t::WARNING_BRIGHT, // Amber
+        _ => t::ACCENT,         // Teal
     }
-}
-
-fn draw_kv(
-    fb: &mut Framebuffer,
-    x: i32,
-    y: i32,
-    w: i32,
-    scale: i32,
-    key: &str,
-    val: &str,
-    val_col: u32,
-) {
-    draw_str(fb, x, y, key, scale, rgb(0x7b, 0x8b, 0x98));
-    let vw = text_width(val, scale);
-    draw_str(fb, x + w - vw, y, val, scale, val_col);
-}
-
-fn fmt_u32(buf: &mut [u8; 16], val: u32) -> &str {
-    let pos = write_u32(buf, 0, val);
-    core::str::from_utf8(&buf[..pos]).unwrap_or("0")
-}
-
-fn fmt_ratio(buf: &mut [u8; 16], a: u32, b: u32) -> &str {
-    let mut pos = write_u32(buf, 0, a);
-    if pos < buf.len() {
-        buf[pos] = b'/';
-        pos += 1;
-    }
-    pos = write_u32(buf, pos, b);
-    core::str::from_utf8(&buf[..pos]).unwrap_or("")
-}
-
-fn write_u32(buf: &mut [u8], mut pos: usize, mut val: u32) -> usize {
-    if val == 0 {
-        if pos < buf.len() {
-            buf[pos] = b'0';
-            pos += 1;
-        }
-        return pos;
-    }
-    let mut tmp = [0u8; 10];
-    let mut n = 0;
-    while val > 0 {
-        tmp[n] = b'0' + (val % 10) as u8;
-        val /= 10;
-        n += 1;
-    }
-    while n > 0 && pos < buf.len() {
-        n -= 1;
-        buf[pos] = tmp[n];
-        pos += 1;
-    }
-    pos
 }

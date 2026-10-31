@@ -121,7 +121,10 @@ pub fn char_advance_prop(ch: char, scale: i32) -> i32 {
 
 /// Proportional string width in pixels (no trailing gap).
 pub fn text_width_prop(s: &str, scale: i32) -> i32 {
-    let units: i32 = s.chars().map(|c| prop_advance_units(&glyph::resolve(c as u32))).sum();
+    let units: i32 = s
+        .chars()
+        .map(|c| prop_advance_units(&glyph::resolve(c as u32)))
+        .sum();
     if units <= 0 {
         0
     } else {
@@ -203,6 +206,7 @@ pub fn draw_str_prop_styled(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn draw_str_centered(
     fb: &mut Framebuffer,
     rx: i32,
@@ -221,6 +225,7 @@ pub fn draw_str_centered(
 }
 
 /// Proportional variant of [`draw_str_centered`].
+#[allow(clippy::too_many_arguments)]
 pub fn draw_str_prop_centered(
     fb: &mut Framebuffer,
     rx: i32,
@@ -255,7 +260,12 @@ pub fn draw_char_styled(
 }
 
 fn missing() -> TextGlyph {
-    TextGlyph { rows: &MISSING_ROWS, dy: 0, lsb: 0, ink_w: 5 }
+    TextGlyph {
+        rows: &MISSING_ROWS,
+        dy: 0,
+        lsb: 0,
+        ink_w: 5,
+    }
 }
 
 /// Rasterize a 5x7 text glyph; in proportional mode blank leading columns are
@@ -341,14 +351,24 @@ mod tests {
         for cp in 0x00A0u32..=0x017F {
             assert!(glyph::lookup_fiveseven(cp).is_some(), "Latin U+{:04X}", cp);
         }
-        for c in ['ñ', 'É', 'ß', 'ł', 'Ω', 'π', 'λ', 'Ж', 'Я', 'д', '€', '∞', '┼', '█'] {
+        for c in [
+            'ñ', 'É', 'ß', 'ł', 'Ω', 'π', 'λ', 'Ж', 'Я', 'д', '€', '∞', '┼', '█',
+        ] {
             assert!(glyph::lookup_fiveseven(c as u32).is_some(), "{}", c);
         }
     }
 
     #[test]
     fn descenders_are_bumped() {
-        for (c, dy) in [('g', 2), ('p', 2), ('q', 2), ('y', 2), ('j', 1), (',', 1), ('a', 0)] {
+        for (c, dy) in [
+            ('g', 2),
+            ('p', 2),
+            ('q', 2),
+            ('y', 2),
+            ('j', 1),
+            (',', 1),
+            ('a', 0),
+        ] {
             assert_eq!(glyph::lookup_fiveseven(c as u32).unwrap().dy, dy, "{}", c);
         }
     }

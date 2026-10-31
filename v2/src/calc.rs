@@ -2,23 +2,17 @@
 //!
 //! Reference implementation for a `/v2/` appliance app:
 //! - Pure `#![no_std]` state machine (`CalcApp`) with zero heap or OS dependencies.
-//! - Draws directly into the maximized `1280 x 688` client surface (`draw_window`).
+//! - Draws directly into the maximized client surface (`draw_window`).
 //! - Draws a live `128 x 72` miniature preview into the Left App Dock (`draw_dock_tile`).
-//! - Accepts client-relative clicks (`click_window`) and key codes (`key_window`).
+//! - Accepts client-relative clicks (`click_window`) and logical keys (`key_window`).
 
-use crate::fb::{rgb, Framebuffer};
+use crate::fb::Framebuffer;
 use crate::font::{draw_str, draw_str_centered, draw_str_prop, text_width};
 use crate::icon::{draw_icon, Icon};
-
-pub const KEY_0: i32 = 10;
-pub const KEY_PLUS: i32 = 20;
-pub const KEY_MINUS: i32 = 21;
-pub const KEY_MUL: i32 = 22;
-pub const KEY_DIV: i32 = 23;
-pub const KEY_EQ: i32 = 24;
-pub const KEY_CLEAR: i32 = 25;
-pub const KEY_BACK: i32 = 26;
-pub const KEY_DOT: i32 = 27;
+use crate::input::{InputResult, Key};
+use crate::layout::{Metrics, Rect};
+use crate::theme as t;
+use crate::ui;
 
 struct CalcGeom {
     pad_x: i32,
@@ -32,19 +26,14 @@ struct CalcGeom {
 }
 
 fn calc_geom(client_w: i32, client_h: i32) -> CalcGeom {
-    let gap = if client_w < 500 || client_h < 450 { 8 } else { 12 };
+    let m = Metrics::new(client_w, client_h);
+    let gap = m.pick(8, 10, 12);
     let max_grid_w = (client_w - 32).clamp(240, 720);
     let bw = ((max_grid_w - 3 * gap) / 4).max(48);
     let grid_w = 4 * bw + 3 * gap;
     let pad_x = ((client_w - grid_w) / 2).max(8);
 
-    let disp_h = if client_h < 450 {
-        52
-    } else if client_h < 600 {
-        72
-    } else {
-        96
-    };
+    let disp_h = m.pick(52, 72, 96);
     let avail_h = (client_h - disp_h - 32).max(200);
     let bh = ((avail_h - 4 * gap) / 5).clamp(32, 92);
     let total_h = disp_h + 20 + 5 * bh + 4 * gap;
@@ -68,33 +57,155 @@ struct Btn {
     row: i32,
     cspan: i32,
     rspan: i32,
-    key: i32,
+    key: Key,
     label: &'static str,
 }
 
 const BUTTONS: [Btn; 18] = [
-    Btn { col: 0, row: 0, cspan: 1, rspan: 1, key: KEY_CLEAR, label: "C" },
-    Btn { col: 1, row: 0, cspan: 1, rspan: 1, key: KEY_BACK,  label: "<" },
-    Btn { col: 2, row: 0, cspan: 1, rspan: 1, key: KEY_DIV,   label: "/" },
-    Btn { col: 3, row: 0, cspan: 1, rspan: 1, key: KEY_MUL,   label: "*" },
-
-    Btn { col: 0, row: 1, cspan: 1, rspan: 1, key: KEY_0 + 7, label: "7" },
-    Btn { col: 1, row: 1, cspan: 1, rspan: 1, key: KEY_0 + 8, label: "8" },
-    Btn { col: 2, row: 1, cspan: 1, rspan: 1, key: KEY_0 + 9, label: "9" },
-    Btn { col: 3, row: 1, cspan: 1, rspan: 1, key: KEY_MINUS, label: "-" },
-
-    Btn { col: 0, row: 2, cspan: 1, rspan: 1, key: KEY_0 + 4, label: "4" },
-    Btn { col: 1, row: 2, cspan: 1, rspan: 1, key: KEY_0 + 5, label: "5" },
-    Btn { col: 2, row: 2, cspan: 1, rspan: 1, key: KEY_0 + 6, label: "6" },
-    Btn { col: 3, row: 2, cspan: 1, rspan: 1, key: KEY_PLUS,  label: "+" },
-
-    Btn { col: 0, row: 3, cspan: 1, rspan: 1, key: KEY_0 + 1, label: "1" },
-    Btn { col: 1, row: 3, cspan: 1, rspan: 1, key: KEY_0 + 2, label: "2" },
-    Btn { col: 2, row: 3, cspan: 1, rspan: 1, key: KEY_0 + 3, label: "3" },
-    Btn { col: 3, row: 3, cspan: 1, rspan: 2, key: KEY_EQ,    label: "=" },
-
-    Btn { col: 0, row: 4, cspan: 2, rspan: 1, key: KEY_0,     label: "0" },
-    Btn { col: 2, row: 4, cspan: 1, rspan: 1, key: KEY_DOT,   label: "." },
+    Btn {
+        col: 0,
+        row: 0,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Escape,
+        label: "C",
+    },
+    Btn {
+        col: 1,
+        row: 0,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Backspace,
+        label: "<",
+    },
+    Btn {
+        col: 2,
+        row: 0,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Slash,
+        label: "/",
+    },
+    Btn {
+        col: 3,
+        row: 0,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Star,
+        label: "*",
+    },
+    Btn {
+        col: 0,
+        row: 1,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Digit7,
+        label: "7",
+    },
+    Btn {
+        col: 1,
+        row: 1,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Digit8,
+        label: "8",
+    },
+    Btn {
+        col: 2,
+        row: 1,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Digit9,
+        label: "9",
+    },
+    Btn {
+        col: 3,
+        row: 1,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Minus,
+        label: "-",
+    },
+    Btn {
+        col: 0,
+        row: 2,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Digit4,
+        label: "4",
+    },
+    Btn {
+        col: 1,
+        row: 2,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Digit5,
+        label: "5",
+    },
+    Btn {
+        col: 2,
+        row: 2,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Digit6,
+        label: "6",
+    },
+    Btn {
+        col: 3,
+        row: 2,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Plus,
+        label: "+",
+    },
+    Btn {
+        col: 0,
+        row: 3,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Digit1,
+        label: "1",
+    },
+    Btn {
+        col: 1,
+        row: 3,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Digit2,
+        label: "2",
+    },
+    Btn {
+        col: 2,
+        row: 3,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Digit3,
+        label: "3",
+    },
+    Btn {
+        col: 3,
+        row: 3,
+        cspan: 1,
+        rspan: 2,
+        key: Key::Enter,
+        label: "=",
+    },
+    Btn {
+        col: 0,
+        row: 4,
+        cspan: 2,
+        rspan: 1,
+        key: Key::Digit0,
+        label: "0",
+    },
+    Btn {
+        col: 2,
+        row: 4,
+        cspan: 1,
+        rspan: 1,
+        key: Key::Dot,
+        label: ".",
+    },
 ];
 
 pub struct CalcApp {
@@ -233,53 +344,74 @@ impl CalcApp {
     }
 }
 
-pub fn key_window(app: &mut CalcApp, key: i32) -> bool {
-    if app.error {
-        app.clear();
-        if key == KEY_CLEAR {
-            return true;
-        }
-    }
-    if (KEY_0..=KEY_0 + 9).contains(&key) {
-        return app.push_char(b'0' + (key - KEY_0) as u8);
-    }
-    match key {
-        KEY_DOT => app.push_char(b'.'),
-        KEY_PLUS => app.press_op(b'+'),
-        KEY_MINUS => app.press_op(b'-'),
-        KEY_MUL => app.press_op(b'*'),
-        KEY_DIV => app.press_op(b'/'),
-        KEY_EQ => app.press_eq(),
-        KEY_BACK => {
-            if app.entry_len == 0 {
-                false
-            } else {
-                app.entry_len -= 1;
-                true
-            }
-        }
-        KEY_CLEAR => {
-            app.clear();
-            true
-        }
-        _ => false,
+impl Default for CalcApp {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-pub fn click_window(app: &mut CalcApp, cx: i32, cy: i32, client_w: i32, client_h: i32) -> bool {
+pub fn key_window(app: &mut CalcApp, key: Key) -> InputResult {
+    if app.error {
+        app.clear();
+        if key == Key::Escape {
+            return InputResult::Changed;
+        }
+    }
+    match key {
+        Key::Digit0
+        | Key::Digit1
+        | Key::Digit2
+        | Key::Digit3
+        | Key::Digit4
+        | Key::Digit5
+        | Key::Digit6
+        | Key::Digit7
+        | Key::Digit8
+        | Key::Digit9 => {
+            let digit = key as i32 - Key::Digit0 as i32;
+            InputResult::from(app.push_char(b'0' + digit as u8))
+        }
+        Key::Dot => InputResult::from(app.push_char(b'.')),
+        Key::Plus => InputResult::from(app.press_op(b'+')),
+        Key::Minus => InputResult::from(app.press_op(b'-')),
+        Key::Star => InputResult::from(app.press_op(b'*')),
+        Key::Slash => InputResult::from(app.press_op(b'/')),
+        Key::Enter => InputResult::from(app.press_eq()),
+        Key::Backspace => {
+            if app.entry_len == 0 {
+                InputResult::Noop
+            } else {
+                app.entry_len -= 1;
+                InputResult::Changed
+            }
+        }
+        Key::Escape => {
+            app.clear();
+            InputResult::Changed
+        }
+        _ => InputResult::Noop,
+    }
+}
+
+pub fn click_window(
+    app: &mut CalcApp,
+    cx: i32,
+    cy: i32,
+    client_w: i32,
+    client_h: i32,
+) -> InputResult {
     let g = calc_geom(client_w, client_h);
     for b in &BUTTONS {
-        let (bx, by, bw, bh) = btn_rect(&g, b);
-        if cx >= bx && cx < bx + bw && cy >= by && cy < by + bh {
+        if btn_rect(&g, b).contains(cx, cy) {
             return key_window(app, b.key);
         }
     }
-    false
+    InputResult::Noop
 }
 
 pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
     // 1. Single flat window surface
-    fb.clear(rgb(0x0b, 0x10, 0x16));
+    fb.clear(t::BG);
     let g = calc_geom(fb.w, fb.h);
 
     // 2. Readout line (pending operator on left, value right-aligned, 2px underline)
@@ -293,7 +425,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
             g.disp_y + (g.disp_h - 7 * op_scale) / 2,
             op_str,
             op_scale,
-            rgb(0x2d, 0xd4, 0xbf),
+            t::ACCENT,
         );
     }
 
@@ -313,29 +445,22 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
         g.disp_y + (g.disp_h - 7 * scale) / 2,
         disp_str,
         scale,
-        rgb(0xf0, 0xf6, 0xfc),
+        t::TEXT,
     );
-    fb.fill(
-        g.pad_x,
-        g.disp_y + g.disp_h - 2,
-        g.grid_w,
-        2,
-        rgb(0x2d, 0xd4, 0xbf),
-    );
+    fb.fill(g.pad_x, g.disp_y + g.disp_h - 2, g.grid_w, 2, t::ACCENT);
 
     // 3. Flat 18-key grid
     let btn_scale = if g.bh < 48 { 2 } else { 3 };
     for b in &BUTTONS {
-        let (bx, by, bw, bh) = btn_rect(&g, b);
+        let r = btn_rect(&g, b);
         let bg = match b.key {
-            KEY_CLEAR => rgb(0x2e, 0x17, 0x1d),
-            KEY_EQ => rgb(0x10, 0x34, 0x37),
-            KEY_PLUS | KEY_MINUS | KEY_MUL | KEY_DIV => rgb(0x12, 0x26, 0x2c),
-            _ => rgb(0x14, 0x1d, 0x26),
+            Key::Escape => t::CALC_CLEAR,
+            Key::Enter => t::CALC_EQ,
+            Key::Plus | Key::Minus | Key::Star | Key::Slash => t::CALC_OP,
+            _ => t::SURFACE_RAISED,
         };
-        fb.fill(bx, by, bw, bh, bg);
-        fb.border(bx, by, bw, bh, 1, rgb(0x24, 0x32, 0x40));
-        draw_str_centered(fb, bx, by, bw, bh, b.label, btn_scale, rgb(0xe6, 0xf1, 0xf8));
+        ui::panel(fb, r, bg, t::CALC_KEY_BORDER);
+        draw_str_centered(fb, r.x, r.y, r.w, r.h, b.label, btn_scale, t::TEXT_BODY);
     }
 }
 
@@ -349,22 +474,9 @@ pub fn draw_dock_tile(
     h: i32,
     active: bool,
 ) {
-    let bg = if active {
-        rgb(0x13, 0x22, 0x2b)
-    } else {
-        rgb(0x10, 0x17, 0x20)
-    };
-    let border = if active {
-        rgb(0x2d, 0xd4, 0xbf)
-    } else {
-        rgb(0x2e, 0x3f, 0x50)
-    };
-    fb.fill(x, y, w, h, bg);
-    fb.border(x, y, w, h, 2, border);
-    fb.fill(x + 2, y + 2, w - 4, 4, rgb(0x2d, 0xd4, 0xbf));
-
-    draw_icon(fb, x + 10, y + 24, Icon::Calculator, 32, rgb(0x2d, 0xd4, 0xbf));
-    draw_str_prop(fb, x + 48, y + 18, "CALC", 2, rgb(0xf0, 0xf6, 0xfc));
+    ui::dock_tile(fb, Rect::new(x, y, w, h), active);
+    draw_icon(fb, x + 10, y + 24, Icon::Calculator, 32, t::ACCENT);
+    draw_str_prop(fb, x + 48, y + 18, "CALC", 2, t::TEXT);
 
     let mut disp_buf = [0u8; 24];
     let disp_str = app.format_display(&mut disp_buf);
@@ -374,15 +486,15 @@ pub fn draw_dock_tile(
     } else {
         disp_str
     };
-    draw_str(fb, x + 48, y + 42, clamped, 1, rgb(0x2d, 0xd4, 0xbf));
+    draw_str(fb, x + 48, y + 42, clamped, 1, t::ACCENT);
 }
 
-fn btn_rect(g: &CalcGeom, b: &Btn) -> (i32, i32, i32, i32) {
+fn btn_rect(g: &CalcGeom, b: &Btn) -> Rect {
     let x = g.pad_x + b.col * (g.bw + g.gap);
     let y = g.key_y + b.row * (g.bh + g.gap);
     let w = b.cspan * g.bw + (b.cspan - 1) * g.gap;
     let h = b.rspan * g.bh + (b.rspan - 1) * g.gap;
-    (x, y, w, h)
+    Rect::new(x, y, w, h)
 }
 
 /// Format a finite `f64` with up to 3 decimal places, stripping trailing zeros.

@@ -1,11 +1,14 @@
 //! Syntax-Highlighted Source Code Preview (`code.rs`).
 //!
 //! Renders mounted source files (`.c`, `.js`, `.ts`, `.py`, `.json`, `.html`,
-//! `.xml`, `.css`) directly into the Right 2/3 Preview Pane (`852 x 688`) of
-//! the `Files` application with line numbers and token coloring.
+//! `.xml`, `.css`) directly into the Right 2/3 Preview Pane of the `Files`
+//! application with line numbers and token coloring.
 
-use crate::fb::{rgb, Framebuffer};
+use crate::fb::Framebuffer;
+use crate::fmt as f;
 use crate::font::{draw_str, text_width};
+use crate::layout::Metrics;
+use crate::theme as t;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CodeLang {
@@ -55,27 +58,78 @@ impl CodeToken {
 }
 
 const KW_JS: &[&[u8]] = &[
-    b"const", b"let", b"var", b"function", b"return", b"if", b"else", b"for", b"while",
-    b"class", b"new", b"this", b"import", b"export", b"from", b"default", b"async",
-    b"await", b"try", b"catch", b"throw", b"typeof", b"null", b"true", b"false",
-    b"undefined", b"of", b"in", b"Boolean", b"String", b"Error",
+    b"const",
+    b"let",
+    b"var",
+    b"function",
+    b"return",
+    b"if",
+    b"else",
+    b"for",
+    b"while",
+    b"class",
+    b"new",
+    b"this",
+    b"import",
+    b"export",
+    b"from",
+    b"default",
+    b"async",
+    b"await",
+    b"try",
+    b"catch",
+    b"throw",
+    b"typeof",
+    b"null",
+    b"true",
+    b"false",
+    b"undefined",
+    b"of",
+    b"in",
+    b"Boolean",
+    b"String",
+    b"Error",
 ];
 
 const KW_TS: &[&[u8]] = &[
-    b"const", b"let", b"function", b"return", b"if", b"else", b"for", b"while",
-    b"export", b"import", b"from", b"interface", b"type", b"as", b"extends",
-    b"implements", b"readonly", b"public", b"private", b"enum", b"of", b"in",
+    b"const",
+    b"let",
+    b"function",
+    b"return",
+    b"if",
+    b"else",
+    b"for",
+    b"while",
+    b"export",
+    b"import",
+    b"from",
+    b"interface",
+    b"type",
+    b"as",
+    b"extends",
+    b"implements",
+    b"readonly",
+    b"public",
+    b"private",
+    b"enum",
+    b"of",
+    b"in",
 ];
 
 const TY_TS: &[&[u8]] = &[
-    b"string", b"number", b"boolean", b"void", b"OrderStatus", b"LineItem", b"OrderSummary",
+    b"string",
+    b"number",
+    b"boolean",
+    b"void",
+    b"OrderStatus",
+    b"LineItem",
+    b"OrderSummary",
 ];
 
 const KW_PY: &[&[u8]] = &[
-    b"def", b"class", b"return", b"if", b"elif", b"else", b"for", b"while", b"in",
-    b"not", b"and", b"or", b"import", b"from", b"as", b"with", b"try", b"except",
-    b"raise", b"yield", b"lambda", b"None", b"True", b"False", b"self", b"print",
-    b"pass", b"global",
+    b"def", b"class", b"return", b"if", b"elif", b"else", b"for", b"while", b"in", b"not", b"and",
+    b"or", b"import", b"from", b"as", b"with", b"try", b"except", b"raise", b"yield", b"lambda",
+    b"None", b"True", b"False", b"self", b"print", b"pass", b"global",
 ];
 
 const TY_PY: &[&[u8]] = &[
@@ -83,31 +137,89 @@ const TY_PY: &[&[u8]] = &[
 ];
 
 const KW_C: &[&[u8]] = &[
-    b"return", b"if", b"else", b"for", b"while", b"sizeof", b"typedef", b"struct",
-    b"static", b"const", b"switch", b"case", b"break", b"continue", b"goto",
-    b"union", b"enum", b"extern", b"volatile", b"printf",
+    b"return",
+    b"if",
+    b"else",
+    b"for",
+    b"while",
+    b"sizeof",
+    b"typedef",
+    b"struct",
+    b"static",
+    b"const",
+    b"switch",
+    b"case",
+    b"break",
+    b"continue",
+    b"goto",
+    b"union",
+    b"enum",
+    b"extern",
+    b"volatile",
+    b"printf",
 ];
 
 const TY_C: &[&[u8]] = &[
-    b"int", b"char", b"void", b"float", b"double", b"long", b"short", b"unsigned",
-    b"signed", b"size_t", b"uint8_t", b"uint32_t", b"int64_t", b"line_item_t",
+    b"int",
+    b"char",
+    b"void",
+    b"float",
+    b"double",
+    b"long",
+    b"short",
+    b"unsigned",
+    b"signed",
+    b"size_t",
+    b"uint8_t",
+    b"uint32_t",
+    b"int64_t",
+    b"line_item_t",
 ];
 
 const KW_JSON: &[&[u8]] = &[b"true", b"false", b"null"];
 
 const KW_RS: &[&[u8]] = &[
-    b"fn", b"let", b"mut", b"pub", b"struct", b"enum", b"impl", b"trait", b"for",
-    b"in", b"match", b"if", b"else", b"while", b"loop", b"return", b"break",
-    b"continue", b"use", b"mod", b"crate", b"self", b"Self", b"as", b"const",
-    b"static", b"type", b"where", b"unsafe", b"async", b"await", b"move", b"ref",
-    b"true", b"false",
+    b"fn",
+    b"let",
+    b"mut",
+    b"pub",
+    b"struct",
+    b"enum",
+    b"impl",
+    b"trait",
+    b"for",
+    b"in",
+    b"match",
+    b"if",
+    b"else",
+    b"while",
+    b"loop",
+    b"return",
+    b"break",
+    b"continue",
+    b"use",
+    b"mod",
+    b"crate",
+    b"self",
+    b"Self",
+    b"as",
+    b"const",
+    b"static",
+    b"type",
+    b"where",
+    b"unsafe",
+    b"async",
+    b"await",
+    b"move",
+    b"ref",
+    b"true",
+    b"false",
 ];
 
 const TY_RS: &[&[u8]] = &[
-    b"u8", b"u16", b"u32", b"u64", b"u128", b"usize",
-    b"i8", b"i16", b"i32", b"i64", b"i128", b"isize",
-    b"f32", b"f64", b"bool", b"char", b"str", b"Option", b"Some", b"None",
-    b"Result", b"Ok", b"Err", b"String", b"Vec",
+    b"u8", b"u16", b"u32", b"u64", b"u128", b"usize", b"i8", b"i16", b"i32", b"i64", b"i128",
+    b"isize", b"f32", b"f64", b"bool", b"char", b"str", b"Option", b"Some", b"None", b"Result",
+    b"Ok", b"Err", b"String", b"Vec",
 ];
 
 const KW_TOML: &[&[u8]] = &[b"true", b"false"];
@@ -154,10 +266,10 @@ pub fn is_image_filename(name: &str) -> bool {
             break;
         }
     }
-    match dot.map(|pos| &bytes[pos..]) {
-        Some(b"png" | b"jpg" | b"jpeg") => true,
-        _ => false,
-    }
+    matches!(
+        dot.map(|pos| &bytes[pos..]),
+        Some(b"png" | b"jpg" | b"jpeg")
+    )
 }
 
 fn word_in(word: &[u8], list: &[&[u8]]) -> bool {
@@ -196,9 +308,12 @@ pub fn tokenize_line(lang: CodeLang, line: &[u8], out: &mut [CodeToken]) -> usiz
     match lang {
         CodeLang::Html | CodeLang::Xml => lex_markup(line, out),
         CodeLang::Css => lex_css(line, out),
-        CodeLang::Rust | CodeLang::C | CodeLang::Js | CodeLang::Ts | CodeLang::Py | CodeLang::Json => {
-            lex_clike(lang, line, out)
-        }
+        CodeLang::Rust
+        | CodeLang::C
+        | CodeLang::Js
+        | CodeLang::Ts
+        | CodeLang::Py
+        | CodeLang::Json => lex_clike(lang, line, out),
         CodeLang::Toml => lex_toml(line, out),
         CodeLang::Markdown => lex_markdown(line, out),
         CodeLang::Plain => {
@@ -665,10 +780,21 @@ fn lex_markdown(s: &[u8], out: &mut [CodeToken]) -> usize {
         return count;
     }
     // Blockquote or list item bullet
-    if trimmed_start < n && (s[trimmed_start] == b'>' || ((s[trimmed_start] == b'-' || s[trimmed_start] == b'*') && trimmed_start + 1 < n && s[trimmed_start + 1] == b' ')) {
+    if trimmed_start < n
+        && (s[trimmed_start] == b'>'
+            || ((s[trimmed_start] == b'-' || s[trimmed_start] == b'*')
+                && trimmed_start + 1 < n
+                && s[trimmed_start + 1] == b' '))
+    {
         emit(out, &mut count, 0, trimmed_start + 1, TokenKind::Keyword);
         if trimmed_start + 1 < n {
-            emit(out, &mut count, trimmed_start + 1, n - (trimmed_start + 1), TokenKind::Plain);
+            emit(
+                out,
+                &mut count,
+                trimmed_start + 1,
+                n - (trimmed_start + 1),
+                TokenKind::Plain,
+            );
         }
         return count;
     }
@@ -722,16 +848,16 @@ fn lex_markdown(s: &[u8], out: &mut [CodeToken]) -> usize {
 
 fn color_for(kind: TokenKind) -> u32 {
     match kind {
-        TokenKind::Plain => rgb(0xe4, 0xec, 0xf2),
-        TokenKind::Keyword => rgb(0x4c, 0xc2, 0xff),
-        TokenKind::Type => rgb(0xc9, 0xa0, 0xff),
-        TokenKind::String => rgb(0x8f, 0xd8, 0xa8),
-        TokenKind::Number => rgb(0xf0, 0xc6, 0x74),
-        TokenKind::Comment => rgb(0x6d, 0x7d, 0x8c),
-        TokenKind::Punct => rgb(0x9a, 0xa7, 0xb4),
-        TokenKind::Tag => rgb(0x4c, 0xc2, 0xff),
-        TokenKind::Attr => rgb(0xf0, 0xc6, 0x74),
-        TokenKind::Preproc => rgb(0xf0, 0xb8, 0x6a),
+        TokenKind::Plain => t::SYN_PLAIN,
+        TokenKind::Keyword => t::SYN_KEYWORD,
+        TokenKind::Type => t::SYN_TYPE,
+        TokenKind::String => t::SYN_STRING,
+        TokenKind::Number => t::SYN_NUMBER,
+        TokenKind::Comment => t::SYN_COMMENT,
+        TokenKind::Punct => t::SYN_PUNCT,
+        TokenKind::Tag => t::SYN_KEYWORD,
+        TokenKind::Attr => t::SYN_NUMBER,
+        TokenKind::Preproc => t::SYN_PREPROC,
     }
 }
 
@@ -758,6 +884,7 @@ fn expand_tabs(src: &[u8], dst: &mut [u8; 160]) -> usize {
 }
 
 /// Render syntax-highlighted code into the region `(x, y, w, h)`.
+#[allow(clippy::too_many_arguments)]
 pub fn draw_code_preview(
     fb: &mut Framebuffer,
     text: &[u8],
@@ -773,7 +900,11 @@ pub fn draw_code_preview(
     let scale = scale.clamp(1, 3);
     let char_adv = 6 * scale;
     let line_h = 10 * scale + 2;
-    let pad_top = if h < 450 { 12 } else { 20 };
+    let pad_top = if Metrics::new(w, h).is_compact() {
+        12
+    } else {
+        20
+    };
     let gutter_w = match scale {
         1 => 34,
         2 => 56,
@@ -784,13 +915,7 @@ pub fn draw_code_preview(
     let visible_lines = ((h - 2 * pad_top).max(0) / line_h) as usize;
 
     // Subtle gutter divider line
-    fb.fill(
-        x + gutter_w,
-        y + 12,
-        1,
-        h - 24,
-        rgb(0x1e, 0x2b, 0x38),
-    );
+    fb.fill(x + gutter_w, y + 12, 1, h - 24, t::CODE_GUTTER);
 
     let mut line_idx = 0usize;
     let mut drawn = 0usize;
@@ -811,7 +936,7 @@ pub fn draw_code_preview(
 
             // Line number in gutter
             let mut num_buf = [b' '; 8];
-            let num_str = fmt_line_no(&mut num_buf, (line_idx + 1) as u32);
+            let num_str = f::line_no(&mut num_buf, (line_idx + 1) as u32);
             let nw = text_width(num_str, scale);
             draw_str(
                 fb,
@@ -819,7 +944,7 @@ pub fn draw_code_preview(
                 ly,
                 num_str,
                 scale,
-                rgb(0x52, 0x64, 0x74),
+                t::CODE_LINE_NO,
             );
 
             // Expand tabs and tokenize
@@ -860,27 +985,6 @@ pub fn draw_code_preview(
         }
         start = end + 1;
     }
-}
-
-fn fmt_line_no(buf: &mut [u8; 8], mut val: u32) -> &str {
-    if val == 0 {
-        buf[0] = b'0';
-        return core::str::from_utf8(&buf[..1]).unwrap_or("0");
-    }
-    let mut tmp = [0u8; 8];
-    let mut n = 0;
-    while val > 0 && n < tmp.len() {
-        tmp[n] = b'0' + (val % 10) as u8;
-        val /= 10;
-        n += 1;
-    }
-    let mut pos = 0;
-    while n > 0 {
-        n -= 1;
-        buf[pos] = tmp[n];
-        pos += 1;
-    }
-    core::str::from_utf8(&buf[..pos]).unwrap_or("")
 }
 
 /// Helper to count the total number of lines in a text slice for chunk paging.
