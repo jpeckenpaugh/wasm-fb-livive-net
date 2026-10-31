@@ -160,6 +160,10 @@ pub struct FilesApp {
     pub staged_text_idx: i32,
     pub staged_text_len: usize,
     pub code_scroll: usize,
+    pub code_col_scroll: usize,
+    pub context_scroll: usize,
+    pub font_scale: i32,
+    pub tts_active: bool,
     /// Index of the context file currently loaded in the guest's context staging buffer (`-1` if none).
     pub staged_context_idx: i32,
     pub staged_context_len: usize,
@@ -185,6 +189,10 @@ impl FilesApp {
             staged_text_idx: -1,
             staged_text_len: 0,
             code_scroll: 0,
+            code_col_scroll: 0,
+            context_scroll: 0,
+            font_scale: 1,
+            tts_active: false,
             staged_context_idx: -1,
             staged_context_len: 0,
             context_mode: false,
@@ -206,6 +214,8 @@ impl FilesApp {
         self.staged_text_idx = -1;
         self.staged_text_len = 0;
         self.code_scroll = 0;
+        self.code_col_scroll = 0;
+        self.context_scroll = 0;
         self.staged_context_idx = -1;
         self.staged_context_len = 0;
         self.context_mode = false;
@@ -300,6 +310,8 @@ impl FilesApp {
         // Pre-select the first file (`row 1`) when opening a non-empty subfolder so preview appears immediately!
         self.row_selected = if fcount > 0 { 1 } else { 0 };
         self.code_scroll = 0;
+        self.code_col_scroll = 0;
+        self.context_scroll = 0;
         self.ensure_selected_staged();
         true
     }
@@ -338,6 +350,7 @@ impl FilesApp {
         self.staged_text_idx = idx;
         self.staged_text_len = byte_len.min(MAX_TEXT_BYTES);
         self.code_scroll = 0;
+        self.code_col_scroll = 0;
         if self.pending_fetch_idx == idx {
             self.pending_fetch_idx = -1;
         }
@@ -346,6 +359,7 @@ impl FilesApp {
     pub fn complete_stage_context(&mut self, idx: i32, byte_len: usize) {
         self.staged_context_idx = idx;
         self.staged_context_len = byte_len.min(MAX_CONTEXT_BYTES);
+        self.context_scroll = 0;
     }
 }
 
@@ -523,7 +537,7 @@ pub fn draw_window(
 
         if app.context_mode {
             let ctx_len = app.staged_context_len.min(staged_context.len());
-            draw_context_preview(fb, &g, sel_entry, &staged_context[..ctx_len]);
+            draw_context_preview(fb, app, &g, sel_entry, &staged_context[..ctx_len]);
         } else if sel_entry.is_image() {
             if app.staged_idx == sel_i32 && app.staged_w > 0 && app.staged_h > 0 {
                 fb.blit_scaled(
@@ -559,6 +573,8 @@ pub fn draw_window(
                 body_h,
                 lang,
                 app.code_scroll,
+                app.font_scale,
+                app.code_col_scroll,
             );
         } else {
             draw_str_centered(
@@ -611,7 +627,7 @@ fn draw_preview_control_bar(
     draw_str(fb, g.right_x + 12, 14, title, 1, text_col);
 
     // Right Controls
-    // [ CONTEXT ] or [ RAW VIEW ] button on far right
+    // 1) Mode button on far right: [ RAW VIEW ] or [ CONTEXT ]
     let mode_btn_txt = if app.context_mode {
         "[ RAW VIEW ]"
     } else {
@@ -624,13 +640,44 @@ fn draw_preview_control_bar(
     fb.border(mode_x, 7, mode_w, 26, 1, accent);
     draw_str_centered(fb, mode_x, 7, mode_w, 26, mode_btn_txt, 1, accent);
 
-    // If not in context mode and not an image, show chunk paging [▲ PREV] [▼ NEXT] and range
+    // 2) Font scale buttons: [ A- ] and [ A+ ]
+    let ap_w = text_width("[ A+ ]", 1) + 8;
+    let am_w = text_width("[ A- ]", 1) + 8;
+    let ap_x = mode_x - ap_w - 8;
+    let am_x = ap_x - am_w - 4;
+
+    fb.fill(ap_x, 8, ap_w, 24, rgb(0x14, 0x1f, 0x2a));
+    fb.border(ap_x, 8, ap_w, 24, 1, rgb(0x2e, 0x3f, 0x50));
+    draw_str_centered(fb, ap_x, 8, ap_w, 24, "[ A+ ]", 1, text_col);
+
+    fb.fill(am_x, 8, am_w, 24, rgb(0x14, 0x1f, 0x2a));
+    fb.border(am_x, 8, am_w, 24, 1, rgb(0x2e, 0x3f, 0x50));
+    draw_str_centered(fb, am_x, 8, am_w, 24, "[ A- ]", 1, text_col);
+
+    // 3) TTS button: [ ▶ TTS ] (idle) or [ ■ STOP ] (active)
+    let tts_btn_txt = if app.tts_active {
+        "[ ■ STOP ]"
+    } else {
+        "[ ▶ TTS ]"
+    };
+    let tts_w = text_width(tts_btn_txt, 1) + 10;
+    let tts_x = am_x - tts_w - 8;
+
+    let (tts_bg, tts_border, tts_fg) = if app.tts_active {
+        (rgb(0x1a, 0x2e, 0x22), rgb(0x2d, 0xd4, 0xbf), rgb(0x34, 0xd3, 0x99))
+    } else {
+        (rgb(0x14, 0x1f, 0x2a), rgb(0x2e, 0x3f, 0x50), text_col)
+    };
+    fb.fill(tts_x, 8, tts_w, 24, tts_bg);
+    fb.border(tts_x, 8, tts_w, 24, 1, tts_border);
+    draw_str_centered(fb, tts_x, 8, tts_w, 24, tts_btn_txt, 1, tts_fg);
+
+    // 4) If in raw code mode: [▼ NEXT], [▲ PREV], and range indicator 1..30 / N
     if !app.context_mode && !entry.is_image() && app.staged_text_idx == app.selected as i32 {
         let total_lines = count_total_lines(&staged_text[..app.staged_text_len]);
         let start_line = app.code_scroll + 1;
         let end_line = (app.code_scroll + CODE_CHUNK_LINES).min(total_lines.max(1));
 
-        // Format "1..30 / 388"
         let mut range_buf = [b' '; 24];
         let range_str = fmt_line_range(&mut range_buf, start_line as u32, end_line as u32, total_lines as u32);
         let rw = text_width(range_str, 1);
@@ -638,11 +685,11 @@ fn draw_preview_control_bar(
         let next_w = text_width("[▼ NEXT]", 1) + 8;
         let prev_w = text_width("[▲ PREV]", 1) + 8;
 
-        let next_x = mode_x - next_w - 12;
-        let prev_x = next_x - prev_w - 6;
-        let range_x = prev_x - rw - 12;
+        let next_x = tts_x - next_w - 8;
+        let prev_x = next_x - prev_w - 4;
+        let range_x = prev_x - rw - 8;
 
-        if range_x > g.right_x + text_width(title, 1) + 20 {
+        if range_x > g.right_x + text_width(title, 1) + 16 {
             draw_str(fb, range_x, 14, range_str, 1, label_col);
 
             fb.fill(prev_x, 8, prev_w, 24, rgb(0x14, 0x1f, 0x2a));
@@ -705,6 +752,7 @@ fn fmt_line_range<'a>(buf: &'a mut [u8; 24], start: u32, end: u32, total: u32) -
 
 fn draw_context_preview(
     fb: &mut Framebuffer,
+    app: &FilesApp,
     g: &FilesGeom,
     entry: &MountEntry,
     context_data: &[u8],
@@ -717,14 +765,9 @@ fn draw_context_preview(
     let key_col = rgb(0xf5, 0x9e, 0x0b); // warm amber for KG keys
     let label_col = rgb(0x7b, 0x8b, 0x98);
     let text_col = rgb(0xe6, 0xf1, 0xf8);
-    let sub_col = rgb(0x38, 0xbd, 0xf8); // light cyan
 
-    let mut y = 54;
-
-    // Subheader
-    let subheader = "CONTEXT THUMBNAIL · ENRICHED .CONTEXT.XML GRAPH";
-    draw_str(fb, rx, y, subheader, 1, sub_col);
-    y += 18;
+    let scroll_px = (app.context_scroll as i32) * 14;
+    let mut y = 50 - scroll_px;
 
     // Mini Knowledge Graph rows: SCOPE, RUNTIME, ROLE, IMPORTS, EXPORTS, DEPENDENTS, INVARIANTS
     let keys = [
@@ -739,53 +782,54 @@ fn draw_context_preview(
 
     let key_w = 90;
     for &key in &keys {
-        if y + 16 > fb.h {
-            break;
+        if y >= 40 && y + 16 <= fb.h {
+            draw_str(fb, rx, y, key, 1, key_col);
+
+            let val = find_context_field(context_data, key.as_bytes()).unwrap_or(if key == "SCOPE" {
+                entry.name_str()
+            } else {
+                "—"
+            });
+
+            // Max characters fitting in remaining width
+            let val_w = content_w - key_w;
+            let max_chars = (val_w / 6).max(4) as usize;
+            let val_clamped = if val.len() > max_chars {
+                &val[..max_chars]
+            } else {
+                val
+            };
+
+            draw_str(fb, rx + key_w, y, val_clamped, 1, text_col);
         }
-        draw_str(fb, rx, y, key, 1, key_col);
-
-        let val = find_context_field(context_data, key.as_bytes()).unwrap_or(if key == "SCOPE" {
-            entry.name_str()
-        } else {
-            "—"
-        });
-
-        // Max characters fitting in remaining width
-        let val_w = content_w - key_w;
-        let max_chars = (val_w / 6).max(4) as usize;
-        let val_clamped = if val.len() > max_chars {
-            &val[..max_chars]
-        } else {
-            val
-        };
-
-        draw_str(fb, rx + key_w, y, val_clamped, 1, text_col);
         y += 18;
     }
 
     y += 6;
-    if y < fb.h {
+    if y >= 40 && y < fb.h {
         fb.fill(rx, y, content_w, 1, rgb(0x22, 0x30, 0x3e));
-        y += 12;
     }
+    y += 12;
+
+    let font_scale = app.font_scale.clamp(1, 3);
 
     // TECHNICAL SUMMARY
-    if y + 16 < fb.h {
+    if y + 16 >= 40 && y < fb.h {
         draw_str(fb, rx, y, "TECHNICAL SUMMARY", 1, accent);
-        y += 16;
-        let summary_val = find_context_field(context_data, b"SUMMARY")
-            .unwrap_or("No context metadata staged for this file.");
-        y = draw_word_wrapped_paragraph(fb, rx, y, content_w, summary_val, text_col);
-        y += 10;
     }
+    y += 16;
+    let summary_val = find_context_field(context_data, b"SUMMARY")
+        .unwrap_or("No context metadata staged for this file.");
+    y = draw_word_wrapped_paragraph(fb, rx, y, content_w, summary_val, text_col, font_scale);
+    y += 10;
 
     // ARCHITECTURAL FIT
-    if y + 16 < fb.h {
-        if let Some(arch_val) = find_context_field(context_data, b"ARCHITECTURE") {
+    if let Some(arch_val) = find_context_field(context_data, b"ARCHITECTURE") {
+        if y + 16 >= 40 && y < fb.h {
             draw_str(fb, rx, y, "ARCHITECTURAL FIT", 1, accent);
-            y += 16;
-            draw_word_wrapped_paragraph(fb, rx, y, content_w, arch_val, label_col);
         }
+        y += 16;
+        draw_word_wrapped_paragraph(fb, rx, y, content_w, arch_val, label_col, font_scale);
     }
 }
 
@@ -818,7 +862,7 @@ pub fn find_context_field<'a>(data: &'a [u8], key: &[u8]) -> Option<&'a str> {
     None
 }
 
-/// Word-wraps text into lines fitting `max_w` at scale 1 (6px/char) and renders to framebuffer.
+/// Word-wraps text into lines fitting `max_w` at the given font `scale` and renders to framebuffer.
 pub fn draw_word_wrapped_paragraph(
     fb: &mut Framebuffer,
     x: i32,
@@ -826,13 +870,17 @@ pub fn draw_word_wrapped_paragraph(
     max_w: i32,
     text: &str,
     col: u32,
+    scale: i32,
 ) -> i32 {
-    let max_chars_per_line = (max_w / 6).max(10) as usize;
+    let scale = scale.clamp(1, 3);
+    let char_w = 6 * scale;
+    let line_step = 10 * scale + 4;
+    let max_chars_per_line = (max_w / char_w).max(8) as usize;
     let bytes = text.as_bytes();
     let mut start = 0;
 
     while start < bytes.len() {
-        if y + 12 > fb.h {
+        if y + 10 * scale > fb.h {
             break;
         }
 
@@ -863,9 +911,11 @@ pub fn draw_word_wrapped_paragraph(
         };
 
         if let Ok(line_str) = core::str::from_utf8(&bytes[start..start + line_len]) {
-            draw_str(fb, x, y, line_str, 1, col);
+            if y >= 40 {
+                draw_str(fb, x, y, line_str, scale, col);
+            }
         }
-        y += 14;
+        y += line_step;
         start += line_len;
     }
     y
@@ -931,7 +981,7 @@ fn draw_folder_summary(
     }
 }
 
-pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_h: i32) -> bool {
+pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_h: i32) -> i32 {
     let g = files_geom(client_w, client_h);
 
     // Left Panel clicks
@@ -939,7 +989,7 @@ pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_
         let row = ((cy - g.row_start_y) / g.row_h) as usize;
         let vis = app.visible_row_count();
         if row >= vis {
-            return false;
+            return 0;
         }
         match app.level {
             FolderLevel::HomeRoot => {
@@ -950,11 +1000,11 @@ pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_
                 } else {
                     FolderLevel::GithubRepo
                 };
-                return app.open_subfolder(folder);
+                return if app.open_subfolder(folder) { 1 } else { 0 };
             }
             FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
                 if row == 0 {
-                    return app.go_parent();
+                    return if app.go_parent() { 1 } else { 0 };
                 }
                 if let Some(gidx) = app.global_idx_for_row(app.level, row) {
                     let is_img = app.entries[gidx].is_image();
@@ -966,8 +1016,10 @@ pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_
                     let changed = app.row_selected != row || !already_staged;
                     app.row_selected = row;
                     app.code_scroll = 0;
+                    app.code_col_scroll = 0;
+                    app.context_scroll = 0;
                     app.ensure_selected_staged();
-                    return changed;
+                    return if changed { 1 } else { 0 };
                 }
             }
         }
@@ -989,32 +1041,63 @@ pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_
 
             if cx >= mode_x && cx < mode_x + mode_w && cy >= 7 && cy <= 33 {
                 app.context_mode = !app.context_mode;
-                return true;
+                return 1;
             }
 
-            // 2. Check [▲ PREV] / [▼ NEXT] hits (if in raw code view)
+            // 2. Check [ A+ ] / [ A- ] hits
+            let ap_w = text_width("[ A+ ]", 1) + 8;
+            let am_w = text_width("[ A- ]", 1) + 8;
+            let ap_x = mode_x - ap_w - 8;
+            let am_x = ap_x - am_w - 4;
+
+            if cy >= 8 && cy <= 32 {
+                if cx >= ap_x && cx < ap_x + ap_w {
+                    app.font_scale = (app.font_scale + 1).min(3);
+                    return 1;
+                }
+                if cx >= am_x && cx < am_x + am_w {
+                    app.font_scale = (app.font_scale - 1).max(1);
+                    return 1;
+                }
+            }
+
+            // 3. Check TTS button hit
+            let tts_btn_txt = if app.tts_active {
+                "[ ■ STOP ]"
+            } else {
+                "[ ▶ TTS ]"
+            };
+            let tts_w = text_width(tts_btn_txt, 1) + 10;
+            let tts_x = am_x - tts_w - 8;
+
+            if cy >= 8 && cy <= 32 && cx >= tts_x && cx < tts_x + tts_w {
+                app.tts_active = !app.tts_active;
+                return 3; // TTS click
+            }
+
+            // 4. Check [▲ PREV] / [▼ NEXT] hits (if in raw code view)
             if !app.context_mode && !entry.is_image() && app.staged_text_idx == sel_idx as i32 {
                 let next_w = text_width("[▼ NEXT]", 1) + 8;
                 let prev_w = text_width("[▲ PREV]", 1) + 8;
-                let next_x = mode_x - next_w - 12;
-                let prev_x = next_x - prev_w - 6;
+                let next_x = tts_x - next_w - 8;
+                let prev_x = next_x - prev_w - 4;
 
                 if cy >= 8 && cy <= 32 {
                     if cx >= prev_x && cx < prev_x + prev_w {
                         app.code_scroll = app.code_scroll.saturating_sub(CODE_CHUNK_LINES);
-                        return true;
+                        return 1;
                     }
                     if cx >= next_x && cx < next_x + next_w {
                         // Advance scroll
                         app.code_scroll = app.code_scroll.saturating_add(CODE_CHUNK_LINES);
-                        return true;
+                        return 1;
                     }
                 }
             }
         }
     }
 
-    false
+    0
 }
 
 pub fn key_window(app: &mut FilesApp, code: i32) -> bool {
@@ -1031,6 +1114,8 @@ pub fn key_window(app: &mut FilesApp, code: i32) -> bool {
                 app.row_selected - 1
             };
             app.code_scroll = 0;
+            app.code_col_scroll = 0;
+            app.context_scroll = 0;
             app.ensure_selected_staged();
             true
         }
@@ -1038,6 +1123,8 @@ pub fn key_window(app: &mut FilesApp, code: i32) -> bool {
         51 | 2 => {
             app.row_selected = (app.row_selected + 1) % vis;
             app.code_scroll = 0;
+            app.code_col_scroll = 0;
+            app.context_scroll = 0;
             app.ensure_selected_staged();
             true
         }
@@ -1046,6 +1133,38 @@ pub fn key_window(app: &mut FilesApp, code: i32) -> bool {
         // Tab / I (33) toggles context mode
         33 => {
             app.context_mode = !app.context_mode;
+            true
+        }
+        // Key code 20 ('+' / '='): increase font scale
+        20 => {
+            app.font_scale = (app.font_scale + 1).min(3);
+            true
+        }
+        // Key code 21 ('-'): decrease font scale
+        21 => {
+            app.font_scale = (app.font_scale - 1).max(1);
+            true
+        }
+        // Key code 36 ('{' / Shift+Left): scroll code columns left
+        36 => {
+            app.code_col_scroll = app.code_col_scroll.saturating_sub(8);
+            true
+        }
+        // Key code 37 ('}' / Shift+Right): scroll code columns right
+        37 => {
+            app.code_col_scroll = app.code_col_scroll.saturating_add(8);
+            true
+        }
+        // Key code 38 (scroll down): code scroll down by 5, context scroll down by 2
+        38 => {
+            app.code_scroll = app.code_scroll.saturating_add(5);
+            app.context_scroll = app.context_scroll.saturating_add(2);
+            true
+        }
+        // Key code 39 (scroll up): code scroll up by 5, context scroll up by 2
+        39 => {
+            app.code_scroll = app.code_scroll.saturating_sub(5);
+            app.context_scroll = app.context_scroll.saturating_sub(2);
             true
         }
         // PageUp / [ (34) scrolls code chunk up

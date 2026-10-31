@@ -57,6 +57,10 @@ const KEY_CODES = {
   Tab: 33, i: 33, I: 33,
   PageUp: 34, '[': 34,
   PageDown: 35, ']': 35,
+  '{': 36, '<': 36,
+  '}': 37, '>': 37,
+  k: 39, K: 39,
+  j: 38, J: 38,
   ArrowUp: 50,
   ArrowDown: 51,
 };
@@ -88,6 +92,100 @@ const clearSnapsBtn = document.getElementById('clear-snaps');
 const guests = [];
 const snapshots = [];
 let activeId = null;
+let activeTtsUtterance = null;
+
+function stopTts(guest) {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  activeTtsUtterance = null;
+  if (guest && guest.exports && guest.exports.app_tts_set_active) {
+    guest.exports.app_tts_set_active(0);
+    guest.render();
+  }
+}
+
+function handleTtsToggle(guest) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    setStatus(`${guest.name} · Web Speech API not supported in this browser`);
+    if (guest.exports && guest.exports.app_tts_set_active) {
+      guest.exports.app_tts_set_active(0);
+      guest.render();
+    }
+    return;
+  }
+
+  const isSpeaking = guest.exports && guest.exports.app_tts_active ? Boolean(guest.exports.app_tts_active()) : false;
+  if (!isSpeaking) {
+    // Stopped speaking
+    stopTts(guest);
+    return;
+  }
+
+  // Get active file idx and read context data from Wasm memory or cache
+  const activePage = guest.exports.app_active_page ? guest.exports.app_active_page() : -1;
+  if (activePage < 0 || !guest.mounts || activePage >= guest.mounts.length) {
+    stopTts(guest);
+    return;
+  }
+
+  const item = guest.mounts[activePage];
+  const ctxPtr = guest.exports.app_mount_context_ptr ? guest.exports.app_mount_context_ptr() : 0;
+  let textToSpeak = '';
+
+  if (ctxPtr) {
+    const mem = new Uint8Array(guest.exports.memory.buffer);
+    const slice = mem.subarray(ctxPtr, ctxPtr + 4096);
+    const zeroIdx = slice.indexOf(0);
+    const len = zeroIdx >= 0 ? zeroIdx : 4096;
+    const raw = new TextDecoder().decode(slice.subarray(0, len));
+    
+    // Parse key-value lines
+    const map = {};
+    for (const line of raw.split('\n')) {
+      const eq = line.indexOf('=');
+      if (eq > 0) {
+        map[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+      }
+    }
+
+    const title = item.name.split('/').pop();
+    const role = map.ROLE ? `Role: ${map.ROLE}. ` : '';
+    const summary = map.SUMMARY ? `Summary: ${map.SUMMARY}. ` : '';
+    const arch = map.ARCHITECTURE ? `Architecture: ${map.ARCHITECTURE}` : '';
+    textToSpeak = `Context for ${title}. ${role}${summary}${arch}`.trim();
+  }
+
+  if (!textToSpeak) {
+    textToSpeak = `Viewing file ${item.name}. No technical summary available.`;
+  }
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(textToSpeak);
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+
+  utterance.onend = () => {
+    if (guest.exports && guest.exports.app_tts_set_active) {
+      guest.exports.app_tts_set_active(0);
+      guest.render();
+    }
+    activeTtsUtterance = null;
+  };
+
+  utterance.onerror = (e) => {
+    console.warn('TTS error:', e);
+    if (guest.exports && guest.exports.app_tts_set_active) {
+      guest.exports.app_tts_set_active(0);
+      guest.render();
+    }
+    activeTtsUtterance = null;
+  };
+
+  activeTtsUtterance = utterance;
+  window.speechSynthesis.speak(utterance);
+  setStatus(`${guest.name} · TTS reading context for ${item.name}…`, true);
+}
 let nextId = 1;
 let totalBlits = 0;
 let moduleBytes = 0;
@@ -668,6 +766,8 @@ async function createGuest(opts = {}) {
         blitToCanvas(t0, t1);
         if (rc === 2) {
           captureSnapshot(vm, true);
+        } else if (rc === 3) {
+          handleTtsToggle(vm);
         } else {
           setStatus(`${vm.name} · ${selectionLabel(vm)} · ${fmtHex32(vm.fbHash)}`, true);
         }

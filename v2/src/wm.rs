@@ -56,6 +56,7 @@ pub const fn menu_header_w(fb_w: i32) -> i32 {
 pub const CLICK_NOOP: i32 = 0;
 pub const CLICK_CHANGED: i32 = 1;
 pub const CLICK_SNAPSHOT: i32 = 2;
+pub const CLICK_TTS: i32 = 3;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AppSlot {
@@ -485,7 +486,10 @@ impl WmState {
                 }
             }
             AppSlot::Files => {
-                if files::click_window(&mut self.files, cx, cy, client_w, client_h) {
+                let rc = files::click_window(&mut self.files, cx, cy, client_w, client_h);
+                if rc == 3 {
+                    CLICK_TTS
+                } else if rc != 0 {
                     CLICK_CHANGED
                 } else {
                     CLICK_NOOP

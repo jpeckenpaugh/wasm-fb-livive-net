@@ -433,6 +433,21 @@ pub extern "C" fn app_set_test_pattern(enabled: i32) {
 }
 
 #[no_mangle]
+pub extern "C" fn app_tts_active() -> i32 {
+    unsafe { i32::from((*GUEST.wm.get()).files.tts_active) }
+}
+
+#[no_mangle]
+pub extern "C" fn app_tts_set_active(active: i32) {
+    with_state(|wm, fb, st, txt, ctx| {
+        wm.files.tts_active = active != 0;
+        if wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+    });
+}
+
+#[no_mangle]
 pub extern "C" fn app_destroy() {
     unsafe {
         let wm = &mut *GUEST.wm.get();
@@ -445,8 +460,8 @@ mod tests {
     use super::*;
     use crate::fb::rgb;
     use crate::wm::{
-        dock_icon_y, CLICK_CHANGED, CLICK_SNAPSHOT, DOCK_ICON_H, DOCK_ICON_W, DOCK_X, DOCK_Y,
-        TITLE_H,
+        dock_icon_y, CLICK_CHANGED, CLICK_SNAPSHOT, CLICK_TTS, DOCK_ICON_H, DOCK_ICON_W, DOCK_X,
+        DOCK_Y, TITLE_H,
     };
 
     #[test]
@@ -652,5 +667,42 @@ mod tests {
         // Test paging keys: PageDown (35) and PageUp (34)
         assert_eq!(app_key(35), CLICK_CHANGED); // scroll chunk down
         assert_eq!(app_key(34), CLICK_CHANGED); // scroll chunk up
+
+        // Test new font scaling and horizontal/vertical scroll keys
+        assert_eq!(app_key(20), CLICK_CHANGED); // font_scale + 1 -> 2
+        assert_eq!(app_key(20), CLICK_CHANGED); // font_scale + 1 -> 3
+        assert_eq!(app_key(20), CLICK_CHANGED); // font_scale clamped at 3
+        assert_eq!(app_key(21), CLICK_CHANGED); // font_scale - 1 -> 2
+        assert_eq!(app_key(21), CLICK_CHANGED); // font_scale - 1 -> 1
+        assert_eq!(app_key(21), CLICK_CHANGED); // font_scale clamped at 1
+
+        assert_eq!(app_key(37), CLICK_CHANGED); // col_scroll + 8
+        assert_eq!(app_key(36), CLICK_CHANGED); // col_scroll - 8
+        assert_eq!(app_key(38), CLICK_CHANGED); // scroll down: code + 5, ctx + 2
+        assert_eq!(app_key(39), CLICK_CHANGED); // scroll up: code - 5, ctx - 2
+
+        // Test TTS button click and C export
+        assert_eq!(app_tts_active(), 0);
+        // Compute click on TTS button in Control bar:
+        // mode_w = text_width("[ RAW VIEW ]", 1) + 12 = 12 * 6 + 12 = 84
+        // mode_x = 1280 - 84 - 12 = 1184
+        // ap_w = 44, ap_x = 1184 - 44 - 8 = 1132
+        // am_w = 44, am_x = 1132 - 44 - 4 = 1084
+        // tts_w = 10 * 6 + 10 = 70, tts_x = 1084 - 70 - 8 = 1006
+        // Click inside TTS button: x = 1020, y = TITLE_H + 16 = 48
+        let tts_click_x = 1020;
+        let tts_click_y = TITLE_H + 16;
+        assert_eq!(app_click(tts_click_x, tts_click_y), CLICK_TTS);
+        assert_eq!(app_tts_active(), 1);
+
+        // Click again to stop TTS
+        assert_eq!(app_click(tts_click_x, tts_click_y), CLICK_TTS);
+        assert_eq!(app_tts_active(), 0);
+
+        // Test host setting TTS active directly via C ABI
+        app_tts_set_active(1);
+        assert_eq!(app_tts_active(), 1);
+        app_tts_set_active(0);
+        assert_eq!(app_tts_active(), 0);
     }
 }

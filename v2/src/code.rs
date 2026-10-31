@@ -767,12 +767,18 @@ pub fn draw_code_preview(
     h: i32,
     lang: CodeLang,
     scroll_line: usize,
+    scale: i32,
+    col_scroll: usize,
 ) {
-    let scale = if w < 520 { 1 } else { 2 };
-    let char_adv = 6 * scale; // 6px at scale 1, 12px at scale 2
-    let line_h = if scale == 1 { 12 } else { 20 };
+    let scale = scale.clamp(1, 3);
+    let char_adv = 6 * scale;
+    let line_h = 10 * scale + 2;
     let pad_top = if h < 450 { 12 } else { 20 };
-    let gutter_w = if scale == 1 { 34 } else { 56 };
+    let gutter_w = match scale {
+        1 => 34,
+        2 => 56,
+        _ => 78,
+    };
     let text_x = x + gutter_w + (if scale == 1 { 10 } else { 16 });
     let max_cols = ((w - gutter_w - 20).max(0) / char_adv) as usize;
     let visible_lines = ((h - 2 * pad_top).max(0) / line_h) as usize;
@@ -823,13 +829,24 @@ pub fn draw_code_preview(
             let nt = tokenize_line(lang, &expanded[..elen], &mut toks);
 
             for t in toks.iter().take(nt) {
-                if t.start >= max_cols {
+                let token_end = t.start + t.len;
+                if token_end <= col_scroll {
+                    // Token is completely scrolled out to the left
+                    continue;
+                }
+                let vis_start = t.start.max(col_scroll);
+                let col_offset = vis_start - col_scroll;
+                if col_offset >= max_cols {
+                    // Beyond the right edge
                     break;
                 }
-                let avail = max_cols - t.start;
-                let tlen = t.len.min(avail);
-                if let Ok(seg) = core::str::from_utf8(&expanded[t.start..t.start + tlen]) {
-                    let tx = text_x + (t.start as i32) * char_adv;
+                let vis_end = token_end.min(col_scroll + max_cols);
+                if vis_end <= vis_start {
+                    continue;
+                }
+                let tlen = vis_end - vis_start;
+                if let Ok(seg) = core::str::from_utf8(&expanded[vis_start..vis_start + tlen]) {
+                    let tx = text_x + (col_offset as i32) * char_adv;
                     draw_str(fb, tx, ly, seg, scale, color_for(t.kind));
                 }
             }
