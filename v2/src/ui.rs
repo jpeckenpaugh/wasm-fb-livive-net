@@ -23,6 +23,23 @@ pub fn separator(fb: &mut Framebuffer, x: i32, y: i32, w: i32) {
     fb.fill(x, y, w, 1, t::BORDER_DARK);
 }
 
+/// Keyboard focus ring: two-pixel amber border with a dark inner separation.
+pub fn focus_ring(fb: &mut Framebuffer, r: Rect) {
+    if r.w <= 0 || r.h <= 0 {
+        return;
+    }
+    fb.border(r.x, r.y, r.w, r.h, 2, t::FOCUS);
+    fb.border(r.x + 2, r.y + 2, r.w - 4, r.h - 4, 1, t::OVERLAY);
+}
+
+/// Mouse hover outline, intentionally weaker than the focus ring.
+pub fn hover_ring(fb: &mut Framebuffer, r: Rect) {
+    if r.w <= 0 || r.h <= 0 {
+        return;
+    }
+    fb.border(r.x, r.y, r.w, r.h, 1, t::TEXT_SOFT);
+}
+
 /// Two-pixel accent rule used under section headings.
 pub fn accent_rule(fb: &mut Framebuffer, x: i32, y: i32, w: i32) {
     fb.fill(x, y, w, 2, t::ACCENT);

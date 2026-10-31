@@ -7,10 +7,10 @@ This document details the architectural design and implementation of on-demand c
 ## 1. On-Demand GitHub Repository Mounts (`gh://`)
 
 The `Files` application structures storage into two main domains:
-1. **`HOME (~/)`**:
+1. **`Home (~/)`**:
    - `~/wallpapers`: 5 wallpaper images (`assets/*.png`), staged as decoded RGBA8888 pixels.
    - `~/samples`: 8 general web/application source files (`demo/*`).
-2. **`GITHUB (gh://)`**:
+2. **`GitHub (gh://)`**:
    - `gh://mines-sm`: Task-scoped upstream code files (`lib.rs`, `Cargo.toml`, `README.md`) located in `gh/mines-sm/`.
 
 No repository files are baked into `appliance.wasm`. When a file is selected, the JS hypervisor fetches the UTF-8 text and stages it into `app_mount_text_ptr()` in Wasm linear memory.
@@ -50,7 +50,7 @@ The `#![no_std]` Rust guest parses this buffer with zero dynamic memory allocati
 
 The Right 2/3 Preview control bar (`y: 0..40`) provides interactive viewport adjustments:
 
-1. **`[ RAW VIEW ]` / `[ CONTEXT ]`**: Toggle between raw content (image or syntax-highlighted code) and structured context breakdown.
+1. **`[ Raw View ]` / `[ Context ]`**: Toggle between raw content (image or syntax-highlighted code) and structured context breakdown.
 2. **Font Scaling (`[ A- ]` / `[ A+ ]`)**:
    - Dynamically scales font between scale 1, 2, and 3.
    - Adjusts line heights (`10 * scale + 2`), character advance (`6 * scale`), visible lines, and word-wrapping boundaries.
@@ -68,4 +68,4 @@ Inside the `Files` control bar, users can click **`[ ▶ TTS ]`**:
 2. The JS hypervisor catches `rc = 3`, reads the active context metadata (`ROLE`, `SUMMARY`, `ARCHITECTURE`) from Wasm linear memory, and synthesizes speech using the browser's native **Web Speech API (`window.speechSynthesis`)**.
 3. Clicking `[ ■ STOP ]` immediately calls `window.speechSynthesis.cancel()`.
 4. When the utterance finishes, `utterance.onend` calls `guest.exports.app_tts_set_active(0)` to reset the button state.
-5. Users can navigate code, page chunks, change font sizes, or switch between `RAW` and `CONTEXT` while narration plays in the background.
+5. Users can navigate code, page chunks, change font sizes, or switch between `Raw` and `Context` while narration plays in the background.

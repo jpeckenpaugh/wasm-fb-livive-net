@@ -59,7 +59,7 @@ pub struct FontSheet {
 pub const FIVESEVEN_US_LATIN: FontSheet = FontSheet {
     id: "FiveSeven",
     locale: "Multi-Script (Latin / Greek / Cyrillic / Symbols)",
-    range_label: "532 GLYPHS + 32 ICONS (UTF-8)",
+    range_label: "532 Glyphs + 32 Icons (UTF-8)",
     first_code: 0x0020,
     last_code: 0x26FF,
     glyph_w: 5,

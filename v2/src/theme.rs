@@ -43,6 +43,9 @@ pub const TEXT_CODE: u32 = rgb(0xe4, 0xec, 0xf2);
 // --- Accent and status -----------------------------------------------------
 pub const ACCENT: u32 = rgb(0x2d, 0xd4, 0xbf);
 pub const ACCENT_DIM: u32 = rgb(0x10, 0x34, 0x37);
+/// Keyboard focus ring. Deliberately distinct from the teal accent so hover and
+/// focus never read as the same state.
+pub const FOCUS: u32 = rgb(0xff, 0xd1, 0x66);
 pub const SUCCESS: u32 = rgb(0x34, 0xd3, 0x99);
 pub const WARNING: u32 = rgb(0xf5, 0x9e, 0x0b);
 pub const WARNING_BRIGHT: u32 = rgb(0xfb, 0xbf, 0x24);

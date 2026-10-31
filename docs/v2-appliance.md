@@ -1,6 +1,6 @@
 # Appliance v2: Minimalist `no_std` Rust Wasm Window Manager & Appliance
 
-`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~90 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, and built-in system attestation.
+`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~99 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, and built-in system attestation.
 
 ```
 Browser Host (web/v2/host.js)
@@ -8,7 +8,7 @@ Browser Host (web/v2/host.js)
   ├── Staging Bridge (RGBA8888, UTF-8 text, KEY=VALUE\n context wire buffer)
   └── Single-threaded Rust Wasm Guest (v2/src/lib.rs)
         ├── Dynamic linear memory paging (__heap_base -> FB + Staging)
-        ├── 32px Title Bar + Left Overlay App Dock (wm.rs)
+        ├── 32px Title Bar + App Home menu/drawer (wm.rs)
         ├── Input/result contract (input.rs), responsive size classes (layout.rs)
         ├── Semantic palette and shared chrome widgets (theme.rs, ui.rs, fmt.rs)
         ├── Zero-allocation 2D Software Rasterizer & Font Engine (fb.rs, font.rs)
@@ -26,7 +26,7 @@ Browser Host (web/v2/host.js)
 
 ### 1.1 Pure `#![no_std]` on `wasm32-unknown-unknown`
 - Zero external runtime dependencies, zero standard library (`no_std`), and panic = abort.
-- Compiles down to **~90 KiB** of Wasm bytecode.
+- Compiles down to **~99 KiB** of Wasm bytecode.
 - Linear memory is dynamically grown via `memory_grow` above `__heap_base` in `app_init(width, height)` to support dynamic resolutions ranging from mobile (`360x800`) to 1080p (`1920x1080`).
 
 ### 1.2 Upstream Host Decoding vs. Zero Static Bloat
@@ -35,8 +35,8 @@ Browser Host (web/v2/host.js)
 - The JS hypervisor (`web/v2/host.js`) decodes PNGs into raw RGBA8888, parses XML, and fetches UTF-8 source code, staging them into designated guest linear memory buffers only when selected.
 
 ### 1.3 Appliance Window Manager (`wm.rs`)
-- **32px Title Bar**: Context menus (`SYSTEM`/`FILES`/`VIEW`/`TESTING`), status, session clock.
-- **Left Overlay App Dock**: Vertical launcher with 1/10th scale preview tiles (`128x72`) that slide over the active surface without displacing client windows, auto-hiding on click.
+- **32px Title Bar**: `Home`, app, `View`, and `Testing` menus, status, session clock.
+- **App Home Drawer**: The `Home` menu's dropdown, using 1/10th scale preview tiles (`128x72`) that overlay the active surface without displacing client windows and close when an app launches.
 - **Flat Maximized Surface**: Zero nested frame borders or redundant window chrome.
 
 ### 1.4 Deterministic Attestation (`build.rs`)
@@ -48,8 +48,9 @@ Browser Host (web/v2/host.js)
 - `layout.rs`: shared `Rect`, `SizeClass` (`Compact` / `Medium` / `Full`), and metrics helpers.
 - `ui.rs`: panel, toolbar, button, dock-tile, separator, and key/value-row widgets.
 - `fmt.rs`: the single allocation-free numeric / date / size / title formatter.
-- `input.rs`: `Key` and `InputResult`; the C ABI still returns `0..3`.
+- `input.rs`: `Key`, `Mods`, and `InputResult` (`0` noop, `1` changed, `2` snapshot, `3` TTS, `4` handled); the host only prevents browser defaults for consumed keys.
 - `wm.rs` menu labels map to `Command` values, and `WmLayout` is shared by drawing and hit testing.
+- Mouse and keyboard share one `Focus` state for the menu bar, dropdowns, Home drawer, and client controls; `hover` is pointer-only preview. See [v2-input.md](v2-input.md).
 - Full-frame FNV hashing is on demand; the host samples telemetry hashes every 10 frames and always requests a fresh hash for snapshots.
 
 ---

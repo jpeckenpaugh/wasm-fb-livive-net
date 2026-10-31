@@ -83,14 +83,14 @@ impl MinesApp {
     pub fn status_str(&self) -> &'static str {
         if self.board.is_terminal {
             if self.board.is_won {
-                "CLEARED (WON)"
+                "Cleared (Won)"
             } else {
-                "DETONATED"
+                "Detonated"
             }
         } else if self.board.move_count == 0 {
-            "READY"
+            "Ready"
         } else {
-            "PLAYING"
+            "Playing"
         }
     }
 }
@@ -259,7 +259,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     let head_sc = if compact_info { 2 } else { 3 };
     let row_sc = if compact_info { 1 } else { 2 };
 
-    draw_str(fb, g.info_x, g.info_y, "MINES 8X8", head_sc, t::TEXT);
+    draw_str(fb, g.info_x, g.info_y, "Mines 8x8", head_sc, t::TEXT);
     let bar_col = if b.is_terminal {
         if b.is_won {
             t::SUCCESS
@@ -282,7 +282,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     ui::kv_row(
         fb,
         row(y),
-        "STATE",
+        "State",
         app.status_str(),
         row_sc,
         label_col,
@@ -292,17 +292,17 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
 
     let mut seed_buf = [b' '; 16];
     let seed_str = f::u32_str(&mut seed_buf, b.seed as u32);
-    ui::kv_row(fb, row(y), "SEED", seed_str, row_sc, label_col, text_col);
+    ui::kv_row(fb, row(y), "Seed", seed_str, row_sc, label_col, text_col);
     y += step_y;
 
     let mut safe_buf = [b' '; 16];
     let safe_str = f::ratio_str(&mut safe_buf, safe_rev, safe_total);
-    ui::kv_row(fb, row(y), "CLEARED", safe_str, row_sc, label_col, text_col);
+    ui::kv_row(fb, row(y), "Cleared", safe_str, row_sc, label_col, text_col);
     y += step_y;
 
     let mut flag_buf = [b' '; 16];
     let flag_str = f::ratio_str(&mut flag_buf, flags_placed, b.num_bombs as u32);
-    ui::kv_row(fb, row(y), "FLAGS", flag_str, row_sc, label_col, text_col);
+    ui::kv_row(fb, row(y), "Flags", flag_str, row_sc, label_col, text_col);
     y += step_y;
 
     if y + step_y <= g.btn_mode.y {
@@ -315,7 +315,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
         ui::kv_row(
             fb,
             row(y),
-            "STRIKES",
+            "Strikes",
             strike_str,
             row_sc,
             label_col,
@@ -325,9 +325,9 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
 
     // --- 3. Interactive Action Buttons ---
     let mode_label = if app.flag_mode {
-        "MODE: FLAG (F)"
+        "Mode: Flag (F)"
     } else {
-        "MODE: REVEAL"
+        "Mode: Reveal"
     };
     ui::button(
         fb,
@@ -340,12 +340,12 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
         },
         row_sc,
     );
-    ui::button(fb, g.btn_seed, "NEW SEED (N)", ui::Tone::Neutral, row_sc);
+    ui::button(fb, g.btn_seed, "New Seed (N)", ui::Tone::Neutral, row_sc);
 
     let rule_lbl = if b.rules.max_strikes > 1 {
-        "RULE: SHIELDED (3 STRIKES)"
+        "Rule: Shielded (3 Strikes)"
     } else {
-        "RULE: CLASSIC (1 STRIKE)"
+        "Rule: Classic (1 Strike)"
     };
     ui::button(fb, g.btn_rule, rule_lbl, ui::Tone::Neutral, row_sc);
 }
@@ -432,16 +432,16 @@ pub fn draw_dock_tile(
 ) {
     ui::dock_tile(fb, Rect::new(x, y, w, h), active);
     draw_icon(fb, x + 10, y + 24, Icon::Games, 32, t::ACCENT);
-    draw_str_prop(fb, x + 48, y + 18, "MINES", 2, t::TEXT);
+    draw_str_prop(fb, x + 48, y + 18, "Mines", 2, t::TEXT);
 
     let sub = if app.board.is_terminal {
         if app.board.is_won {
-            "8X8 WON"
+            "8x8 Won"
         } else {
-            "8X8 BOOM"
+            "8x8 Boom"
         }
     } else {
-        "8X8 SEEDED"
+        "8x8 Seeded"
     };
     draw_str_prop(fb, x + 48, y + 42, sub, 1, t::ACCENT);
 }

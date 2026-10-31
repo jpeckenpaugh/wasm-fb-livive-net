@@ -20,9 +20,9 @@ This repository includes two generations:
 
 ### 1. Appliance v2 (Rust `#![no_std]` Window Manager) — Recommended
 Located in `v2/` and served at `/v2/`:
-- **Size**: **~90 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
+- **Size**: **~99 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
 - **Architecture**: Bare-metal `#![no_std]` Rust (`wasm32-unknown-unknown`), dynamic resolution scaling (360×800 up to 1080p), zero-allocation 2D software rasterizer and bitmap font engine. Shared `theme`, `layout`, `ui`, `fmt`, and `input` modules keep colors, size classes, chrome, formatting, and key/result contracts in one place.
-- **Window Manager (`wm.rs`)**: 32px Title Bar with pull-down menus, vertical Left Overlay App Dock, and flat maximized client surfaces.
+- **Window Manager (`wm.rs`)**: 32px Title Bar with `Home`, app, `View`, and `Testing` menus; the App Home drawer is the `Home` dropdown. Mouse and keyboard share one focus model (`F9`/`Alt+D` Home drawer, `F10`/`Alt+M` menu bar, `Tab` client traversal, `Enter`/`Space` activation); see [docs/v2-input.md](docs/v2-input.md).
 - **Applications**:
   - **System**: FNV-1a 64-bit build attestation (`build.rs`), performance telemetry, and test patterns.
   - **Calculator**: Interactive desk calculator with formatted separators.

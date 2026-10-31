@@ -20,7 +20,7 @@ pub mod wm;
 use core::cell::UnsafeCell;
 use fb::{Framebuffer, DEFAULT_H, DEFAULT_W, MAX_DIM, MAX_PIXELS};
 use files::{MAX_CONTEXT_BYTES, MAX_TEXT_BYTES};
-use input::Key;
+use input::{Key, Mods};
 use wm::{AppSlot, WmState};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -222,16 +222,62 @@ pub extern "C" fn app_click(x: i32, y: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn app_key(key: i32) -> i32 {
+    app_key_mods(key, 0)
+}
+
+/// Preferred entry point: `mods` is the bitmask from [`Mods`].
+#[no_mangle]
+pub extern "C" fn app_key_mods(key: i32, mods: i32) -> i32 {
     let Some(key) = Key::from_code(key) else {
         return 0;
     };
+    let mods = Mods::from_bits(mods);
     with_state(|wm, fb, st, txt, ctx| {
-        let rc = wm.key(key);
+        let rc = wm.key(key, mods);
         if rc.is_changed() {
             wm.render(fb, st, txt, ctx);
         }
         rc.to_i32()
     })
+}
+
+#[no_mangle]
+pub extern "C" fn app_pointer_move(x: i32, y: i32) -> i32 {
+    with_state(|wm, fb, st, txt, ctx| {
+        let rc = wm.pointer_move(x, y);
+        if rc.is_changed() {
+            wm.render(fb, st, txt, ctx);
+        }
+        rc.to_i32()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn app_pointer_leave() -> i32 {
+    with_state(|wm, fb, st, txt, ctx| {
+        let rc = wm.pointer_leave();
+        if rc.is_changed() {
+            wm.render(fb, st, txt, ctx);
+        }
+        rc.to_i32()
+    })
+}
+
+/// Encoded focus target for tests and the host status line.
+#[no_mangle]
+pub extern "C" fn app_focus() -> i32 {
+    unsafe { (*GUEST.wm.get()).focus_code() }
+}
+
+/// Keyboard focus inside the Files pane (`FilesFocus` discriminant).
+#[no_mangle]
+pub extern "C" fn app_files_focus() -> i32 {
+    unsafe { (*GUEST.wm.get()).files.focus as i32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_files_context_mode() -> i32 {
+    unsafe { i32::from((*GUEST.wm.get()).files.context_mode) }
 }
 
 #[no_mangle]
@@ -391,7 +437,7 @@ pub extern "C" fn app_snapshot_count() -> u32 {
 
 #[no_mangle]
 pub extern "C" fn app_dock_visible() -> i32 {
-    unsafe { i32::from((*GUEST.wm.get()).dock_visible) }
+    unsafe { i32::from((*GUEST.wm.get()).drawer_open()) }
 }
 
 #[no_mangle]
@@ -469,8 +515,8 @@ mod tests {
     use super::*;
     use crate::fb::rgb;
     use crate::wm::{
-        dock_icon_y, CLICK_CHANGED, CLICK_SNAPSHOT, CLICK_TTS, DOCK_ICON_H, DOCK_ICON_W, DOCK_X,
-        DOCK_Y, TITLE_H,
+        dock_icon_y, CLICK_CHANGED, CLICK_NOOP, CLICK_SNAPSHOT, CLICK_TTS, DOCK_ICON_H,
+        DOCK_ICON_W, DOCK_X, DOCK_Y, TITLE_H,
     };
 
     #[test]
@@ -649,14 +695,17 @@ mod tests {
         }
         app_mount_commit_context(0, ctx_wire.len());
 
-        // Toggle context mode via key 33 (Tab / I)
-        assert_eq!(app_key(33), CLICK_CHANGED);
+        // Toggle context mode via `I` (40). Tab (33) is now focus traversal.
+        assert_eq!(app_files_context_mode(), 0);
+        assert_eq!(app_key(40), CLICK_CHANGED);
+        assert_eq!(app_files_context_mode(), 1);
         let ctx_hash = app_fb_hash();
         assert_ne!(ctx_hash, raw_hash);
 
-        // Toggle back to raw mode via key 33
-        assert_eq!(app_key(33), CLICK_CHANGED);
-        assert_eq!(app_fb_hash(), raw_hash);
+        // Toggle back to raw mode with the same key.
+        assert_eq!(app_key(40), CLICK_CHANGED);
+        assert_eq!(app_files_context_mode(), 0);
+        assert_ne!(app_fb_hash(), ctx_hash);
 
         // Toggle via menu item 2 (TOGGLE CONTEXT)
         assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
@@ -664,7 +713,7 @@ mod tests {
             app_click(files_menu_x, TITLE_H + 16 + 2 * wm::MENU_ITEM_H),
             CLICK_CHANGED
         );
-        assert_eq!(app_fb_hash(), ctx_hash);
+        assert_eq!(app_files_context_mode(), 1);
 
         // Toggle back via menu item 2
         assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
@@ -672,7 +721,7 @@ mod tests {
             app_click(files_menu_x, TITLE_H + 16 + 2 * wm::MENU_ITEM_H),
             CLICK_CHANGED
         );
-        assert_eq!(app_fb_hash(), raw_hash);
+        assert_eq!(app_files_context_mode(), 0);
 
         // Test paging keys: PageDown (35) and PageUp (34)
         assert_eq!(app_key(35), CLICK_CHANGED); // scroll chunk down
@@ -714,5 +763,64 @@ mod tests {
         assert_eq!(app_tts_active(), 1);
         app_tts_set_active(0);
         assert_eq!(app_tts_active(), 0);
+    }
+
+    #[test]
+    fn keyboard_focus_traversal_and_activation() {
+        app_set_session(1);
+        assert_eq!(app_init(1280, 720), 1);
+        assert_eq!(app_focus(), 0);
+
+        // F10 -> Home header, Down -> Home drawer, Enter -> System.
+        assert_eq!(app_key(61), CLICK_CHANGED);
+        assert_eq!(app_focus(), 100);
+        assert_eq!(app_key(51), CLICK_CHANGED);
+        assert_eq!(app_focus(), 200);
+        assert_eq!(app_key(24), CLICK_CHANGED);
+        assert_eq!(app_focus(), 0);
+        assert_eq!(app_selected(), 1);
+        assert_eq!(app_active_page(), 0);
+
+        // F9 -> Home drawer, Down -> Calc, Enter -> launch.
+        assert_eq!(app_key(60), CLICK_CHANGED);
+        assert_eq!(app_focus(), 200);
+        assert_eq!(app_dock_visible(), 1);
+        assert_eq!(app_key(51), CLICK_CHANGED);
+        assert_eq!(app_focus(), 201);
+        assert_eq!(app_key(24), CLICK_CHANGED);
+        assert_eq!(app_focus(), 0);
+        assert_eq!(app_selected(), 2);
+        assert_eq!(app_dock_visible(), 0);
+
+        // Esc closes the drawer to the Home header; a second Esc returns to
+        // the client.
+        assert_eq!(app_key(60), CLICK_CHANGED);
+        assert_eq!(app_focus(), 200);
+        assert_eq!(app_key(25), CLICK_CHANGED);
+        assert_eq!(app_focus(), 100);
+        assert_eq!(app_key(25), CLICK_CHANGED);
+        assert_eq!(app_focus(), 0);
+        assert_eq!(app_dock_visible(), 0);
+
+        // Ctrl+3 launches Files without opening the dock.
+        assert_eq!(app_key_mods(13, 2), CLICK_CHANGED);
+        assert_eq!(app_selected(), 3);
+        assert_eq!(app_focus(), 0);
+
+        // Tab cycles Files controls; Shift+Tab reverses.
+        assert_eq!(app_files_focus(), 0);
+        assert_eq!(app_key(33), CLICK_CHANGED);
+        assert_eq!(app_files_focus(), 1);
+        assert_eq!(app_key_mods(33, 1), CLICK_CHANGED);
+        assert_eq!(app_files_focus(), 0);
+    }
+
+    #[test]
+    fn pointer_hover_is_reported_once() {
+        assert_eq!(app_init(1280, 720), 1);
+        assert_eq!(app_pointer_move(56, 16), CLICK_CHANGED); // first menu header
+        assert_eq!(app_pointer_move(56, 16), CLICK_NOOP);
+        assert_eq!(app_pointer_move(10, 400), CLICK_CHANGED); // leaves the header
+        assert_eq!(app_pointer_leave(), CLICK_NOOP);
     }
 }

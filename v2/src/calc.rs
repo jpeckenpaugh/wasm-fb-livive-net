@@ -67,7 +67,7 @@ const BUTTONS: [Btn; 18] = [
         row: 0,
         cspan: 1,
         rspan: 1,
-        key: Key::Escape,
+        key: Key::Clear,
         label: "C",
     },
     Btn {
@@ -353,7 +353,7 @@ impl Default for CalcApp {
 pub fn key_window(app: &mut CalcApp, key: Key) -> InputResult {
     if app.error {
         app.clear();
-        if key == Key::Escape {
+        if key == Key::Clear {
             return InputResult::Changed;
         }
     }
@@ -385,7 +385,7 @@ pub fn key_window(app: &mut CalcApp, key: Key) -> InputResult {
                 InputResult::Changed
             }
         }
-        Key::Escape => {
+        Key::Clear => {
             app.clear();
             InputResult::Changed
         }
@@ -454,7 +454,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
     for b in &BUTTONS {
         let r = btn_rect(&g, b);
         let bg = match b.key {
-            Key::Escape => t::CALC_CLEAR,
+            Key::Clear => t::CALC_CLEAR,
             Key::Enter => t::CALC_EQ,
             Key::Plus | Key::Minus | Key::Star | Key::Slash => t::CALC_OP,
             _ => t::SURFACE_RAISED,
@@ -476,7 +476,7 @@ pub fn draw_dock_tile(
 ) {
     ui::dock_tile(fb, Rect::new(x, y, w, h), active);
     draw_icon(fb, x + 10, y + 24, Icon::Calculator, 32, t::ACCENT);
-    draw_str_prop(fb, x + 48, y + 18, "CALC", 2, t::TEXT);
+    draw_str_prop(fb, x + 48, y + 18, "Calc", 2, t::TEXT);
 
     let mut disp_buf = [0u8; 24];
     let disp_str = app.format_display(&mut disp_buf);

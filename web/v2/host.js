@@ -54,22 +54,31 @@ const KEY_CODES = {
   '5': 15, '6': 16, '7': 17, '8': 18, '9': 19,
   '+': 20, '-': 21, '*': 22, 'x': 22, 'X': 22, '/': 23,
   '=': 24, Enter: 24,
-  Escape: 25, c: 25, C: 25,
+  Escape: 25,
   Backspace: 26,
   '.': 27, ',': 27,
   f: 30, F: 30,
   n: 31, N: 31,
   r: 32, R: 32,
-  Tab: 33, i: 33, I: 33,
+  Tab: 33,
   PageUp: 34, '[': 34,
   PageDown: 35, ']': 35,
   '{': 36, '<': 36,
   '}': 37, '>': 37,
   k: 39, K: 39,
   j: 38, J: 38,
+  i: 40, I: 40,
+  Home: 41,
+  End: 42,
+  c: 43, C: 43,
   ArrowUp: 50,
   ArrowDown: 51,
+  F9: 60,
+  F10: 61,
 };
+
+/* Modifier bits mirrored by `v2/src/input.rs::Mods`. */
+const MODS = { Shift: 1, Ctrl: 2, Alt: 4, Meta: 8 };
 
 const KiB = 1024;
 const MiB = 1024 * KiB;
@@ -219,13 +228,27 @@ const selectionLabel = (guest) => {
   const sel = guest.exports.app_selected();
   if (sel === 1) {
     const page = guest.exports.app_active_page();
-    const sec = page === 1 ? 'locale' : page === 2 ? 'fonts' : 'about';
-    return `system (${sec})`;
+    const sec =
+      page === 1 ? 'Locale' : page === 2 ? 'Fonts' : page === 3 ? 'Icons' : 'About';
+    return `System (${sec})`;
   }
-  if (sel === 2) return 'calc';
-  if (sel === 3) return 'files';
-  if (sel === 4) return 'mines';
-  return 'desktop';
+  if (sel === 2) return 'Calc';
+  if (sel === 3) return 'Files';
+  if (sel === 4) return 'Mines';
+  return 'Desktop';
+};
+
+/* Focus codes mirror `v2/src/wm.rs`; menu order is Home, App, View, Testing. */
+const MENU_NAMES = ['Home', 'App', 'View', 'Testing'];
+const focusLabel = (code) => {
+  if (code === 0) return 'client';
+  if (code >= 200) {
+    const idx = Math.floor((code - 200) / 10);
+    const item = (code - 200) % 10;
+    return `${MENU_NAMES[idx] || 'Menu'} ${item}`;
+  }
+  if (code >= 100) return MENU_NAMES[code - 100] || 'Menu bar';
+  return `focus-${code}`;
 };
 
 let wasmModulePromise = null;
@@ -792,12 +815,20 @@ async function createGuest(opts = {}) {
       render();
     };
 
+    const logicalPoint = (event) => {
+      const rect = vm.canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      return {
+        x: Math.floor(((event.clientX - rect.left) * width) / rect.width),
+        y: Math.floor(((event.clientY - rect.top) * height) / rect.height),
+      };
+    };
+
     vm.canvas.addEventListener('pointerdown', (event) => {
       event.preventDefault();
-      const rect = vm.canvas.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      const x = Math.floor(((event.clientX - rect.left) * width) / rect.width);
-      const y = Math.floor(((event.clientY - rect.top) * height) / rect.height);
+      const point = logicalPoint(event);
+      if (!point) return;
+      const { x, y } = point;
       vm.canvas.focus({ preventScroll: true });
       const rightClick = event.button === 2 || event.ctrlKey;
       if (rightClick && exports.app_selected() === 4) {
@@ -814,16 +845,75 @@ async function createGuest(opts = {}) {
       event.preventDefault();
     });
 
-    vm.canvas.addEventListener('keydown', (event) => {
-      const code = KEY_CODES[event.key];
-      if (code == null) return;
-      event.preventDefault();
+    // Hover is coalesced to one guest update per animation frame.
+    let movePending = false;
+    let movePoint = null;
+    const flushMove = () => {
+      movePending = false;
+      if (!movePoint || vm.disposed || !vm.exports) return;
+      const point = movePoint;
+      movePoint = null;
       const t0 = performance.now();
-      const rc = exports.app_key(code);
+      const rc = exports.app_pointer_move(point.x, point.y);
       const t1 = performance.now();
-      if (rc !== 0) {
+      if (rc !== 0) blitToCanvas(t0, t1);
+    };
+    vm.canvas.addEventListener('pointermove', (event) => {
+      const point = logicalPoint(event);
+      if (!point) return;
+      movePoint = point;
+      if (!movePending) {
+        movePending = true;
+        requestAnimationFrame(flushMove);
+      }
+    });
+    vm.canvas.addEventListener('pointerleave', () => {
+      if (!vm.exports) return;
+      movePoint = null;
+      const t0 = performance.now();
+      const rc = exports.app_pointer_leave();
+      const t1 = performance.now();
+      if (rc !== 0) blitToCanvas(t0, t1);
+    });
+
+    vm.canvas.addEventListener('keydown', (event) => {
+      let code = KEY_CODES[event.key];
+      // Fallback when the OS/browser reserves the F9/F10 keys.
+      if (code == null && event.altKey) {
+        if (event.code === 'KeyM') code = 61;
+        if (event.code === 'KeyD') code = 60;
+      }
+      if (code == null) return;
+
+      // F9/F10 are toggles; holding them should not flap overlays.
+      if (event.repeat && (code === 60 || code === 61)) return;
+
+      const mods =
+        (event.shiftKey ? MODS.Shift : 0) |
+        (event.ctrlKey ? MODS.Ctrl : 0) |
+        (event.altKey ? MODS.Alt : 0) |
+        (event.metaKey ? MODS.Meta : 0);
+      const t0 = performance.now();
+      const rc = exports.app_key_mods
+        ? exports.app_key_mods(code, mods)
+        : exports.app_key(code);
+      const t1 = performance.now();
+
+      // 0 = ignored: let the browser keep its default (Tab, browser shortcuts).
+      if (rc === 0) return;
+      event.preventDefault();
+      if (rc === 1 || rc === 2 || rc === 3) {
         blitToCanvas(t0, t1);
-        setStatus(`${vm.name} · ${selectionLabel(vm)} · ${fmtHex32(vm.fbHash)}`, true);
+        if (rc === 2) {
+          captureSnapshot(vm, true);
+        } else if (rc === 3) {
+          handleTtsToggle(vm);
+        } else {
+          setStatus(
+            `${vm.name} · ${selectionLabel(vm)} · focus ${focusLabel(exports.app_focus())} · ${fmtHex32(vm.fbHash)}`,
+            true,
+          );
+        }
         servicePendingMountFetch(vm);
       }
     });
@@ -909,6 +999,7 @@ window.__appliance = {
     renders: guest.frames,
     fbHash: guest.fbHash,
     fbHashHex: fmtHex32(guest.fbHash),
+    focus: guest.exports ? guest.exports.app_focus() : 0,
   })),
   click: (id, x, y) => {
     const guest = guests.find((candidate) => candidate.id === id) || guests[0];
@@ -920,6 +1011,7 @@ window.__appliance = {
     return {
       rc,
       view: selectionLabel(guest),
+      focus: guest.exports.app_focus(),
       dockVisible: Boolean(guest.exports.app_dock_visible()),
       fbHash: guest.fbHash,
       fbHashHex: fmtHex32(guest.fbHash),

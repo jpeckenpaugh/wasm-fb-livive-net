@@ -15,7 +15,7 @@ use crate::fb::Framebuffer;
 use crate::fmt as f;
 use crate::font::{draw_str, draw_str_centered, draw_str_prop, text_width};
 use crate::icon::{draw_icon, Icon};
-use crate::input::{InputResult, Key};
+use crate::input::{InputResult, Key, Mods};
 use crate::layout::{Metrics, Rect};
 use crate::theme as t;
 use crate::ui;
@@ -141,6 +141,66 @@ impl MountEntry {
     }
 }
 
+/// Keyboard focus inside the Files app.
+#[repr(i32)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FilesFocus {
+    Browser,
+    Mode,
+    FontInc,
+    FontDec,
+    Tts,
+    Prev,
+    Next,
+}
+
+impl FilesFocus {
+    pub const CONTROLS: [FilesFocus; 6] = [
+        FilesFocus::Mode,
+        FilesFocus::FontInc,
+        FilesFocus::FontDec,
+        FilesFocus::Tts,
+        FilesFocus::Prev,
+        FilesFocus::Next,
+    ];
+
+    pub fn next(self, paging: bool) -> Self {
+        match self {
+            FilesFocus::Browser => FilesFocus::Mode,
+            FilesFocus::Mode => FilesFocus::FontInc,
+            FilesFocus::FontInc => FilesFocus::FontDec,
+            FilesFocus::FontDec => FilesFocus::Tts,
+            FilesFocus::Tts => {
+                if paging {
+                    FilesFocus::Prev
+                } else {
+                    FilesFocus::Browser
+                }
+            }
+            FilesFocus::Prev => FilesFocus::Next,
+            FilesFocus::Next => FilesFocus::Browser,
+        }
+    }
+
+    pub fn prev(self, paging: bool) -> Self {
+        match self {
+            FilesFocus::Browser => {
+                if paging {
+                    FilesFocus::Next
+                } else {
+                    FilesFocus::Tts
+                }
+            }
+            FilesFocus::Mode => FilesFocus::Browser,
+            FilesFocus::FontInc => FilesFocus::Mode,
+            FilesFocus::FontDec => FilesFocus::FontInc,
+            FilesFocus::Tts => FilesFocus::FontDec,
+            FilesFocus::Prev => FilesFocus::Tts,
+            FilesFocus::Next => FilesFocus::Prev,
+        }
+    }
+}
+
 pub struct FilesApp {
     pub entries: [MountEntry; MAX_MOUNT_FILES],
     pub count: usize,
@@ -172,6 +232,11 @@ pub struct FilesApp {
     /// Whether the currently staged image is also pinned as the Desktop Wallpaper.
     pub wallpaper_active: bool,
     pub wallpaper_idx: i32,
+    /// Keyboard focus inside the Files pane.
+    pub focus: FilesFocus,
+    pub focus_visible: bool,
+    pub hover_row: Option<usize>,
+    pub hover_control: Option<FilesFocus>,
 }
 
 impl FilesApp {
@@ -198,6 +263,10 @@ impl FilesApp {
             context_mode: false,
             wallpaper_active: false,
             wallpaper_idx: -1,
+            focus: FilesFocus::Browser,
+            focus_visible: false,
+            hover_row: None,
+            hover_control: None,
         }
     }
 
@@ -219,6 +288,10 @@ impl FilesApp {
         self.staged_context_idx = -1;
         self.staged_context_len = 0;
         self.context_mode = false;
+        self.focus = FilesFocus::Browser;
+        self.focus_visible = false;
+        self.hover_row = None;
+        self.hover_control = None;
     }
 
     pub fn add_mount(&mut self, name_bytes: &[u8], byte_size: u32) -> i32 {
@@ -386,9 +459,9 @@ pub fn draw_window(
     // --- 1. Left 1/3 Panel: Folder / File Browser ---
     let path_title = match app.level {
         FolderLevel::HomeRoot => "~/",
-        FolderLevel::HomeWallpapers => "~/WALLPAPERS",
-        FolderLevel::HomeSamples => "~/SAMPLES",
-        FolderLevel::GithubRepo => "GH://MINES-SM",
+        FolderLevel::HomeWallpapers => "~/Wallpapers",
+        FolderLevel::HomeSamples => "~/Samples",
+        FolderLevel::GithubRepo => "gh://mines-sm",
     };
     let head_scale = if g.left_w < 240 { 2 } else { 3 };
     draw_str(fb, g.pad_x, g.head_y, path_title, head_scale, t::TEXT);
@@ -418,10 +491,13 @@ pub fn draw_window(
             for (r, &(fname, fcount)) in folders.iter().enumerate() {
                 let ry = g.row_start_y + (r as i32) * g.row_h;
                 let selected = r == app.row_selected;
+                let hovered = app.hover_row == Some(r);
 
                 if selected {
                     fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_SELECTED);
                     fb.fill(g.pad_x, ry, 4, g.row_h - 4, accent);
+                } else if hovered {
+                    fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_HOVER);
                 }
 
                 let isz = if g.row_scale == 1 { 12 } else { 16 };
@@ -468,10 +544,13 @@ pub fn draw_window(
                     break;
                 }
                 let selected = r == app.row_selected;
+                let hovered = app.hover_row == Some(r);
 
                 if selected {
                     fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_SELECTED);
                     fb.fill(g.pad_x, ry, 4, g.row_h - 4, accent);
+                } else if hovered {
+                    fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_HOVER);
                 }
 
                 let isz = if g.row_scale == 1 { 12 } else { 16 };
@@ -493,7 +572,7 @@ pub fn draw_window(
                         if selected { t::TEXT } else { text_col },
                     );
                     if show_meta {
-                        let up_lbl = "UP";
+                        let up_lbl = "Up";
                         let uw = text_width(up_lbl, g.row_scale);
                         draw_str(
                             fb,
@@ -559,6 +638,17 @@ pub fn draw_window(
         }
     }
 
+    // Keyboard focus ring on the active browser row.
+    if app.focus_visible && app.focus == FilesFocus::Browser {
+        let vis = app.visible_row_count();
+        if app.row_selected < vis {
+            let ry = g.row_start_y + app.row_selected as i32 * g.row_h;
+            if ry + g.row_h - 4 <= fb.h {
+                ui::focus_ring(fb, Rect::new(g.pad_x, ry, row_w, g.row_h - 4));
+            }
+        }
+    }
+
     // --- 2. Vertical Split Divider ---
     fb.fill(g.div_x, 0, 2, fb.h, t::BORDER);
 
@@ -594,7 +684,7 @@ pub fn draw_window(
                     body_y,
                     g.right_w,
                     body_h,
-                    "LOADING PREVIEW...",
+                    "Loading preview...",
                     g.row_scale,
                     accent,
                 );
@@ -621,7 +711,7 @@ pub fn draw_window(
                 body_y,
                 g.right_w,
                 body_h,
-                "LOADING PREVIEW...",
+                "Loading preview...",
                 g.row_scale,
                 accent,
             );
@@ -653,14 +743,32 @@ struct PreviewControls {
     next: Option<Rect>,
 }
 
+impl PreviewControls {
+    fn rect_for(&self, focus: FilesFocus) -> Option<Rect> {
+        match focus {
+            FilesFocus::Mode => Some(self.mode),
+            FilesFocus::FontInc => Some(self.ap),
+            FilesFocus::FontDec => Some(self.am),
+            FilesFocus::Tts => Some(self.tts),
+            FilesFocus::Prev => self.prev,
+            FilesFocus::Next => self.next,
+            FilesFocus::Browser => None,
+        }
+    }
+}
+
+fn show_paging(app: &FilesApp, is_image: bool) -> bool {
+    !app.context_mode && !is_image && app.staged_text_idx == app.selected as i32
+}
+
 /// One source of truth for the right-pane control bar geometry. Draw and hit
 /// testing both use this layout so they cannot drift apart.
 fn preview_controls(app: &FilesApp, g: &FilesGeom, is_image: bool) -> PreviewControls {
     let mode_w = text_width(
         if app.context_mode {
-            "[ RAW VIEW ]"
+            "[ Raw View ]"
         } else {
-            "[ CONTEXT ]"
+            "[ Context ]"
         },
         1,
     ) + 12;
@@ -673,7 +781,7 @@ fn preview_controls(app: &FilesApp, g: &FilesGeom, is_image: bool) -> PreviewCon
 
     let tts_w = text_width(
         if app.tts_active {
-            "[ \u{23f9} STOP ]"
+            "[ \u{23f9} Stop ]"
         } else {
             "[ \u{25b6} TTS ]"
         },
@@ -681,10 +789,9 @@ fn preview_controls(app: &FilesApp, g: &FilesGeom, is_image: bool) -> PreviewCon
     ) + 10;
     let tts_x = am_x - tts_w - 8;
 
-    let show_paging = !app.context_mode && !is_image && app.staged_text_idx == app.selected as i32;
-    let (prev, next) = if show_paging {
-        let next_w = text_width("[\u{25bc} NEXT]", 1) + 8;
-        let prev_w = text_width("[\u{25b2} PREV]", 1) + 8;
+    let (prev, next) = if show_paging(app, is_image) {
+        let next_w = text_width("[\u{25bc} Next]", 1) + 8;
+        let prev_w = text_width("[\u{25b2} Prev]", 1) + 8;
         let next_x = tts_x - next_w - 8;
         let prev_x = next_x - prev_w - 4;
         (
@@ -723,9 +830,9 @@ fn draw_preview_control_bar(
         fb,
         c.mode,
         if app.context_mode {
-            "[ RAW VIEW ]"
+            "[ Raw View ]"
         } else {
-            "[ CONTEXT ]"
+            "[ Context ]"
         },
         ui::Tone::Accent,
         1,
@@ -736,7 +843,7 @@ fn draw_preview_control_bar(
         fb,
         c.tts,
         if app.tts_active {
-            "[ \u{23f9} STOP ]"
+            "[ \u{23f9} Stop ]"
         } else {
             "[ \u{25b6} TTS ]"
         },
@@ -764,17 +871,28 @@ fn draw_preview_control_bar(
         if range_x > g.right_x + text_width(title, 1) + 16 {
             draw_str(fb, range_x, 14, range_str, 1, t::TEXT_DIM);
         }
-        ui::button(fb, prev, "[\u{25b2} PREV]", ui::Tone::Neutral, 1);
-        ui::button(fb, next, "[\u{25bc} NEXT]", ui::Tone::Neutral, 1);
+        ui::button(fb, prev, "[\u{25b2} Prev]", ui::Tone::Neutral, 1);
+        ui::button(fb, next, "[\u{25bc} Next]", ui::Tone::Neutral, 1);
+    }
+
+    if let Some(hover) = app.hover_control {
+        if let Some(r) = c.rect_for(hover) {
+            ui::hover_ring(fb, r);
+        }
+    }
+    if app.focus_visible {
+        if let Some(r) = c.rect_for(app.focus) {
+            ui::focus_ring(fb, r);
+        }
     }
 }
 
 fn fmt_file_title<'a>(buf: &'a mut [u8; 64], level: FolderLevel, base_name: &str) -> &'a str {
     let mut pos = 0;
     let prefix = match level {
-        FolderLevel::GithubRepo => "GH://MINES-SM/",
-        FolderLevel::HomeWallpapers => "~/WALLPAPERS/",
-        FolderLevel::HomeSamples => "~/SAMPLES/",
+        FolderLevel::GithubRepo => "gh://mines-sm/",
+        FolderLevel::HomeWallpapers => "~/Wallpapers/",
+        FolderLevel::HomeSamples => "~/Samples/",
         FolderLevel::HomeRoot => "~/",
     };
     for &b in prefix.as_bytes() {
@@ -785,17 +903,24 @@ fn fmt_file_title<'a>(buf: &'a mut [u8; 64], level: FolderLevel, base_name: &str
     }
     for &b in base_name.as_bytes() {
         if pos < buf.len() {
-            // uppercase for title banner aesthetic
-            let ch = if b.is_ascii_lowercase() {
-                b.to_ascii_uppercase()
-            } else {
-                b
-            };
-            buf[pos] = ch;
+            buf[pos] = b;
             pos += 1;
         }
     }
     core::str::from_utf8(&buf[..pos]).unwrap_or("")
+}
+
+fn context_label(key: &str) -> &str {
+    match key {
+        "SCOPE" => "Scope",
+        "RUNTIME" => "Runtime",
+        "ROLE" => "Role",
+        "IMPORTS" => "Imports",
+        "EXPORTS" => "Exports",
+        "DEPENDENTS" => "Dependents",
+        "INVARIANTS" => "Invariants",
+        other => other,
+    }
 }
 
 fn draw_context_preview(
@@ -831,7 +956,7 @@ fn draw_context_preview(
     let key_w = 90;
     for &key in &keys {
         if y >= 40 && y + 16 <= fb.h {
-            draw_str(fb, rx, y, key, 1, key_col);
+            draw_str(fb, rx, y, context_label(key), 1, key_col);
 
             let val =
                 find_context_field(context_data, key.as_bytes()).unwrap_or(if key == "SCOPE" {
@@ -864,7 +989,7 @@ fn draw_context_preview(
 
     // TECHNICAL SUMMARY
     if y + 16 >= 40 && y < fb.h {
-        draw_str(fb, rx, y, "TECHNICAL SUMMARY", 1, accent);
+        draw_str(fb, rx, y, "Technical Summary", 1, accent);
     }
     y += 16;
     let summary_val = find_context_field(context_data, b"SUMMARY")
@@ -875,7 +1000,7 @@ fn draw_context_preview(
     // ARCHITECTURAL FIT
     if let Some(arch_val) = find_context_field(context_data, b"ARCHITECTURE") {
         if y + 16 >= 40 && y < fb.h {
-            draw_str(fb, rx, y, "ARCHITECTURAL FIT", 1, accent);
+            draw_str(fb, rx, y, "Architectural Fit", 1, accent);
         }
         y += 16;
         draw_word_wrapped_paragraph(fb, rx, y, content_w, arch_val, label_col, font_scale);
@@ -978,15 +1103,15 @@ fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, fold
     let pad = if g.right_w < 400 { 16 } else { 48 };
     let rx = g.right_x + pad;
     let title = match folder {
-        FolderLevel::HomeWallpapers => "~/WALLPAPERS",
-        FolderLevel::HomeSamples => "~/SAMPLES",
-        FolderLevel::GithubRepo => "GH://MINES-SM",
+        FolderLevel::HomeWallpapers => "~/Wallpapers",
+        FolderLevel::HomeSamples => "~/Samples",
+        FolderLevel::GithubRepo => "gh://mines-sm",
         FolderLevel::HomeRoot => "~/",
     };
     let subtitle = match folder {
-        FolderLevel::HomeWallpapers => "RGBA8888 UPSTREAM IMAGES",
-        FolderLevel::HomeSamples => "UTF-8 GENERAL CODE SAMPLES",
-        FolderLevel::GithubRepo => "BITBOARD MINESWEEPER STATE MACHINE",
+        FolderLevel::HomeWallpapers => "RGBA8888 Upstream Images",
+        FolderLevel::HomeSamples => "UTF-8 General Code Samples",
+        FolderLevel::GithubRepo => "Bitboard Minesweeper State Machine",
         FolderLevel::HomeRoot => "",
     };
 
@@ -1043,6 +1168,7 @@ pub fn click_window(
 
     // Left panel: folder / file browser rows.
     if cx < g.left_w && cy >= g.row_start_y {
+        app.focus = FilesFocus::Browser;
         let row = ((cy - g.row_start_y) / g.row_h) as usize;
         let vis = app.visible_row_count();
         if row >= vis {
@@ -1088,46 +1214,162 @@ pub fn click_window(
             let c = preview_controls(app, &g, app.entries[sel_idx].is_image());
 
             if c.mode.contains(cx, cy) {
-                app.context_mode = !app.context_mode;
-                return InputResult::Changed;
+                app.focus = FilesFocus::Mode;
+                return activate_control(app, FilesFocus::Mode);
             }
             if c.ap.contains(cx, cy) {
-                app.font_scale = (app.font_scale + 1).min(3);
-                return InputResult::Changed;
+                app.focus = FilesFocus::FontInc;
+                return activate_control(app, FilesFocus::FontInc);
             }
             if c.am.contains(cx, cy) {
-                app.font_scale = (app.font_scale - 1).max(1);
-                return InputResult::Changed;
+                app.focus = FilesFocus::FontDec;
+                return activate_control(app, FilesFocus::FontDec);
             }
             if c.tts.contains(cx, cy) {
-                app.tts_active = !app.tts_active;
-                return InputResult::Tts;
+                app.focus = FilesFocus::Tts;
+                return activate_control(app, FilesFocus::Tts);
             }
             if let Some(prev) = c.prev {
                 if prev.contains(cx, cy) {
-                    app.code_scroll = app.code_scroll.saturating_sub(CODE_CHUNK_LINES);
-                    return InputResult::Changed;
+                    app.focus = FilesFocus::Prev;
+                    return activate_control(app, FilesFocus::Prev);
                 }
             }
             if let Some(next) = c.next {
                 if next.contains(cx, cy) {
-                    app.code_scroll = app.code_scroll.saturating_add(CODE_CHUNK_LINES);
-                    return InputResult::Changed;
+                    app.focus = FilesFocus::Next;
+                    return activate_control(app, FilesFocus::Next);
                 }
             }
         }
     }
 
+    app.focus = FilesFocus::Browser;
     InputResult::Noop
 }
 
-pub fn key_window(app: &mut FilesApp, key: Key) -> InputResult {
+fn activate_control(app: &mut FilesApp, focus: FilesFocus) -> InputResult {
+    match focus {
+        FilesFocus::Mode => {
+            app.context_mode = !app.context_mode;
+            InputResult::Changed
+        }
+        FilesFocus::FontInc => {
+            app.font_scale = (app.font_scale + 1).min(3);
+            InputResult::Changed
+        }
+        FilesFocus::FontDec => {
+            app.font_scale = (app.font_scale - 1).max(1);
+            InputResult::Changed
+        }
+        FilesFocus::Tts => {
+            app.tts_active = !app.tts_active;
+            InputResult::Tts
+        }
+        FilesFocus::Prev => {
+            app.code_scroll = app.code_scroll.saturating_sub(CODE_CHUNK_LINES);
+            InputResult::Changed
+        }
+        FilesFocus::Next => {
+            app.code_scroll = app.code_scroll.saturating_add(CODE_CHUNK_LINES);
+            InputResult::Changed
+        }
+        FilesFocus::Browser => InputResult::Noop,
+    }
+}
+
+pub fn key_window(app: &mut FilesApp, key: Key, mods: Mods) -> InputResult {
     let vis = app.visible_row_count();
+    let paging = app
+        .active_file_idx()
+        .map(|idx| show_paging(app, app.entries[idx].is_image()))
+        .unwrap_or(false);
+
+    // Focus traversal and app-level toggles work from any pane.
+    if key == Key::Tab {
+        let next = if mods.shift() {
+            app.focus.prev(paging)
+        } else {
+            app.focus.next(paging)
+        };
+        if next != app.focus {
+            app.focus = next;
+            return InputResult::Changed;
+        }
+        return InputResult::Handled;
+    }
+    if key == Key::Info {
+        app.context_mode = !app.context_mode;
+        return InputResult::Changed;
+    }
+
+    // Global-ish preview keys remain available while a control is focused.
+    match key {
+        Key::Plus => {
+            app.font_scale = (app.font_scale + 1).min(3);
+            return InputResult::Changed;
+        }
+        Key::Minus => {
+            app.font_scale = (app.font_scale - 1).max(1);
+            return InputResult::Changed;
+        }
+        Key::PageUp => {
+            if app.code_scroll > 0 {
+                app.code_scroll = app.code_scroll.saturating_sub(CODE_CHUNK_LINES);
+                return InputResult::Changed;
+            }
+            return InputResult::Noop;
+        }
+        Key::PageDown => {
+            app.code_scroll = app.code_scroll.saturating_add(CODE_CHUNK_LINES);
+            return InputResult::Changed;
+        }
+        Key::ScrollLeft => {
+            app.code_col_scroll = app.code_col_scroll.saturating_sub(8);
+            return InputResult::Changed;
+        }
+        Key::ScrollRight => {
+            app.code_col_scroll = app.code_col_scroll.saturating_add(8);
+            return InputResult::Changed;
+        }
+        Key::ScrollDown => {
+            app.code_scroll = app.code_scroll.saturating_add(5);
+            app.context_scroll = app.context_scroll.saturating_add(2);
+            return InputResult::Changed;
+        }
+        Key::ScrollUp => {
+            app.code_scroll = app.code_scroll.saturating_sub(5);
+            app.context_scroll = app.context_scroll.saturating_sub(2);
+            return InputResult::Changed;
+        }
+        _ => {}
+    }
+
+    if app.focus != FilesFocus::Browser {
+        return match key {
+            Key::Left => {
+                app.focus = app.focus.prev(paging);
+                InputResult::Changed
+            }
+            Key::Right | Key::Tab => {
+                app.focus = app.focus.next(paging);
+                InputResult::Changed
+            }
+            Key::Enter | Key::Space => activate_control(app, app.focus),
+            Key::Escape | Key::Up | Key::Down | Key::Home | Key::End => {
+                app.focus = FilesFocus::Browser;
+                InputResult::Changed
+            }
+            _ => InputResult::Noop,
+        };
+    }
+
     if vis == 0 {
         return InputResult::Noop;
     }
+
     match key {
-        Key::Up | Key::Left => {
+        Key::Up => {
             app.row_selected = if app.row_selected == 0 {
                 vis - 1
             } else {
@@ -1139,7 +1381,7 @@ pub fn key_window(app: &mut FilesApp, key: Key) -> InputResult {
             app.ensure_selected_staged();
             InputResult::Changed
         }
-        Key::Down | Key::Right => {
+        Key::Down => {
             app.row_selected = (app.row_selected + 1) % vis;
             app.code_scroll = 0;
             app.code_col_scroll = 0;
@@ -1147,77 +1389,107 @@ pub fn key_window(app: &mut FilesApp, key: Key) -> InputResult {
             app.ensure_selected_staged();
             InputResult::Changed
         }
-        Key::Backspace => InputResult::from(app.go_parent()),
-        Key::Tab => {
-            app.context_mode = !app.context_mode;
+        Key::Home => {
+            app.row_selected = 0;
+            app.code_scroll = 0;
+            app.code_col_scroll = 0;
+            app.context_scroll = 0;
+            app.ensure_selected_staged();
             InputResult::Changed
         }
-        Key::Plus => {
-            app.font_scale = (app.font_scale + 1).min(3);
+        Key::End => {
+            app.row_selected = vis - 1;
+            app.code_scroll = 0;
+            app.code_col_scroll = 0;
+            app.context_scroll = 0;
+            app.ensure_selected_staged();
             InputResult::Changed
         }
-        Key::Minus => {
-            app.font_scale = (app.font_scale - 1).max(1);
-            InputResult::Changed
-        }
-        Key::ScrollLeft => {
-            app.code_col_scroll = app.code_col_scroll.saturating_sub(8);
-            InputResult::Changed
-        }
-        Key::ScrollRight => {
-            app.code_col_scroll = app.code_col_scroll.saturating_add(8);
-            InputResult::Changed
-        }
-        Key::ScrollDown => {
-            app.code_scroll = app.code_scroll.saturating_add(5);
-            app.context_scroll = app.context_scroll.saturating_add(2);
-            InputResult::Changed
-        }
-        Key::ScrollUp => {
-            app.code_scroll = app.code_scroll.saturating_sub(5);
-            app.context_scroll = app.context_scroll.saturating_sub(2);
-            InputResult::Changed
-        }
-        Key::PageUp => {
-            if app.code_scroll > 0 {
-                app.code_scroll = app.code_scroll.saturating_sub(CODE_CHUNK_LINES);
+        Key::Left | Key::Backspace => {
+            if app.go_parent() {
                 InputResult::Changed
             } else {
-                InputResult::Noop
+                InputResult::Handled
             }
         }
-        Key::PageDown => {
-            app.code_scroll = app.code_scroll.saturating_add(CODE_CHUNK_LINES);
-            InputResult::Changed
+        Key::Right => {
+            if app.active_file_idx().is_some() {
+                app.focus = FilesFocus::Mode;
+                InputResult::Changed
+            } else {
+                InputResult::Handled
+            }
         }
-        Key::Enter => match app.level {
-            FolderLevel::HomeRoot => {
-                let folder = if app.row_selected == 0 {
-                    FolderLevel::HomeWallpapers
-                } else if app.row_selected == 1 {
-                    FolderLevel::HomeSamples
-                } else {
-                    FolderLevel::GithubRepo
-                };
-                InputResult::from(app.open_subfolder(folder))
-            }
-            FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
-                if app.row_selected == 0 {
-                    return InputResult::from(app.go_parent());
-                }
-                if app.selected_is_image() {
-                    if let Some(gidx) = app.active_file_idx() {
-                        app.wallpaper_active = true;
-                        app.wallpaper_idx = gidx as i32;
-                        app.ensure_selected_staged();
-                        return InputResult::Changed;
-                    }
-                }
-                InputResult::Noop
-            }
-        },
+        Key::Enter | Key::Space => enter_browser_row(app),
+        Key::Escape => InputResult::Handled,
         _ => InputResult::Noop,
     }
+}
+
+fn enter_browser_row(app: &mut FilesApp) -> InputResult {
+    match app.level {
+        FolderLevel::HomeRoot => {
+            let folder = if app.row_selected == 0 {
+                FolderLevel::HomeWallpapers
+            } else if app.row_selected == 1 {
+                FolderLevel::HomeSamples
+            } else {
+                FolderLevel::GithubRepo
+            };
+            InputResult::from(app.open_subfolder(folder))
+        }
+        FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
+            if app.row_selected == 0 {
+                return InputResult::from(app.go_parent());
+            }
+            if app.selected_is_image() {
+                if let Some(gidx) = app.active_file_idx() {
+                    app.wallpaper_active = true;
+                    app.wallpaper_idx = gidx as i32;
+                    app.ensure_selected_staged();
+                    return InputResult::Changed;
+                }
+            }
+            InputResult::Noop
+        }
+    }
+}
+
+pub fn pointer_move(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_h: i32) -> bool {
+    let g = files_geom(client_w, client_h);
+    let mut row = None;
+    let mut control = None;
+
+    if cx < g.left_w && cy >= g.row_start_y {
+        let candidate = ((cy - g.row_start_y) / g.row_h) as usize;
+        if candidate < app.visible_row_count() {
+            row = Some(candidate);
+        }
+    } else if cx >= g.right_x && cy < 40 {
+        if let Some(sel_idx) = app.active_file_idx() {
+            let c = preview_controls(app, &g, app.entries[sel_idx].is_image());
+            for focus in FilesFocus::CONTROLS {
+                if let Some(r) = c.rect_for(focus) {
+                    if r.contains(cx, cy) {
+                        control = Some(focus);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    let changed = app.hover_row != row || app.hover_control != control;
+    app.hover_row = row;
+    app.hover_control = control;
+    changed
+}
+
+pub fn pointer_leave(app: &mut FilesApp) -> bool {
+    let changed = app.hover_row.is_some() || app.hover_control.is_some();
+    app.hover_row = None;
+    app.hover_control = None;
+    changed
 }
 
 /// Draw the `128 x 72` live icon in the Left App Dock.
@@ -1232,7 +1504,7 @@ pub fn draw_dock_tile(
 ) {
     ui::dock_tile(fb, Rect::new(x, y, w, h), active);
     draw_icon(fb, x + 10, y + 24, Icon::Files, 32, t::ACCENT);
-    draw_str_prop(fb, x + 48, y + 18, "FILES", 2, t::TEXT);
+    draw_str_prop(fb, x + 48, y + 18, "Files", 2, t::TEXT);
 
     let mut sub_buf = [b' '; 16];
     let sub_str = f::mount_count(&mut sub_buf, app.count as u32);

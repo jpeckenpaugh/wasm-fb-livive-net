@@ -1,17 +1,18 @@
 //! Minimalist Appliance Window Manager (`wm.rs`).
 //!
 //! 1. 32px Title Bar (`y: 0..32`):
-//!    - Top-left App Dock button (`x: 0..44`)
-//!    - Context menus (`SYSTEM`/`CALC`/`FILES`/`MINES`, `VIEW`, `TESTING`)
-//!    - Right-aligned user, session, and date/time (`TESTER · VM-01 · ...`)
-//! 2. Left Overlay App Dock:
-//!    - Four `128x72` tiles (1/10th scale), stacked vertically over the active
-//!      surface without displacing it, auto-hiding after a launch.
+//!    - App Home menu (`x: 0..44`) with its app drawer as the dropdown
+//!    - Context menus (`System`/`Calc`/`Files`/`Mines`, `View`, `Testing`)
+//!    - Right-aligned user, session, and date/time (`Tester · VM-01 · ...`)
+//! 2. App Home Drawer:
+//!    - Four `128x72` tiles (1/10th scale), drawn as the Home menu's dropdown
+//!      below the Home header.
 //! 3. Maximized Client Window:
 //!    - Flat surface directly below the title bar at the session resolution.
 //!
-//! All geometry lives in [`WmLayout`] so drawing and hit testing cannot drift.
-//! Menu labels map to [`Command`] values rather than numeric item indices.
+//! Mouse and keyboard share one [`Focus`] state. The Home drawer, menus, and
+//! client controls are all reachable with either input source, and activation
+//! always goes through the same command path.
 
 use crate::calc::{self, CalcApp};
 use crate::fb::{rgb, Framebuffer};
@@ -19,25 +20,27 @@ use crate::files::{self, FilesApp};
 use crate::fmt as f;
 use crate::font::{draw_str_prop, text_width_prop};
 use crate::icon::{draw_icon, Icon};
-use crate::input::{InputResult, Key};
+use crate::input::{InputResult, Key, Mods};
 use crate::layout::{Metrics, Rect};
 use crate::mines::{self, MinesApp};
 use crate::system::{self, SystemApp, SystemSection};
 use crate::theme as t;
+use crate::ui;
 
 pub const TITLE_H: i32 = 32;
-pub const DOCK_BTN_W: i32 = 44;
+pub const HOME_BTN_W: i32 = 44;
 
-// Left App Dock geometry: 128x72 icons (1/10th of 1280x720) stacked vertically.
+// App Home drawer geometry: 128x72 icons (1/10th of 1280x720) stacked
+// vertically and drawn as the Home menu's dropdown.
 pub const DOCK_ICON_W: i32 = 128;
 pub const DOCK_ICON_H: i32 = 72;
 pub const DOCK_GAP: i32 = 10;
 pub const DOCK_X: i32 = 12;
 pub const DOCK_Y: i32 = TITLE_H + 10;
 
-// Menu Bar geometry.
-pub const MENU_COUNT: usize = 3;
-pub const MENU_X0: i32 = DOCK_BTN_W + 4;
+// Menu Bar geometry (Home + app + View + Testing).
+pub const MENU_COUNT: usize = 4;
+pub const MENU_X0: i32 = HOME_BTN_W + 4;
 pub const MENU_HEADER_W: i32 = 104;
 pub const MENU_DROP_W: i32 = 224;
 pub const MENU_ITEM_H: i32 = 30;
@@ -48,6 +51,7 @@ pub const CLICK_NOOP: i32 = InputResult::Noop as i32;
 pub const CLICK_CHANGED: i32 = InputResult::Changed as i32;
 pub const CLICK_SNAPSHOT: i32 = InputResult::Snapshot as i32;
 pub const CLICK_TTS: i32 = InputResult::Tts as i32;
+pub const CLICK_HANDLED: i32 = InputResult::Handled as i32;
 
 #[inline]
 pub const fn dock_icon_y(slot_idx: usize) -> i32 {
@@ -66,7 +70,7 @@ pub const fn menu_header_w(fb_w: i32) -> i32 {
 }
 
 /// App surfaces. `Desktop` is a real surface (wallpaper or backdrop), not a
-/// null state; the four dock apps are the `APP_COUNT` launched surfaces.
+/// null state; the four drawer apps are the `APP_COUNT` launched surfaces.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AppSlot {
     Desktop = 0,
@@ -105,7 +109,77 @@ impl AppSlot {
             _ => None,
         }
     }
+
+    pub const fn title(self) -> &'static str {
+        match self {
+            AppSlot::Desktop => "Desktop",
+            AppSlot::System => "System",
+            AppSlot::Calc => "Calc",
+            AppSlot::Files => "Files",
+            AppSlot::Mines => "Mines",
+        }
+    }
 }
+
+/// Menu-bar entries. `Home` is a first-class menu whose dropdown is the app
+/// drawer; the app menu title changes with the active app.
+#[repr(usize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MenuId {
+    Home = 0,
+    App = 1,
+    View = 2,
+    Testing = 3,
+}
+
+impl MenuId {
+    pub const ALL: [MenuId; 4] = [MenuId::Home, MenuId::App, MenuId::View, MenuId::Testing];
+
+    pub const fn index(self) -> usize {
+        self as usize
+    }
+
+    pub const fn from_index(idx: usize) -> Option<Self> {
+        match idx {
+            0 => Some(MenuId::Home),
+            1 => Some(MenuId::App),
+            2 => Some(MenuId::View),
+            3 => Some(MenuId::Testing),
+            _ => None,
+        }
+    }
+
+    pub const fn next(self) -> Self {
+        match self {
+            MenuId::Home => MenuId::App,
+            MenuId::App => MenuId::View,
+            MenuId::View => MenuId::Testing,
+            MenuId::Testing => MenuId::Home,
+        }
+    }
+
+    pub const fn prev(self) -> Self {
+        match self {
+            MenuId::Home => MenuId::Testing,
+            MenuId::App => MenuId::Home,
+            MenuId::View => MenuId::App,
+            MenuId::Testing => MenuId::View,
+        }
+    }
+}
+
+/// Shared focus target for mouse and keyboard.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Focus {
+    Client,
+    MenuBar { menu: MenuId },
+    Menu { menu: MenuId, item: usize },
+}
+
+/// ABI-friendly focus codes for the host and test harness.
+pub const FOCUS_CLIENT: i32 = 0;
+pub const FOCUS_MENU_BAR: i32 = 100;
+pub const FOCUS_MENU: i32 = 200;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Command {
@@ -114,6 +188,7 @@ pub enum Command {
     Fonts,
     Icons,
     CloseWindow,
+    Launch(AppSlot),
     CalcClear,
     FilesHome,
     FilesGithub,
@@ -123,7 +198,6 @@ pub enum Command {
     MinesReplay,
     MinesToggleFlag,
     MinesToggleRules,
-    ToggleDock,
     TestPattern,
     Snapshot,
 }
@@ -134,112 +208,124 @@ pub struct MenuItem {
     pub command: Command,
 }
 
+const MENU_HOME: &[MenuItem] = &[
+    MenuItem {
+        label: "System",
+        command: Command::Launch(AppSlot::System),
+    },
+    MenuItem {
+        label: "Calc",
+        command: Command::Launch(AppSlot::Calc),
+    },
+    MenuItem {
+        label: "Files",
+        command: Command::Launch(AppSlot::Files),
+    },
+    MenuItem {
+        label: "Mines",
+        command: Command::Launch(AppSlot::Mines),
+    },
+];
 const MENU_DESKTOP: &[MenuItem] = &[
     MenuItem {
-        label: "ABOUT",
+        label: "About",
         command: Command::About,
     },
     MenuItem {
-        label: "LOCALE",
+        label: "Locale",
         command: Command::Locale,
     },
     MenuItem {
-        label: "FONTS",
+        label: "Fonts",
         command: Command::Fonts,
     },
     MenuItem {
-        label: "ICONS",
+        label: "Icons",
         command: Command::Icons,
     },
 ];
 const MENU_SYSTEM: &[MenuItem] = &[
     MenuItem {
-        label: "ABOUT",
+        label: "About",
         command: Command::About,
     },
     MenuItem {
-        label: "LOCALE",
+        label: "Locale",
         command: Command::Locale,
     },
     MenuItem {
-        label: "FONTS",
+        label: "Fonts",
         command: Command::Fonts,
     },
     MenuItem {
-        label: "ICONS",
+        label: "Icons",
         command: Command::Icons,
     },
     MenuItem {
-        label: "CLOSE WINDOW",
+        label: "Close Window",
         command: Command::CloseWindow,
     },
 ];
 const MENU_CALC: &[MenuItem] = &[
     MenuItem {
-        label: "CLEAR (AC)",
+        label: "Clear (AC)",
         command: Command::CalcClear,
     },
     MenuItem {
-        label: "CLOSE WINDOW",
+        label: "Close Window",
         command: Command::CloseWindow,
     },
 ];
 const MENU_FILES: &[MenuItem] = &[
     MenuItem {
-        label: "HOME (~/)",
+        label: "Home (~/)",
         command: Command::FilesHome,
     },
     MenuItem {
-        label: "GITHUB (GH://)",
+        label: "GitHub (gh://)",
         command: Command::FilesGithub,
     },
     MenuItem {
-        label: "TOGGLE CONTEXT",
+        label: "Toggle Context",
         command: Command::FilesToggleContext,
     },
     MenuItem {
-        label: "SET AS WALLPAPER",
+        label: "Set as Wallpaper",
         command: Command::FilesSetWallpaper,
     },
     MenuItem {
-        label: "CLOSE WINDOW",
+        label: "Close Window",
         command: Command::CloseWindow,
     },
 ];
 const MENU_MINES: &[MenuItem] = &[
     MenuItem {
-        label: "NEW SEED (N)",
+        label: "New Seed (N)",
         command: Command::MinesNewSeed,
     },
     MenuItem {
-        label: "REPLAY SEED (R)",
+        label: "Replay Seed (R)",
         command: Command::MinesReplay,
     },
     MenuItem {
-        label: "TOGGLE FLAG (F)",
+        label: "Toggle Flag (F)",
         command: Command::MinesToggleFlag,
     },
     MenuItem {
-        label: "TOGGLE SHIELD RULE",
+        label: "Toggle Shield Rule",
         command: Command::MinesToggleRules,
     },
     MenuItem {
-        label: "CLOSE WINDOW",
+        label: "Close Window",
         command: Command::CloseWindow,
     },
 ];
-const MENU_VIEW: &[MenuItem] = &[
-    MenuItem {
-        label: "TOGGLE DOCK",
-        command: Command::ToggleDock,
-    },
-    MenuItem {
-        label: "TEST PATTERN",
-        command: Command::TestPattern,
-    },
-];
+const MENU_VIEW: &[MenuItem] = &[MenuItem {
+    label: "Test Pattern",
+    command: Command::TestPattern,
+}];
 const MENU_TESTING: &[MenuItem] = &[MenuItem {
-    label: "SNAPSHOT",
+    label: "Snapshot",
     command: Command::Snapshot,
 }];
 
@@ -268,19 +354,35 @@ impl WmLayout {
         }
     }
 
-    pub const fn header_x(&self, idx: usize) -> i32 {
-        MENU_X0 + (idx as i32) * self.header_w
+    pub fn header_rect(&self, menu: MenuId) -> Rect {
+        match menu {
+            MenuId::Home => Rect::new(0, 0, HOME_BTN_W, TITLE_H),
+            _ => Rect::new(
+                MENU_X0 + (menu.index() as i32 - 1) * self.header_w,
+                0,
+                self.header_w,
+                TITLE_H,
+            ),
+        }
     }
 
-    pub fn header_rect(&self, idx: usize) -> Rect {
-        Rect::new(self.header_x(idx), 0, self.header_w, TITLE_H)
-    }
-
-    pub fn dropdown_rect(&self, idx: usize, item_count: usize, fb_w: i32) -> Rect {
+    pub fn dropdown_rect(&self, menu: MenuId, item_count: usize, fb_w: i32) -> Rect {
+        if menu == MenuId::Home {
+            let h = (item_count as i32) * (DOCK_ICON_H + DOCK_GAP) - DOCK_GAP;
+            return Rect::new(DOCK_X, DOCK_Y, DOCK_ICON_W, h.max(DOCK_ICON_H));
+        }
         let w = MENU_DROP_W.min(fb_w - 16);
-        let x = self.header_rect(idx).x.min(fb_w - w - 4).max(0);
+        let x = self.header_rect(menu).x.min(fb_w - w - 4).max(0);
         let h = (item_count as i32) * MENU_ITEM_H + 8;
         Rect::new(x, TITLE_H, w, h)
+    }
+
+    pub fn menu_item_rect(&self, menu: MenuId, item: usize, item_count: usize, fb_w: i32) -> Rect {
+        if menu == MenuId::Home {
+            return Rect::new(DOCK_X, dock_icon_y(item), DOCK_ICON_W, DOCK_ICON_H);
+        }
+        let r = self.dropdown_rect(menu, item_count, fb_w);
+        Rect::new(r.x, r.y + 4 + (item as i32) * MENU_ITEM_H, r.w, MENU_ITEM_H)
     }
 }
 
@@ -290,8 +392,9 @@ pub struct WmState {
     pub height: i32,
     pub session_id: u32,
     pub active_app: AppSlot,
-    pub dock_visible: bool,
-    pub open_menu: Option<usize>,
+    pub focus: Focus,
+    pub hover: Option<Focus>,
+    pub focus_visible: bool,
     pub test_pattern: bool,
     pub snapshot_seq: u32,
     pub hour: u8,
@@ -314,8 +417,9 @@ impl WmState {
             height: 720,
             session_id: 1,
             active_app: AppSlot::Desktop,
-            dock_visible: false,
-            open_menu: None,
+            focus: Focus::Client,
+            hover: None,
+            focus_visible: false,
             test_pattern: false,
             snapshot_seq: 0,
             hour: 6,
@@ -336,8 +440,9 @@ impl WmState {
         self.height = if h > 0 { h } else { 720 };
         self.session_id = if session_id > 0 { session_id } else { 1 };
         self.active_app = AppSlot::Desktop;
-        self.dock_visible = false;
-        self.open_menu = None;
+        self.focus = Focus::Client;
+        self.hover = None;
+        self.focus_visible = false;
         self.test_pattern = false;
         self.snapshot_seq = 0;
         self.system = SystemApp::new();
@@ -347,32 +452,46 @@ impl WmState {
         self.ready = true;
     }
 
-    pub fn menu_title(&self, menu_idx: usize) -> &'static str {
-        match menu_idx {
-            0 => match self.active_app {
-                AppSlot::Desktop | AppSlot::System => "SYSTEM",
-                AppSlot::Calc => "CALC",
-                AppSlot::Files => "FILES",
-                AppSlot::Mines => "MINES",
-            },
-            1 => "VIEW",
-            2 => "TESTING",
-            _ => "",
+    /// Whether the App Home drawer (the Home menu dropdown) is open.
+    pub fn drawer_open(&self) -> bool {
+        matches!(
+            self.focus,
+            Focus::Menu {
+                menu: MenuId::Home,
+                ..
+            }
+        )
+    }
+
+    pub fn menu_title(&self, menu: MenuId) -> &'static str {
+        match menu {
+            MenuId::Home => "",
+            MenuId::App => self.active_app.title(),
+            MenuId::View => "View",
+            MenuId::Testing => "Testing",
         }
     }
 
-    pub fn menu_items(&self, menu_idx: usize) -> &'static [MenuItem] {
-        match menu_idx {
-            0 => match self.active_app {
+    pub fn menu_items(&self, menu: MenuId) -> &'static [MenuItem] {
+        match menu {
+            MenuId::Home => MENU_HOME,
+            MenuId::App => match self.active_app {
                 AppSlot::Desktop => MENU_DESKTOP,
                 AppSlot::System => MENU_SYSTEM,
                 AppSlot::Calc => MENU_CALC,
                 AppSlot::Files => MENU_FILES,
                 AppSlot::Mines => MENU_MINES,
             },
-            1 => MENU_VIEW,
-            2 => MENU_TESTING,
-            _ => &[],
+            MenuId::View => MENU_VIEW,
+            MenuId::Testing => MENU_TESTING,
+        }
+    }
+
+    pub fn focus_code(&self) -> i32 {
+        match self.focus {
+            Focus::Client => FOCUS_CLIENT,
+            Focus::MenuBar { menu } => FOCUS_MENU_BAR + menu.index() as i32,
+            Focus::Menu { menu, item } => FOCUS_MENU + menu.index() as i32 * 10 + item as i32,
         }
     }
 
@@ -416,31 +535,37 @@ impl WmState {
                     }
                 }
                 AppSlot::System => {
+                    self.system.focus_visible = self.focus_visible && self.focus == Focus::Client;
                     system::draw_window(&mut client_fb, &self.system, self.width, self.height)
                 }
                 AppSlot::Calc => calc::draw_window(&mut client_fb, &self.calc),
-                AppSlot::Files => files::draw_window(
-                    &mut client_fb,
-                    &self.files,
-                    staged_px,
-                    staged_text,
-                    staged_context,
-                ),
+                AppSlot::Files => {
+                    self.files.focus_visible = self.focus_visible && self.focus == Focus::Client;
+                    files::draw_window(
+                        &mut client_fb,
+                        &self.files,
+                        staged_px,
+                        staged_text,
+                        staged_context,
+                    )
+                }
                 AppSlot::Mines => mines::draw_window(&mut client_fb, &self.mines),
             }
         }
 
-        // 2. Left overlay dock.
-        if self.dock_visible {
-            self.draw_left_dock(fb);
+        // 2. App Home drawer (Home menu dropdown).
+        if self.drawer_open() {
+            self.draw_home_menu(fb);
         }
 
         // 3. Title bar.
         self.draw_title_bar(fb);
 
-        // 4. Open dropdown.
-        if let Some(menu_idx) = self.open_menu {
-            self.draw_dropdown_menu(fb, menu_idx);
+        // 4. Other open dropdowns.
+        if let Focus::Menu { menu, .. } = self.focus {
+            if menu != MenuId::Home {
+                self.draw_dropdown_menu(fb, menu);
+            }
         }
     }
 
@@ -449,45 +574,77 @@ impl WmState {
         fb.fill(0, 0, fb.w, TITLE_H, t::TITLE_BG);
         fb.fill(0, TITLE_H - 1, fb.w, 1, t::BORDER);
 
-        // Top-left dock button.
-        let btn_bg = if self.dock_visible {
+        // App Home header, drawn as an icon button.
+        let home = layout.header_rect(MenuId::Home);
+        let home_open = self.drawer_open();
+        let home_hover = matches!(
+            self.hover,
+            Some(Focus::MenuBar { menu: MenuId::Home })
+                | Some(Focus::Menu {
+                    menu: MenuId::Home,
+                    ..
+                })
+        );
+        let home_bg = if home_open {
             t::ACCENT
+        } else if home_hover {
+            t::SURFACE_HOVER
         } else {
             t::SURFACE_RAISED
         };
-        let icon_col = if self.dock_visible {
-            t::OVERLAY
-        } else {
-            t::ACCENT
-        };
-        fb.fill(0, 0, DOCK_BTN_W, TITLE_H - 1, btn_bg);
-        fb.fill(DOCK_BTN_W - 1, 0, 1, TITLE_H - 1, t::BORDER);
+        let home_icon = if home_open { t::OVERLAY } else { t::ACCENT };
+        fb.fill(home.x, home.y, home.w, TITLE_H - 1, home_bg);
+        fb.fill(home.right() - 1, 0, 1, TITLE_H - 1, t::BORDER);
         draw_icon(
             fb,
-            (DOCK_BTN_W - 20) / 2,
+            (HOME_BTN_W - 20) / 2,
             (TITLE_H - 1 - 20) / 2,
             Icon::Menu,
             20,
-            icon_col,
+            home_icon,
         );
+        if self.focus_visible && matches!(self.focus, Focus::MenuBar { menu: MenuId::Home }) {
+            ui::focus_ring(fb, home);
+        }
 
-        // Menu headers.
-        for i in 0..MENU_COUNT {
-            let r = layout.header_rect(i);
-            let is_open = self.open_menu == Some(i);
+        // Text menu headers.
+        for menu in MenuId::ALL {
+            if menu == MenuId::Home {
+                continue;
+            }
+            let r = layout.header_rect(menu);
+            let is_open = matches!(
+                self.focus,
+                Focus::Menu { menu: m, .. } | Focus::MenuBar { menu: m } if m == menu
+            );
+            let hovered = matches!(
+                self.hover,
+                Some(Focus::MenuBar { menu: m }) | Some(Focus::Menu { menu: m, .. }) if m == menu
+            );
             if is_open {
                 fb.fill(r.x, 2, r.w - 4, TITLE_H - 3, t::SURFACE_HOVER);
                 fb.fill(r.x, TITLE_H - 3, r.w - 4, 2, t::ACCENT);
+            } else if hovered {
+                fb.fill(r.x, 2, r.w - 4, TITLE_H - 3, t::SURFACE);
             }
-            let fg = if is_open { t::TEXT } else { t::TEXT_SOFT };
+            let fg = if is_open {
+                t::TEXT
+            } else if hovered {
+                t::TEXT_BODY
+            } else {
+                t::TEXT_SOFT
+            };
             draw_str_prop(
                 fb,
                 r.x + 10,
                 layout.menu_text_y,
-                self.menu_title(i),
+                self.menu_title(menu),
                 layout.menu_scale,
                 fg,
             );
+            if self.focus_visible && matches!(self.focus, Focus::MenuBar { menu: m } if m == menu) {
+                ui::focus_ring(fb, r);
+            }
         }
 
         // Right side: one formatted session/date/time string.
@@ -514,70 +671,91 @@ impl WmState {
         );
     }
 
-    fn draw_left_dock(&self, fb: &mut Framebuffer) {
-        for (idx, &slot) in AppSlot::DOCK_APPS.iter().enumerate() {
-            let y = dock_icon_y(idx);
-            let active = self.active_app == slot;
+    fn draw_home_menu(&self, fb: &mut Framebuffer) {
+        let items = self.menu_items(MenuId::Home);
+        let layout = WmLayout::new(fb.w);
+        let r = layout.dropdown_rect(MenuId::Home, items.len(), fb.w);
+
+        fb.shade(r.x - 6, r.y - 6, r.w + 12, r.h + 12, 80);
+        fb.fill(r.x - 6, r.y - 6, r.w + 12, r.h + 12, t::SURFACE);
+        fb.border(r.x - 6, r.y - 6, r.w + 12, r.h + 12, 2, t::ACCENT);
+
+        for (idx, slot) in AppSlot::DOCK_APPS.iter().enumerate() {
+            let tr = layout.menu_item_rect(MenuId::Home, idx, items.len(), fb.w);
+            let active = self.active_app == *slot;
             match slot {
-                AppSlot::System => system::draw_dock_tile(
-                    fb,
-                    &self.system,
-                    DOCK_X,
-                    y,
-                    DOCK_ICON_W,
-                    DOCK_ICON_H,
-                    active,
-                ),
-                AppSlot::Calc => calc::draw_dock_tile(
-                    fb,
-                    &self.calc,
-                    DOCK_X,
-                    y,
-                    DOCK_ICON_W,
-                    DOCK_ICON_H,
-                    active,
-                ),
-                AppSlot::Files => files::draw_dock_tile(
-                    fb,
-                    &self.files,
-                    DOCK_X,
-                    y,
-                    DOCK_ICON_W,
-                    DOCK_ICON_H,
-                    active,
-                ),
-                AppSlot::Mines => mines::draw_dock_tile(
-                    fb,
-                    &self.mines,
-                    DOCK_X,
-                    y,
-                    DOCK_ICON_W,
-                    DOCK_ICON_H,
-                    active,
-                ),
+                AppSlot::System => {
+                    system::draw_dock_tile(fb, &self.system, tr.x, tr.y, tr.w, tr.h, active)
+                }
+                AppSlot::Calc => {
+                    calc::draw_dock_tile(fb, &self.calc, tr.x, tr.y, tr.w, tr.h, active)
+                }
+                AppSlot::Files => {
+                    files::draw_dock_tile(fb, &self.files, tr.x, tr.y, tr.w, tr.h, active)
+                }
+                AppSlot::Mines => {
+                    mines::draw_dock_tile(fb, &self.mines, tr.x, tr.y, tr.w, tr.h, active)
+                }
                 AppSlot::Desktop => {}
+            }
+            let focused = self.focus_visible
+                && matches!(self.focus, Focus::Menu { menu: MenuId::Home, item } if item == idx);
+            let hovered = matches!(
+                self.hover,
+                Some(Focus::Menu { menu: MenuId::Home, item }) if item == idx
+            );
+            if hovered && !focused {
+                ui::hover_ring(fb, tr);
+            }
+            if focused {
+                ui::focus_ring(fb, tr);
             }
         }
     }
 
-    fn draw_dropdown_menu(&self, fb: &mut Framebuffer, menu_idx: usize) {
-        let items = self.menu_items(menu_idx);
+    fn draw_dropdown_menu(&self, fb: &mut Framebuffer, menu: MenuId) {
+        let items = self.menu_items(menu);
         if items.is_empty() {
             return;
         }
         let layout = WmLayout::new(fb.w);
-        let r = layout.dropdown_rect(menu_idx, items.len(), fb.w);
+        let r = layout.dropdown_rect(menu, items.len(), fb.w);
+        let selected = match self.focus {
+            Focus::Menu { item, .. } => item,
+            _ => 0,
+        };
 
         fb.shade(r.x + 4, r.y + 4, r.w, r.h, 80);
         fb.fill(r.x, r.y, r.w, r.h, t::SURFACE);
         fb.border(r.x, r.y, r.w, r.h, 2, t::ACCENT);
 
         for (idx, item) in items.iter().enumerate() {
-            let iy = r.y + 4 + (idx as i32) * MENU_ITEM_H;
-            if idx > 0 {
-                fb.fill(r.x + 8, iy, r.w - 16, 1, t::BORDER_SOFT);
+            let ir = layout.menu_item_rect(menu, idx, items.len(), fb.w);
+            let hovered = matches!(
+                self.hover,
+                Some(Focus::Menu { menu: m, item }) if m == menu && item == idx
+            );
+            if idx == selected || hovered {
+                fb.fill(ir.x + 2, ir.y, ir.w - 4, ir.h, t::SURFACE_HOVER);
             }
-            draw_str_prop(fb, r.x + 14, iy + 8, item.label, 2, t::TEXT_MENU);
+            if idx > 0 {
+                fb.fill(r.x + 8, ir.y, r.w - 16, 1, t::BORDER_SOFT);
+            }
+            draw_str_prop(
+                fb,
+                ir.x + 14,
+                ir.y + 8,
+                item.label,
+                2,
+                if idx == selected {
+                    t::TEXT
+                } else {
+                    t::TEXT_MENU
+                },
+            );
+            if self.focus_visible && idx == selected {
+                ui::focus_ring(fb, ir.inset(1));
+            }
         }
     }
 
@@ -588,76 +766,76 @@ impl WmState {
 
         if self.test_pattern {
             self.test_pattern = false;
+            self.focus = Focus::Client;
+            self.focus_visible = false;
             return InputResult::Changed;
         }
 
         let layout = WmLayout::new(self.width);
+        self.focus_visible = false;
+        self.files.hover_row = None;
+        self.files.hover_control = None;
+        self.system.hover_tab = None;
 
         // Layer 1: an open dropdown consumes the click.
-        if let Some(menu_idx) = self.open_menu {
-            let items = self.menu_items(menu_idx);
-            let r = layout.dropdown_rect(menu_idx, items.len(), self.width);
+        if let Focus::Menu { menu, .. } = self.focus {
+            let items = self.menu_items(menu);
+            let r = layout.dropdown_rect(menu, items.len(), self.width);
 
             if r.contains(x, y) {
-                let rel_y = y - (r.y + 4);
-                if rel_y >= 0 {
-                    let item_idx = (rel_y / MENU_ITEM_H) as usize;
-                    if item_idx < items.len() {
-                        self.open_menu = None;
-                        return self.execute_command(items[item_idx].command);
+                if menu == MenuId::Home {
+                    for idx in 0..items.len() {
+                        let ir = layout.menu_item_rect(menu, idx, items.len(), self.width);
+                        if ir.contains(x, y) {
+                            self.focus = Focus::Client;
+                            return self.execute_command(items[idx].command);
+                        }
+                    }
+                } else {
+                    let rel_y = y - (r.y + 4);
+                    if rel_y >= 0 {
+                        let item_idx = (rel_y / MENU_ITEM_H) as usize;
+                        if item_idx < items.len() {
+                            self.focus = Focus::Client;
+                            return self.execute_command(items[item_idx].command);
+                        }
                     }
                 }
             }
 
             if (0..TITLE_H).contains(&y) {
-                if (0..DOCK_BTN_W).contains(&x) {
-                    self.open_menu = None;
-                    self.dock_visible = !self.dock_visible;
-                    return InputResult::Changed;
-                }
-                for i in 0..MENU_COUNT {
-                    if layout.header_rect(i).contains(x, y) {
-                        self.open_menu = if i == menu_idx { None } else { Some(i) };
+                for candidate in MenuId::ALL {
+                    if layout.header_rect(candidate).contains(x, y) {
+                        self.focus = if candidate == menu {
+                            Focus::MenuBar { menu }
+                        } else {
+                            Focus::Menu {
+                                menu: candidate,
+                                item: 0,
+                            }
+                        };
                         return InputResult::Changed;
                     }
                 }
             }
 
-            self.open_menu = None;
+            self.focus = Focus::Client;
             return InputResult::Changed;
         }
 
         // Layer 2: title bar.
         if (0..TITLE_H).contains(&y) {
-            if (0..DOCK_BTN_W).contains(&x) {
-                self.dock_visible = !self.dock_visible;
-                return InputResult::Changed;
-            }
-            for i in 0..MENU_COUNT {
-                if layout.header_rect(i).contains(x, y) {
-                    self.open_menu = Some(i);
+            for menu in MenuId::ALL {
+                if layout.header_rect(menu).contains(x, y) {
+                    self.focus = Focus::Menu { menu, item: 0 };
                     return InputResult::Changed;
                 }
             }
             return InputResult::Noop;
         }
 
-        // Layer 3: left dock.
-        if self.dock_visible && (DOCK_X..DOCK_X + DOCK_ICON_W).contains(&x) {
-            for (idx, &slot) in AppSlot::DOCK_APPS.iter().enumerate() {
-                let r = Rect::new(DOCK_X, dock_icon_y(idx), DOCK_ICON_W, DOCK_ICON_H);
-                if r.contains(x, y) {
-                    if slot == AppSlot::Files {
-                        self.files.ensure_selected_staged();
-                    }
-                    self.active_app = slot;
-                    self.dock_visible = false;
-                    return InputResult::Changed;
-                }
-            }
-        }
-
-        // Layer 4: client surface.
+        // Layer 3: client surface.
+        self.focus = Focus::Client;
         let cx = x;
         let cy = y - TITLE_H;
         let client_w = self.width;
@@ -671,6 +849,108 @@ impl WmState {
         }
     }
 
+    pub fn pointer_move(&mut self, x: i32, y: i32) -> InputResult {
+        if !self.ready || self.test_pattern {
+            return InputResult::Noop;
+        }
+        let layout = WmLayout::new(self.width);
+        let previous = self.hover;
+        let mut hover = None;
+        let mut over_chrome = false;
+
+        if let Focus::Menu { menu, .. } = self.focus {
+            // An open dropdown is modal: suppress client hover behind it.
+            over_chrome = true;
+            let items = self.menu_items(menu);
+            let r = layout.dropdown_rect(menu, items.len(), self.width);
+            if r.contains(x, y) {
+                if menu == MenuId::Home {
+                    for idx in 0..items.len() {
+                        let ir = layout.menu_item_rect(menu, idx, items.len(), self.width);
+                        if ir.contains(x, y) {
+                            hover = Some(Focus::Menu { menu, item: idx });
+                        }
+                    }
+                } else {
+                    let rel_y = y - (r.y + 4);
+                    if rel_y >= 0 {
+                        let item = (rel_y / MENU_ITEM_H) as usize;
+                        if item < items.len() {
+                            hover = Some(Focus::Menu { menu, item });
+                        }
+                    }
+                }
+            } else if (0..TITLE_H).contains(&y) {
+                over_chrome = true;
+                for candidate in MenuId::ALL {
+                    if layout.header_rect(candidate).contains(x, y) {
+                        hover = Some(Focus::MenuBar { menu: candidate });
+                    }
+                }
+            }
+        } else if (0..TITLE_H).contains(&y) {
+            over_chrome = true;
+            for menu in MenuId::ALL {
+                if layout.header_rect(menu).contains(x, y) {
+                    hover = Some(Focus::MenuBar { menu });
+                }
+            }
+        }
+
+        let client_hover = if !over_chrome {
+            let cx = x;
+            let cy = y - TITLE_H;
+            let client_w = self.width;
+            let client_h = (self.height - TITLE_H).max(1);
+            match self.active_app {
+                AppSlot::Files => files::pointer_move(&mut self.files, cx, cy, client_w, client_h),
+                AppSlot::System => {
+                    system::pointer_move(&mut self.system, cx, cy, client_w, client_h)
+                }
+                _ => false,
+            }
+        } else {
+            // Moving into chrome must clear stale client hover highlights.
+            files::pointer_leave(&mut self.files) || system::pointer_leave(&mut self.system)
+        };
+
+        self.hover = hover;
+        if previous != self.hover || client_hover {
+            InputResult::Changed
+        } else {
+            InputResult::Noop
+        }
+    }
+
+    pub fn pointer_leave(&mut self) -> InputResult {
+        if !self.ready {
+            return InputResult::Noop;
+        }
+        let changed = self.hover.is_some()
+            || files::pointer_leave(&mut self.files)
+            || system::pointer_leave(&mut self.system);
+        self.hover = None;
+        if changed {
+            InputResult::Changed
+        } else {
+            InputResult::Noop
+        }
+    }
+
+    fn launch_app(&mut self, slot: AppSlot) -> InputResult {
+        if slot == AppSlot::Files {
+            self.files.ensure_selected_staged();
+        }
+        self.active_app = slot;
+        self.focus = Focus::Client;
+        self.hover = None;
+        self.focus_visible = false;
+        self.files.hover_row = None;
+        self.files.hover_control = None;
+        self.system.hover_tab = None;
+        InputResult::Changed
+    }
+
     fn execute_command(&mut self, command: Command) -> InputResult {
         match command {
             Command::About => self.open_system(SystemSection::About),
@@ -679,8 +959,10 @@ impl WmState {
             Command::Icons => self.open_system(SystemSection::Icons),
             Command::CloseWindow => {
                 self.active_app = AppSlot::Desktop;
+                self.focus = Focus::Client;
                 InputResult::Changed
             }
+            Command::Launch(slot) => self.launch_app(slot),
             Command::CalcClear => {
                 self.calc.clear();
                 InputResult::Changed
@@ -704,6 +986,7 @@ impl WmState {
                         self.files.wallpaper_idx = sel as i32;
                         self.files.ensure_selected_staged();
                         self.active_app = AppSlot::Desktop;
+                        self.focus = Focus::Client;
                     }
                 }
                 InputResult::Changed
@@ -724,17 +1007,15 @@ impl WmState {
                 self.mines.toggle_rules();
                 InputResult::Changed
             }
-            Command::ToggleDock => {
-                self.dock_visible = !self.dock_visible;
-                InputResult::Changed
-            }
             Command::TestPattern => {
                 self.test_pattern = !self.test_pattern;
+                self.focus = Focus::Client;
                 InputResult::Changed
             }
             Command::Snapshot => {
                 self.snapshot_seq = self.snapshot_seq.wrapping_add(1);
                 self.system.snapshots_taken = self.snapshot_seq;
+                self.focus = Focus::Client;
                 InputResult::Snapshot
             }
         }
@@ -743,43 +1024,227 @@ impl WmState {
     fn open_system(&mut self, section: SystemSection) -> InputResult {
         self.active_app = AppSlot::System;
         self.system.section = section;
-        self.dock_visible = false;
+        self.focus = Focus::Client;
         InputResult::Changed
     }
 
-    pub fn key(&mut self, key: Key) -> InputResult {
+    pub fn key(&mut self, key: Key, mods: Mods) -> InputResult {
         if !self.ready {
             return InputResult::Noop;
         }
-        if key == Key::Escape {
-            if self.open_menu.is_some() {
-                self.open_menu = None;
-                return InputResult::Changed;
-            }
-            if self.dock_visible {
-                self.dock_visible = false;
-                return InputResult::Changed;
-            }
-            if self.test_pattern {
-                self.test_pattern = false;
-                return InputResult::Changed;
+
+        // Ctrl/Cmd + 1..4 launches an app without opening the Home drawer.
+        if mods.command() {
+            if let Some(slot) = match key {
+                Key::Digit1 => Some(AppSlot::System),
+                Key::Digit2 => Some(AppSlot::Calc),
+                Key::Digit3 => Some(AppSlot::Files),
+                Key::Digit4 => Some(AppSlot::Mines),
+                _ => None,
+            } {
+                let rc = self.launch_app(slot);
+                self.focus_visible = true;
+                return rc;
             }
         }
-        if key == Key::Space {
-            self.dock_visible = !self.dock_visible;
+
+        // App Home shortcut opens the Home menu (drawer), like clicking it.
+        if key == Key::Dock {
+            self.focus = Focus::Menu {
+                menu: MenuId::Home,
+                item: 0,
+            };
+            self.hover = None;
+            self.focus_visible = true;
             return InputResult::Changed;
         }
 
-        match self.active_app {
-            AppSlot::System => self.key_system(key),
-            AppSlot::Calc => calc::key_window(&mut self.calc, key),
-            AppSlot::Files => files::key_window(&mut self.files, key),
-            AppSlot::Mines => mines::key_window(&mut self.mines, key),
-            AppSlot::Desktop => InputResult::Noop,
+        if key == Key::MenuBar {
+            self.focus = Focus::MenuBar { menu: MenuId::Home };
+            self.hover = None;
+            self.focus_visible = true;
+            return InputResult::Changed;
+        }
+
+        // Escape pops one layer. From the client it focuses App Home without
+        // opening the drawer.
+        if key == Key::Escape {
+            self.focus = match self.focus {
+                Focus::Menu { menu, .. } => Focus::MenuBar { menu },
+                Focus::MenuBar { menu: MenuId::Home } => Focus::Client,
+                Focus::MenuBar { .. } => Focus::MenuBar { menu: MenuId::Home },
+                Focus::Client => Focus::MenuBar { menu: MenuId::Home },
+            };
+            self.hover = None;
+            self.focus_visible = true;
+            return InputResult::Changed;
+        }
+
+        let rc = match self.focus {
+            Focus::MenuBar { menu } => self.key_menu_bar(key, mods, menu),
+            Focus::Menu { menu, item } => self.key_menu(key, mods, menu, item),
+            Focus::Client => self.key_client(key, mods),
+        };
+        if rc.is_consumed() {
+            self.focus_visible = true;
+        }
+        rc
+    }
+
+    fn key_menu_bar(&mut self, key: Key, mods: Mods, menu: MenuId) -> InputResult {
+        match key {
+            Key::Left => {
+                self.focus = Focus::MenuBar { menu: menu.prev() };
+                InputResult::Changed
+            }
+            Key::Right => {
+                self.focus = Focus::MenuBar { menu: menu.next() };
+                InputResult::Changed
+            }
+            Key::Tab => {
+                self.focus = Focus::MenuBar {
+                    menu: if mods.shift() {
+                        menu.prev()
+                    } else {
+                        menu.next()
+                    },
+                };
+                InputResult::Changed
+            }
+            Key::Down | Key::Enter | Key::Space => {
+                self.focus = Focus::Menu { menu, item: 0 };
+                InputResult::Changed
+            }
+            Key::Up => {
+                let items = self.menu_items(menu).len();
+                self.focus = Focus::Menu {
+                    menu,
+                    item: items.saturating_sub(1),
+                };
+                InputResult::Changed
+            }
+            Key::Home => {
+                self.focus = Focus::MenuBar { menu: MenuId::Home };
+                InputResult::Changed
+            }
+            Key::End => {
+                self.focus = Focus::MenuBar {
+                    menu: MenuId::Testing,
+                };
+                InputResult::Changed
+            }
+            _ => InputResult::Handled,
         }
     }
 
-    fn key_system(&mut self, key: Key) -> InputResult {
+    fn key_menu(&mut self, key: Key, mods: Mods, menu: MenuId, item: usize) -> InputResult {
+        let items = self.menu_items(menu);
+        if items.is_empty() {
+            self.focus = Focus::MenuBar { menu };
+            return InputResult::Changed;
+        }
+        match key {
+            Key::Up => {
+                self.focus = Focus::Menu {
+                    menu,
+                    item: if item == 0 { items.len() - 1 } else { item - 1 },
+                };
+                InputResult::Changed
+            }
+            Key::Down => {
+                self.focus = Focus::Menu {
+                    menu,
+                    item: (item + 1) % items.len(),
+                };
+                InputResult::Changed
+            }
+            Key::Left => {
+                self.focus = Focus::Menu {
+                    menu: menu.prev(),
+                    item: 0,
+                };
+                InputResult::Changed
+            }
+            Key::Right => {
+                self.focus = Focus::Menu {
+                    menu: menu.next(),
+                    item: 0,
+                };
+                InputResult::Changed
+            }
+            Key::Tab => {
+                self.focus = Focus::Menu {
+                    menu: if mods.shift() {
+                        menu.prev()
+                    } else {
+                        menu.next()
+                    },
+                    item: 0,
+                };
+                InputResult::Changed
+            }
+            Key::PageDown => {
+                self.focus = Focus::Menu {
+                    menu: menu.next(),
+                    item: 0,
+                };
+                InputResult::Changed
+            }
+            Key::PageUp => {
+                self.focus = Focus::Menu {
+                    menu: menu.prev(),
+                    item: 0,
+                };
+                InputResult::Changed
+            }
+            Key::Home => {
+                self.focus = Focus::Menu { menu, item: 0 };
+                InputResult::Changed
+            }
+            Key::End => {
+                self.focus = Focus::Menu {
+                    menu,
+                    item: items.len() - 1,
+                };
+                InputResult::Changed
+            }
+            Key::Enter | Key::Space => {
+                let cmd = items[item.min(items.len() - 1)].command;
+                self.focus = Focus::Client;
+                self.execute_command(cmd)
+            }
+            _ => InputResult::Handled,
+        }
+    }
+
+    fn key_client(&mut self, key: Key, mods: Mods) -> InputResult {
+        let rc = match self.active_app {
+            AppSlot::Desktop => match key {
+                Key::Left
+                | Key::Right
+                | Key::Up
+                | Key::Down
+                | Key::PageUp
+                | Key::PageDown
+                | Key::Home
+                | Key::End
+                | Key::Space => InputResult::Handled,
+                _ => InputResult::Noop,
+            },
+            AppSlot::System => self.key_system(key, mods),
+            AppSlot::Calc => calc::key_window(&mut self.calc, key),
+            AppSlot::Files => files::key_window(&mut self.files, key, mods),
+            AppSlot::Mines => mines::key_window(&mut self.mines, key),
+        };
+        if key == Key::Space && !rc.is_consumed() {
+            // Avoid page-scrolling while a client surface has focus.
+            InputResult::Handled
+        } else {
+            rc
+        }
+    }
+
+    fn key_system(&mut self, key: Key, mods: Mods) -> InputResult {
         match key {
             Key::Digit1 | Key::Digit2 | Key::Digit3 | Key::Digit4 => {
                 let idx = key as i32 - Key::Digit1 as i32;
@@ -788,17 +1253,27 @@ impl WmState {
                     self.system.section = target;
                     InputResult::Changed
                 } else {
-                    InputResult::Noop
+                    InputResult::Handled
                 }
             }
-            Key::Left | Key::Right => {
+            Key::Left | Key::Right | Key::Tab | Key::Up | Key::Down => {
                 let cur = self.system.section as usize;
-                let next = if key == Key::Left {
-                    (cur + SystemSection::COUNT - 1) % SystemSection::COUNT
-                } else {
+                let forward =
+                    key == Key::Right || key == Key::Down || (key == Key::Tab && !mods.shift());
+                let next = if forward {
                     (cur + 1) % SystemSection::COUNT
+                } else {
+                    (cur + SystemSection::COUNT - 1) % SystemSection::COUNT
                 };
                 self.system.section = SystemSection::from_index(next);
+                InputResult::Changed
+            }
+            Key::Home => {
+                self.system.section = SystemSection::About;
+                InputResult::Changed
+            }
+            Key::End => {
+                self.system.section = SystemSection::Icons;
                 InputResult::Changed
             }
             _ => InputResult::Noop,
@@ -848,15 +1323,15 @@ mod tests {
         }
         assert_eq!(AppSlot::Desktop.dock_index(), None);
         assert_eq!(AppSlot::from_dock_index(AppSlot::APP_COUNT), None);
+        assert_eq!(AppSlot::Desktop.title(), "Desktop");
     }
 
     #[test]
     fn menu_labels_map_to_commands() {
-        let wm = WmState::new();
         for app in AppSlot::DOCK_APPS {
             let mut wm = WmState::new();
             wm.active_app = app;
-            let items = wm.menu_items(0);
+            let items = wm.menu_items(MenuId::App);
             assert!(!items.is_empty());
             for pair in items.windows(2) {
                 assert_ne!(pair[0].label, pair[1].label);
@@ -864,10 +1339,22 @@ mod tests {
         }
         let mut files = WmState::new();
         files.active_app = AppSlot::Files;
-        assert_eq!(files.menu_items(0)[2].command, Command::FilesToggleContext);
-        assert_eq!(files.menu_items(0)[4].command, Command::CloseWindow);
-        assert_eq!(wm.menu_items(1)[1].command, Command::TestPattern);
-        assert_eq!(wm.menu_items(2)[0].command, Command::Snapshot);
+        assert_eq!(
+            files.menu_items(MenuId::App)[2].command,
+            Command::FilesToggleContext
+        );
+        assert_eq!(
+            files.menu_items(MenuId::App)[4].command,
+            Command::CloseWindow
+        );
+        assert_eq!(
+            WmState::new().menu_items(MenuId::View)[0].command,
+            Command::TestPattern
+        );
+        assert_eq!(
+            WmState::new().menu_items(MenuId::Testing)[0].command,
+            Command::Snapshot
+        );
     }
 
     #[test]
@@ -885,6 +1372,11 @@ mod tests {
             InputResult::Changed
         );
         assert_eq!(wm.active_app, AppSlot::Desktop);
+        assert_eq!(
+            wm.execute_command(Command::Launch(AppSlot::Mines)),
+            InputResult::Changed
+        );
+        assert_eq!(wm.active_app, AppSlot::Mines);
     }
 
     #[test]
@@ -898,12 +1390,18 @@ mod tests {
         assert!(!full.right_compact);
         assert!(compact.right_compact);
 
-        for idx in 0..MENU_COUNT {
-            let r = full.dropdown_rect(idx, 5, 1280);
+        assert_eq!(
+            full.header_rect(MenuId::Home),
+            Rect::new(0, 0, HOME_BTN_W, TITLE_H)
+        );
+        for menu in MenuId::ALL {
+            let r = full.dropdown_rect(menu, 5, 1280);
             assert!(r.x >= 0 && r.right() <= 1280);
             assert!(r.contains(r.x + 1, r.y + 1));
+            let item = full.menu_item_rect(menu, 3, 5, 1280);
+            assert!(item.x >= r.x && item.right() <= r.right());
         }
-        let r = compact.dropdown_rect(2, 1, 390);
+        let r = compact.dropdown_rect(MenuId::Testing, 1, 390);
         assert!(r.x >= 0 && r.right() <= 390);
     }
 }

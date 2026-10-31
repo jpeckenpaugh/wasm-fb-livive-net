@@ -49,10 +49,10 @@ impl SystemSection {
 
     pub fn label(self) -> &'static str {
         match self {
-            SystemSection::About => "ABOUT",
-            SystemSection::Locale => "LOCALE",
-            SystemSection::Fonts => "FONTS",
-            SystemSection::Icons => "ICONS",
+            SystemSection::About => "About",
+            SystemSection::Locale => "Locale",
+            SystemSection::Fonts => "Fonts",
+            SystemSection::Icons => "Icons",
         }
     }
 }
@@ -60,6 +60,8 @@ impl SystemSection {
 pub struct SystemApp {
     pub section: SystemSection,
     pub snapshots_taken: u32,
+    pub focus_visible: bool,
+    pub hover_tab: Option<usize>,
     // UTC wall clock + timezone offset (minutes East of UTC, e.g. -240 for UTC-04:00)
     pub utc_year: u16,
     pub utc_month: u8,
@@ -75,6 +77,8 @@ impl SystemApp {
         Self {
             section: SystemSection::About,
             snapshots_taken: 0,
+            focus_visible: false,
+            hover_tab: None,
             utc_year: 2026,
             utc_month: 10,
             utc_day: 30,
@@ -103,19 +107,28 @@ pub fn draw_window(fb: &mut Framebuffer, app: &SystemApp, session_w: i32, sessio
             SystemSection::Icons => draw_icons(&mut content),
         }
     }
-    draw_section_bar(fb, content_h, app.section);
+    draw_section_bar(fb, content_h, app.section, app.focus_visible, app.hover_tab);
 }
 
-fn draw_section_bar(fb: &mut Framebuffer, y: i32, active: SystemSection) {
+fn draw_section_bar(
+    fb: &mut Framebuffer,
+    y: i32,
+    active: SystemSection,
+    focus_visible: bool,
+    hover_tab: Option<usize>,
+) {
     fb.fill(0, y, fb.w, SECTION_BAR_H, t::BAR);
     ui::separator(fb, 0, y, fb.w);
     let tab_w = (fb.w / SystemSection::COUNT as i32).max(1);
     for idx in 0..SystemSection::COUNT {
         let x = idx as i32 * tab_w;
         let selected = SystemSection::from_index(idx) == active;
+        let hovered = hover_tab == Some(idx);
         if selected {
             fb.fill(x, y + 1, tab_w, SECTION_BAR_H - 1, t::SURFACE);
             fb.fill(x, y + SECTION_BAR_H - 2, tab_w, 2, t::ACCENT);
+        } else if hovered {
+            fb.fill(x, y + 1, tab_w, SECTION_BAR_H - 1, t::SURFACE_HOVER);
         }
         draw_str_centered(
             fb,
@@ -125,9 +138,40 @@ fn draw_section_bar(fb: &mut Framebuffer, y: i32, active: SystemSection) {
             SECTION_BAR_H - 1,
             SystemSection::from_index(idx).label(),
             1,
-            if selected { t::TEXT } else { t::TEXT_DIM },
+            if selected {
+                t::TEXT
+            } else if hovered {
+                t::TEXT_BODY
+            } else {
+                t::TEXT_DIM
+            },
         );
+        if focus_visible && selected {
+            ui::focus_ring(fb, Rect::new(x + 1, y + 1, tab_w - 2, SECTION_BAR_H - 2));
+        }
     }
+}
+
+pub fn pointer_move(app: &mut SystemApp, cx: i32, cy: i32, client_w: i32, client_h: i32) -> bool {
+    let next = if cy >= client_h - SECTION_BAR_H {
+        let tab_w = (client_w / SystemSection::COUNT as i32).max(1);
+        let idx = (cx / tab_w).clamp(0, SystemSection::COUNT as i32 - 1) as usize;
+        Some(idx)
+    } else {
+        None
+    };
+    if app.hover_tab == next {
+        false
+    } else {
+        app.hover_tab = next;
+        true
+    }
+}
+
+pub fn pointer_leave(app: &mut SystemApp) -> bool {
+    let changed = app.hover_tab.is_some();
+    app.hover_tab = None;
+    changed
 }
 
 /// Click the System section tabs. Content itself is read-only.
@@ -173,7 +217,7 @@ fn draw_icons(fb: &mut Framebuffer) {
             fb,
             x0 + 320,
             y + 7,
-            "32X32 2-BIT  U+E000..U+E01F",
+            "32x32 2-bit  U+E000..U+E01F",
             1,
             label_col,
         );
@@ -229,7 +273,7 @@ fn draw_icons(fb: &mut Framebuffer) {
 
     // 3. Inline icons in text (monospace + proportional).
     if y + 40 < fb.h {
-        let mono = "\u{E000} HOME  \u{E001} BACK  \u{E004} CANCEL  \u{E015} GAMES";
+        let mono = "\u{E000} Home  \u{E001} Back  \u{E004} Cancel  \u{E015} Games";
         draw_str(fb, x0, y, mono, body_scale, ink);
         let y2 = y + 7 * body_scale + 12;
         if y2 + 7 * body_scale < fb.h {
@@ -255,20 +299,20 @@ fn draw_about(fb: &mut Framebuffer, app: &SystemApp, session_w: i32, session_h: 
     let (x0, w, val_off, y0, row_h) = layout_margins(fb.w, fb.h);
     let head_scale = Metrics::new(fb.w, fb.h).head_scale();
 
-    draw_str(fb, x0, y0, "ABOUT", head_scale, t::TEXT);
+    draw_str(fb, x0, y0, "About", head_scale, t::TEXT);
     fb.fill(x0, y0 + 12 * head_scale, w, 2, t::ACCENT);
 
     let rows_y = y0 + 12 * head_scale + 24;
 
-    draw_row(fb, x0, rows_y, w, val_off, "VERSION", PKG_VERSION);
-    draw_row(fb, x0, rows_y + row_h, w, val_off, "TARGET", TARGET_TRIPLE);
+    draw_row(fb, x0, rows_y, w, val_off, "Version", PKG_VERSION);
+    draw_row(fb, x0, rows_y + row_h, w, val_off, "Target", TARGET_TRIPLE);
     draw_row(
         fb,
         x0,
         rows_y + row_h * 2,
         w,
         val_off,
-        "PROFILE",
+        "Profile",
         BUILD_PROFILE,
     );
     draw_row(
@@ -277,7 +321,7 @@ fn draw_about(fb: &mut Framebuffer, app: &SystemApp, session_w: i32, session_h: 
         rows_y + row_h * 3,
         w,
         val_off,
-        "COMPILER",
+        "Compiler",
         RUSTC_VER,
     );
     draw_row(
@@ -286,7 +330,7 @@ fn draw_about(fb: &mut Framebuffer, app: &SystemApp, session_w: i32, session_h: 
         rows_y + row_h * 4,
         w,
         val_off,
-        "SOURCE FNV1A",
+        "Source FNV-1a",
         SRC_HASH,
     );
 
@@ -298,7 +342,7 @@ fn draw_about(fb: &mut Framebuffer, app: &SystemApp, session_w: i32, session_h: 
         rows_y + row_h * 5,
         w,
         val_off,
-        "FRAMEBUFFER",
+        "Framebuffer",
         fb_str,
     );
 
@@ -310,7 +354,7 @@ fn draw_about(fb: &mut Framebuffer, app: &SystemApp, session_w: i32, session_h: 
         rows_y + row_h * 6,
         w,
         val_off,
-        "SNAPSHOTS",
+        "Snapshots",
         snap_str,
     );
 }
@@ -321,20 +365,20 @@ fn draw_locale(fb: &mut Framebuffer, app: &SystemApp) {
     let (x0, w, val_off, y0, row_h) = layout_margins(fb.w, fb.h);
     let head_scale = Metrics::new(fb.w, fb.h).head_scale();
 
-    draw_str(fb, x0, y0, "LOCALE", head_scale, t::TEXT);
+    draw_str(fb, x0, y0, "Locale", head_scale, t::TEXT);
     fb.fill(x0, y0 + 12 * head_scale, w, 2, t::ACCENT);
 
     let rows_y = y0 + 12 * head_scale + 24;
 
-    draw_row(fb, x0, rows_y, w, val_off, "LANGUAGE", "en-US");
+    draw_row(fb, x0, rows_y, w, val_off, "Language", "en-US");
     draw_row(
         fb,
         x0,
         rows_y + row_h,
         w,
         val_off,
-        "CHARSET",
-        "UTF-8 (LATIN / GREEK / CYRILLIC / SYMBOLS)",
+        "Charset",
+        "UTF-8 (Latin / Greek / Cyrillic / Symbols)",
     );
 
     let mut utc_buf = [b' '; 24];
@@ -347,18 +391,18 @@ fn draw_locale(fb: &mut Framebuffer, app: &SystemApp) {
         app.utc_min,
         app.utc_sec,
     );
-    draw_row(fb, x0, rows_y + row_h * 2, w, val_off, "UTC TIME", utc_str);
+    draw_row(fb, x0, rows_y + row_h * 2, w, val_off, "UTC Time", utc_str);
 
     let mut tz_buf = [b' '; 24];
     let tz_str = f::tz_offset(&mut tz_buf, app.tz_offset_min);
-    draw_row(fb, x0, rows_y + row_h * 3, w, val_off, "UTC OFFSET", tz_str);
+    draw_row(fb, x0, rows_y + row_h * 3, w, val_off, "UTC Offset", tz_str);
     draw_row(
         fb,
         x0,
         rows_y + row_h * 4,
         w,
         val_off,
-        "SCRIPTS",
+        "Scripts",
         "¡Hola España! · Γεια σας · Привет мир · ┌─┼─┐",
     );
 }
@@ -394,7 +438,7 @@ fn draw_fonts(fb: &mut Framebuffer) {
     // 1. Character Set
     let y_cs = y0 + 12 * head_scale + (if compact { 10 } else { 18 });
     let cs_step = if compact { 16 } else { 22 };
-    draw_str(fb, x0, y_cs, "UPPER", body_scale, label_col);
+    draw_str(fb, x0, y_cs, "Upper", body_scale, label_col);
     draw_str(
         fb,
         x0 + val_off,
@@ -404,7 +448,7 @@ fn draw_fonts(fb: &mut Framebuffer) {
         val_col,
     );
 
-    draw_str(fb, x0, y_cs + cs_step, "LOWER", body_scale, label_col);
+    draw_str(fb, x0, y_cs + cs_step, "Lower", body_scale, label_col);
     draw_str(
         fb,
         x0 + val_off,
@@ -414,7 +458,7 @@ fn draw_fonts(fb: &mut Framebuffer) {
         val_col,
     );
 
-    draw_str(fb, x0, y_cs + cs_step * 2, "LATIN+", body_scale, label_col);
+    draw_str(fb, x0, y_cs + cs_step * 2, "Latin+", body_scale, label_col);
     draw_str(
         fb,
         x0 + val_off,
@@ -428,7 +472,7 @@ fn draw_fonts(fb: &mut Framebuffer) {
         fb,
         x0,
         y_cs + cs_step * 3,
-        "GREEK/CYR",
+        "Greek/Cyr",
         body_scale,
         label_col,
     );
@@ -441,7 +485,7 @@ fn draw_fonts(fb: &mut Framebuffer) {
         val_col,
     );
 
-    draw_str(fb, x0, y_cs + cs_step * 4, "SYMBOLS", body_scale, label_col);
+    draw_str(fb, x0, y_cs + cs_step * 4, "Symbols", body_scale, label_col);
     draw_str(
         fb,
         x0 + val_off,
@@ -456,11 +500,11 @@ fn draw_fonts(fb: &mut Framebuffer) {
     // 2. Scale Ladder (1x .. 5x)
     let mut y_scale = div1_y + (if compact { 10 } else { 18 });
     let scales: [(i32, &str); 5] = [
-        (1, "1X (5X7)"),
-        (2, "2X (10X14)"),
-        (3, "3X (15X21)"),
-        (4, "4X (20X28)"),
-        (5, "5X (25X35)"),
+        (1, "1x (5x7)"),
+        (2, "2x (10x14)"),
+        (3, "3x (15x21)"),
+        (4, "4x (20x28)"),
+        (5, "5x (25x35)"),
     ];
     let scale_gap = if compact { 8 } else { 14 };
     for &(sc, label) in &scales {
@@ -486,11 +530,11 @@ fn draw_fonts(fb: &mut Framebuffer) {
     let style_sc = if compact { 2 } else { 3 };
     let style_step = if compact { 24 } else { 36 };
     let styles: [(FontStyle, &str); 5] = [
-        (FontStyle::Regular, "REGULAR"),
-        (FontStyle::Bold, "BOLD"),
-        (FontStyle::Italic, "ITALIC"),
-        (FontStyle::Matrix, "MATRIX"),
-        (FontStyle::Underline, "UNDERLINE"),
+        (FontStyle::Regular, "Regular"),
+        (FontStyle::Bold, "Bold"),
+        (FontStyle::Italic, "Italic"),
+        (FontStyle::Matrix, "Matrix"),
+        (FontStyle::Underline, "Underline"),
     ];
     for (idx, &(style, name)) in styles.iter().enumerate() {
         let ry = y_style + (idx as i32) * style_step;
@@ -559,6 +603,6 @@ pub fn draw_dock_tile(
 ) {
     ui::dock_tile(fb, Rect::new(x, y, w, h), active);
     draw_icon(fb, x + 10, y + 24, Icon::System, 32, t::ACCENT);
-    draw_str_prop(fb, x + 48, y + 18, "SYSTEM", 2, t::TEXT);
+    draw_str_prop(fb, x + 48, y + 18, "System", 2, t::TEXT);
     draw_str_prop(fb, x + 48, y + 42, app.section.label(), 1, t::ACCENT);
 }

@@ -5,7 +5,7 @@
 This document specifies the design and parallel sub-agent implementation plan for folding two high-leverage testing seams into the **`wasm-fb` `/v2/` `#![no_std]` Rust WebAssembly Framebuffer Appliance**:
 
 1. **Seam #1 — GitHub On-Demand Code Context (`gh://`):**
-   - Extends the `Files` application into two top-level sections: **`HOME (~/)`** (containing `wallpapers/` and `samples/`) and **`GITHUB (gh://)`** (task-scoped repository files provided on demand by the JS hypervisor, starting with `jpeckenpaugh/mines-sm` for the `Mines` testing workflow).
+   - Extends the `Files` application into two top-level sections: **`Home (~/)`** (containing `wallpapers/` and `samples/`) and **`GitHub (gh://)`** (task-scoped repository files provided on demand by the JS hypervisor, starting with `jpeckenpaugh/mines-sm` for the `Mines` testing workflow).
    - Just as the JS hypervisor acts as an upstream `RGBA8888` image decoder so we never bloat the `.wasm` binary with image codecs or raw PNGs, it acts as a **GitHub Index + On-Demand Chunk Upstream**. The guest receives a lightweight file tree manifest and stages UTF-8 code chunks only when a file is selected or paged.
 
 2. **Seam #2 — Enriched OS Metadata & Knowledge Graph Sidecars (`.context.xml`):**
@@ -13,7 +13,7 @@ This document specifies the design and parallel sub-agent implementation plan fo
    - Each `.context.xml` entry contains:
      1. **Mini Knowledge Graph:** `runtime`, `role`, `imports`, `exports`, `dependents`, and `invariants`.
      2. **Technical Summary (1–2 paragraphs):** What the file does and how it fits into the broader system architecture.
-   - Inside the `Files` app's **Right 2/3 Preview Pane**, clicking the **`[ CONTEXT ]` / `[ RAW ]`** toggle button (or pressing `Tab` / `I`, or selecting `FILES -> TOGGLE CONTEXT VIEW` from the Title Bar) switches the preview between the raw file content (image or syntax-highlighted source code) and its structured **Context Thumbnail + Knowledge Graph**—giving a Beta Tester Agent instant architectural grounding with zero wasted tokens.
+   - Inside the `Files` app's **Right 2/3 Preview Pane**, clicking the **`[ Context ]` / `[ Raw ]`** toggle button (or pressing `I`, or selecting `Files -> Toggle Context View` from the Title Bar) switches the preview between the raw file content (image or syntax-highlighted source code) and its structured **Context Thumbnail + Knowledge Graph**—giving a Beta Tester Agent instant architectural grounding with zero wasted tokens. `Tab` is reserved for focus traversal.
 
 ### Strict Architectural Invariants ("Less is More")
 - **Single Flat Maximized Surface:** All rendering happens directly on the flat client surface below the 32px Title Bar (`fb.sub_rows(TITLE_H, client_h)`). **No nested window frames, no fake inner title bars, and no duplicate status strings.**
@@ -103,9 +103,9 @@ Because each field is a single line (`KEY=VALUE\n`), the `#![no_std]` Rust guest
 
 #### Mount Entry Path Prefix Convention
 All mounted files are registered through `app_mount_add(name_len, byte_size)` using their virtual path prefix:
-- `wallpapers/<name>` → belongs to **`HOME (~/)`** → sub-folder `~/wallpapers`
-- `samples/<name>` → belongs to **`HOME (~/)`** → sub-folder `~/samples`
-- `github/<name>` → belongs to **`GITHUB (gh://)`** → listed directly under `gh://mines-sm`
+- `wallpapers/<name>` → belongs to **`Home (~/)`** → sub-folder `~/wallpapers`
+- `samples/<name>` → belongs to **`Home (~/)`** → sub-folder `~/samples`
+- `github/<name>` → belongs to **`GitHub (gh://)`** → listed directly under `gh://mines-sm`
 
 #### `FolderLevel` Enum in `v2/src/files.rs`
 ```rust
@@ -118,13 +118,13 @@ pub enum FolderLevel {
 }
 ```
 
-- **Switching between `HOME (~/)` and `GITHUB (gh://)`:**
+- **Switching between `Home (~/)` and `GITHUB (gh://)`:**
   1. **Title Bar `FILES` Menu:**
-     - `HOME (~/)` — Switches Left 1/3 browser to `FolderLevel::HomeRoot`
-     - `GITHUB (GH://)` — Switches Left 1/3 browser to `FolderLevel::GithubRepo` (and auto-selects the first repo file)
-     - `TOGGLE CONTEXT (TAB)` — Toggles the Right 2/3 Preview Pane between `RAW` (image/code) and `CONTEXT` (`.context.xml` knowledge graph + summary)
-     - `SET AS WALLPAPER` — Pins the active image as Desktop Wallpaper
-     - `CLOSE WINDOW` — Returns to Desktop
+     - `Home (~/)` — Switches Left 1/3 browser to `FolderLevel::HomeRoot`
+     - `GitHub (gh://)` — Switches Left 1/3 browser to `FolderLevel::GithubRepo` (and auto-selects the first repo file)
+     - `TOGGLE CONTEXT (TAB)` — Toggles the Right 2/3 Preview Pane between `Raw` (image/code) and `Context` (`.context.xml` knowledge graph + summary)
+     - `Set as Wallpaper` — Pins the active image as Desktop Wallpaper
+     - `Close Window` — Returns to Desktop
   2. **Left 1/3 Panel Header:**
      - Displays `~/` (at `HomeRoot`), `~/WALLPAPERS`, `~/SAMPLES`, or `GH://MINES-SM` (at `GithubRepo`).
      - At `HomeRoot`, we can also include a 3rd row `gh://mines-sm/` (`3 ITEMS`) below `wallpapers/` and `samples/` so clicking it in the Left 1/3 panel also enters `GithubRepo` directly without even needing the Title Bar menu!
@@ -138,13 +138,13 @@ When a file is selected in `HomeWallpapers`, `HomeSamples`, or `GithubRepo`, the
 1. **Top Control Strip (`y: 0..40` inside Right 2/3 pane):**
    - Left side: File path & mode label (e.g., `GH://MINES-SM/LIB.RS` or `~/SAMPLES/SCRIPT.PY`).
    - Right side:
-     - When in `RAW` mode on a multi-page code file: **`[▲ PREV]`** and **`[▼ NEXT]`** chunk buttons + line range (`1..30 / 388`).
-     - Always visible on the far right: **`[ CONTEXT ]`** (when viewing raw image/code) or **`[ RAW VIEW ]`** (when viewing the `.context.xml` breakdown), highlighted with the teal/amber accent border.
+     - When in `Raw` mode on a multi-page code file: **`[▲ Prev]`** and **`[▼ Next]`** chunk buttons + line range (`1..30 / 388`).
+     - Always visible on the far right: **`[ Context ]`** (when viewing raw image/code) or **`[ Raw View ]`** (when viewing the `.context.xml` breakdown), highlighted with the teal/amber accent border.
 2. **Body Region (`y: 42..fb.h` inside Right 2/3 pane):**
-   - **If `context_mode == false` (`RAW` mode):**
+   - **If `context_mode == false` (`Raw` mode):**
      - Image (`wallpapers/*`): Blits scaled `RGBA8888` buffer into `(right_x, 42, right_w, fb.h - 42)`.
      - Code (`samples/*`, `github/*`): Calls `draw_code_preview` with syntax highlighting (`.rs`, `.toml`, `.md`, `.c`, `.js`, `.ts`, `.py`, `.json`, `.html`, `.xml`, `.css`) starting at `app.code_scroll`.
-   - **If `context_mode == true` (`CONTEXT` mode):**
+   - **If `context_mode == true` (`Context` mode):**
      - Renders the structured `.context.xml` breakdown from `staged_context`:
        - **Subheader:** `CONTEXT THUMBNAIL · GENERATED BY DEEPSEEK-V4.1-FLASH`
        - **Knowledge Graph Grid (6 compact rows):**
@@ -182,21 +182,21 @@ To execute this cleanly in parallel without merge conflicts, the work is partiti
   - `v2/src/files.rs`:
     - Add `FolderLevel::{HomeRoot, HomeWallpapers, HomeSamples, GithubRepo}` (with `gh://mines-sm/` accessible both as the 3rd row in `HomeRoot` and directly from `FILES -> GITHUB (GH://)`).
     - Add `context_mode: bool`, `staged_context_idx: i32`, `staged_context_len: usize`, and `MAX_CONTEXT_BYTES = 4096`.
-    - Render the 40px top control bar in the Right 2/3 preview pane with `[▲ PREV]`, `[▼ NEXT]`, and `[ CONTEXT ]` / `[ RAW VIEW ]` hit-testing.
+    - Render the 40px top control bar in the Right 2/3 preview pane with `[▲ Prev]`, `[▼ Next]`, and `[ Context ]` / `[ Raw View ]` hit-testing.
     - Implement `draw_context_preview` to parse the `KEY=VALUE\n` context buffer and render the Knowledge Graph rows + word-wrapped `SUMMARY` and `ARCHITECTURE` paragraphs.
-    - Support keyboard navigation: `Tab` or `I` (key code `33`) toggles `context_mode`; `[` / `PageUp` (key code `34`) and `]` / `PageDown` (key code `35`) page through code chunks.
+    - Support keyboard navigation: `I` (key code `40`) toggles `context_mode`, while `Tab` (`33`) traverses client focus; `[` / `PageUp` (key code `34`) and `]` / `PageDown` (key code `35`) page through code chunks.
   - `v2/src/wm.rs`:
-    - Update `FILES` Title Bar menu items to `&["HOME (~/)", "GITHUB (GH://)", "TOGGLE CONTEXT", "SET AS WALLPAPER", "CLOSE WINDOW"]` and wire their actions.
+    - Update `FILES` Title Bar menu items to `&["Home (~/)", "GitHub (gh://)", "Toggle Context", "Set as Wallpaper", "Close Window"]` and wire their actions.
   - `v2/src/lib.rs`:
     - Add `context_staging` buffer (`4096` bytes) above `text_staging` in linear memory.
     - Export `app_mount_context_ptr() -> *mut u8` and `app_mount_commit_context(idx: i32, byte_len: usize)`.
-    - Update unit tests in `v2/src/lib.rs` to verify `GITHUB` mounts, code paging, and `CONTEXT` preview rendering.
+    - Update unit tests in `v2/src/lib.rs` to verify `GITHUB` mounts, code paging, and `Context` preview rendering.
 
 ### Sub-Agent 3: Host Bridge & Build Pipeline (`web/v2/host.js`, `Makefile`, `Dockerfile`, `pages.yml`)
 - **Owned Files:**
   - `web/v2/host.js`:
     - Add `github/lib.rs`, `github/Cargo.toml`, and `github/README.md` to `DEFAULT_MOUNTS` pointing to `../gh/mines-sm/*`.
     - Implement `fetchContextForMount(item)` using `fetch()` + `DOMParser` on the directory's `.context.xml` (`../assets/.context.xml`, `../demo/.context.xml`, `../gh/mines-sm/.context.xml`), formatting the matched `<file name="...">` node into the `KEY=VALUE\n` wire format and committing it via `app_mount_context_ptr()` + `app_mount_commit_context(idx, len)` whenever a mount is staged.
-    - Map `Tab` / `i` / `I` to key code `33`, `PageUp` / `[` to `34`, and `PageDown` / `]` to `35`.
+    - Map `Tab` to `33`, `i` / `I` to `40`, `PageUp` / `[` to `34`, and `PageDown` / `]` to `35`.
   - `Makefile`, `Dockerfile`, `.github/workflows/pages.yml`, `.gitignore`, `.dockerignore`:
     - Copy `gh/` (including `.context.xml`) and `demo/.context.xml` / `assets/.context.xml` into `web/gh/`, `web/demo/`, `web/assets/`, `/usr/share/nginx/html/`, and `site/`.

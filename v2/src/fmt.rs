@@ -59,10 +59,10 @@ pub fn size_str(buf: &mut [u8; 16], bytes: u32) -> &str {
     core::str::from_utf8(&buf[..pos]).unwrap_or("")
 }
 
-/// `N ITEMS`
+/// `N Items`
 pub fn items_str(buf: &mut [u8; 16], count: u32) -> &str {
     let mut pos = write_u32(buf, 0, count);
-    push_bytes(buf, &mut pos, b" ITEMS");
+    push_bytes(buf, &mut pos, b" Items");
     core::str::from_utf8(&buf[..pos]).unwrap_or("")
 }
 
@@ -174,7 +174,7 @@ pub fn title_right(
     compact: bool,
 ) -> &str {
     let mut pos = 0;
-    push_bytes(buf, &mut pos, if compact { b"VM-" } else { b"TESTER  VM-" });
+    push_bytes(buf, &mut pos, if compact { b"VM-" } else { b"Tester  VM-" });
     push(buf, &mut pos, b'0' + ((session_id / 10) % 10) as u8);
     push(buf, &mut pos, b'0' + (session_id % 10) as u8);
     push(buf, &mut pos, b' ');
@@ -232,7 +232,7 @@ mod tests {
         let mut t = [0u8; 64];
         assert_eq!(
             title_right(&mut t, 1, 2026, 10, 30, 7, 5, 9, false),
-            "TESTER  VM-01  2026-10-30 07:05:09"
+            "Tester  VM-01  2026-10-30 07:05:09"
         );
         assert_eq!(
             title_right(&mut t, 12, 2026, 10, 30, 7, 5, 9, true),

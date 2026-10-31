@@ -60,4 +60,4 @@ FiveSeven ships 6 sheets (`0020-007E_basic_latin.txt`, `00A0-00FF_latin1.txt`, `
 `0370-03FF_greek.txt`, `0400-04FF_cyrillic.txt`, `2000-26FF_symbols.txt`) totaling 532 text glyphs (~4.3 KB),
 plus 32 icons × 256 B = 8 KB.
 
-Preview: **System → ICONS** (key `4`), **System → FONTS** (key `3`), and **System → LOCALE** (key `2`).
+Preview: **System → Icons** (key `4`), **System → Fonts** (key `3`), and **System → Locale** (key `2`).
