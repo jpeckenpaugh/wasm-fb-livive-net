@@ -7,7 +7,8 @@
 //!   Classic (`max_strikes: 1`) vs. Shielded (`max_strikes: 3`) rules.
 
 use crate::fb::{rgb, Framebuffer};
-use crate::font::{draw_str, draw_str_centered, text_width};
+use crate::font::{draw_str, draw_str_centered, draw_str_prop, text_width};
+use crate::icon::{draw_icon, Icon};
 use crate::mine_sm::{Action, ActionType, BoardState, Rules};
 
 pub const DEFAULT_SEED: u64 = 42;
@@ -483,7 +484,8 @@ pub fn draw_dock_tile(
     fb.border(x, y, w, h, 2, border);
     fb.fill(x + 2, y + 2, w - 4, 4, rgb(0x2d, 0xd4, 0xbf));
 
-    draw_str_centered(fb, x, y + 14, w, 24, "MINES", 2, rgb(0xf0, 0xf6, 0xfc));
+    draw_icon(fb, x + 10, y + 24, Icon::Games, 32, rgb(0x2d, 0xd4, 0xbf));
+    draw_str_prop(fb, x + 48, y + 18, "MINES", 2, rgb(0xf0, 0xf6, 0xfc));
 
     let sub = if app.board.is_terminal {
         if app.board.is_won {
@@ -494,7 +496,7 @@ pub fn draw_dock_tile(
     } else {
         "8X8 SEEDED"
     };
-    draw_str_centered(fb, x, y + 42, w, 16, sub, 1, rgb(0x2d, 0xd4, 0xbf));
+    draw_str_prop(fb, x + 48, y + 42, sub, 1, rgb(0x2d, 0xd4, 0xbf));
 }
 
 fn count_color(cnt: u8) -> u32 {

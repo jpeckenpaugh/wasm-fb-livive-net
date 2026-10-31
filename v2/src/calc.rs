@@ -7,7 +7,8 @@
 //! - Accepts client-relative clicks (`click_window`) and key codes (`key_window`).
 
 use crate::fb::{rgb, Framebuffer};
-use crate::font::{draw_str, draw_str_centered, text_width};
+use crate::font::{draw_str, draw_str_centered, draw_str_prop, text_width};
+use crate::icon::{draw_icon, Icon};
 
 pub const KEY_0: i32 = 10;
 pub const KEY_PLUS: i32 = 20;
@@ -362,17 +363,18 @@ pub fn draw_dock_tile(
     fb.border(x, y, w, h, 2, border);
     fb.fill(x + 2, y + 2, w - 4, 4, rgb(0x2d, 0xd4, 0xbf));
 
-    draw_str_centered(fb, x, y + 14, w, 24, "CALC", 2, rgb(0xf0, 0xf6, 0xfc));
+    draw_icon(fb, x + 10, y + 24, Icon::Calculator, 32, rgb(0x2d, 0xd4, 0xbf));
+    draw_str_prop(fb, x + 48, y + 18, "CALC", 2, rgb(0xf0, 0xf6, 0xfc));
 
     let mut disp_buf = [0u8; 24];
     let disp_str = app.format_display(&mut disp_buf);
-    let max_chars = 16;
+    let max_chars = 12;
     let clamped = if disp_str.len() > max_chars {
         &disp_str[..max_chars]
     } else {
         disp_str
     };
-    draw_str_centered(fb, x, y + 42, w, 16, clamped, 1, rgb(0x2d, 0xd4, 0xbf));
+    draw_str(fb, x + 48, y + 42, clamped, 1, rgb(0x2d, 0xd4, 0xbf));
 }
 
 fn btn_rect(g: &CalcGeom, b: &Btn) -> (i32, i32, i32, i32) {

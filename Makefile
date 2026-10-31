@@ -47,7 +47,7 @@ all: $(WASM_OUT) $(V2_WASM_OUT)
 
 v2: $(V2_WASM_OUT)
 
-$(V2_WASM_OUT): $(wildcard v2/Cargo.toml v2/build.rs v2/src/*.rs)
+$(V2_WASM_OUT): $(wildcard v2/Cargo.toml v2/build.rs v2/src/*.rs v2/glyphs/*/*.txt)
 	@mkdir -p $(dir $@)
 	cargo build --manifest-path v2/Cargo.toml --target wasm32-unknown-unknown --release
 	cp v2/target/wasm32-unknown-unknown/release/appliance.wasm $@

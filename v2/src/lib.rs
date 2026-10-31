@@ -5,6 +5,8 @@ pub mod code;
 pub mod fb;
 pub mod files;
 pub mod font;
+pub mod glyph;
+pub mod icon;
 pub mod mine_sm;
 pub mod mines;
 pub mod system;

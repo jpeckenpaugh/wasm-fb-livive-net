@@ -14,7 +14,8 @@
 use crate::calc::{self, CalcApp};
 use crate::fb::{rgb, Framebuffer};
 use crate::files::{self, FilesApp};
-use crate::font::draw_str;
+use crate::font::{draw_str_prop, text_width_prop};
+use crate::icon::{draw_icon, Icon};
 use crate::mines::{self, MinesApp};
 use crate::system::{self, SystemApp, SystemSection};
 
@@ -149,8 +150,8 @@ impl WmState {
     pub fn menu_items(&self, menu_idx: usize) -> &'static [&'static str] {
         match menu_idx {
             0 => match self.active_app {
-                AppSlot::Desktop => &["ABOUT", "LOCALE", "FONTS"],
-                AppSlot::System => &["ABOUT", "LOCALE", "FONTS", "CLOSE WINDOW"],
+                AppSlot::Desktop => &["ABOUT", "LOCALE", "FONTS", "ICONS"],
+                AppSlot::System => &["ABOUT", "LOCALE", "FONTS", "ICONS", "CLOSE WINDOW"],
                 AppSlot::Calc => &["CLEAR (AC)", "CLOSE WINDOW"],
                 AppSlot::Files => &[
                     "HOME (~/)",
@@ -264,11 +265,7 @@ impl WmState {
         fb.fill(0, 0, DOCK_BTN_W, TITLE_H - 1, btn_bg);
         fb.fill(DOCK_BTN_W - 1, 0, 1, TITLE_H - 1, rgb(0x22, 0x30, 0x3e));
 
-        for row in 0..3 {
-            let py = 9 + row * 5;
-            fb.fill(12, py, 6, 3, icon_col);
-            fb.fill(20, py, 12, 3, icon_col);
-        }
+        draw_icon(fb, (DOCK_BTN_W - 20) / 2, (TITLE_H - 1 - 20) / 2, Icon::Menu, 20, icon_col);
 
         // 2. Menu Headers
         let mhw = menu_header_w(fb.w);
@@ -286,7 +283,7 @@ impl WmState {
             } else {
                 rgb(0xc8, 0xd7, 0xe2)
             };
-            draw_str(fb, mx + 8, menu_ty, self.menu_title(i), menu_sc, fg);
+            draw_str_prop(fb, mx + 10, menu_ty, self.menu_title(i), menu_sc, fg);
         }
 
         // 3. Right Side: User, Session, and Full Timestamp shown ONCE
@@ -304,8 +301,8 @@ impl WmState {
         );
         let right_sc = if fb.w < 540 { 1 } else { 2 };
         let right_ty = if right_sc == 1 { 12 } else { 9 };
-        let rw = crate::font::text_width(right_str, right_sc);
-        draw_str(fb, fb.w - rw - 10, right_ty, right_str, right_sc, rgb(0x9f, 0xb3, 0xc8));
+        let rw = text_width_prop(right_str, right_sc);
+        draw_str_prop(fb, fb.w - rw - 10, right_ty, right_str, right_sc, rgb(0x9f, 0xb3, 0xc8));
     }
 
     fn draw_left_dock(&self, fb: &mut Framebuffer) {
@@ -382,7 +379,7 @@ impl WmState {
             if idx > 0 {
                 fb.fill(mx + 8, iy, drop_w - 16, 1, rgb(0x1f, 0x2c, 0x38));
             }
-            draw_str(fb, mx + 14, iy + 8, label, 2, rgb(0xd4, 0xe2, 0xea));
+            draw_str_prop(fb, mx + 14, iy + 8, label, 2, rgb(0xd4, 0xe2, 0xea));
         }
     }
 
@@ -509,13 +506,13 @@ impl WmState {
     fn execute_menu_item(&mut self, menu_idx: usize, item_idx: usize) -> i32 {
         match (menu_idx, item_idx) {
             (0, idx) => match (self.active_app, idx) {
-                (AppSlot::Desktop | AppSlot::System, 0..=2) => {
+                (AppSlot::Desktop | AppSlot::System, 0..=3) => {
                     self.active_app = AppSlot::System;
                     self.system.section = SystemSection::from_index(idx);
                     self.dock_visible = false;
                     CLICK_CHANGED
                 }
-                (AppSlot::System, 3) => {
+                (AppSlot::System, 4) => {
                     self.active_app = AppSlot::Desktop;
                     CLICK_CHANGED
                 }
@@ -620,7 +617,7 @@ impl WmState {
 
         match self.active_app {
             AppSlot::System => match code {
-                11..=13 => {
+                11..=14 => {
                     let target = SystemSection::from_index((code - 11) as usize);
                     if self.system.section != target {
                         self.system.section = target;
@@ -631,9 +628,9 @@ impl WmState {
                 1 | 2 => {
                     let cur = self.system.section as usize;
                     let next = if code == 1 {
-                        (cur + 2) % 3
+                        (cur + SystemSection::COUNT - 1) % SystemSection::COUNT
                     } else {
-                        (cur + 1) % 3
+                        (cur + 1) % SystemSection::COUNT
                     };
                     self.system.section = SystemSection::from_index(next);
                     CLICK_CHANGED

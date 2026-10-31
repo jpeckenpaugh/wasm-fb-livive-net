@@ -12,7 +12,8 @@
 
 use crate::code::{count_total_lines, draw_code_preview, is_image_filename, lang_for_filename};
 use crate::fb::{rgb, Framebuffer};
-use crate::font::{draw_str, draw_str_centered, text_width};
+use crate::font::{draw_str, draw_str_centered, draw_str_prop, text_width};
+use crate::icon::{draw_icon, Icon};
 
 pub const MAX_MOUNT_FILES: usize = 24;
 pub const MAX_NAME_LEN: usize = 48;
@@ -418,9 +419,19 @@ pub fn draw_window(
                     fb.fill(g.pad_x, ry, 4, g.row_h - 4, accent);
                 }
 
+                let isz = if g.row_scale == 1 { 12 } else { 16 };
+                draw_icon(
+                    fb,
+                    g.pad_x + 8,
+                    ry + (g.row_h - 4 - isz) / 2,
+                    Icon::Folder,
+                    isz,
+                    if selected { accent } else { label_col },
+                );
+
                 draw_str(
                     fb,
-                    g.pad_x + 10,
+                    g.pad_x + 12 + isz,
                     ry + text_pad_y,
                     fname,
                     g.row_scale,
@@ -458,10 +469,19 @@ pub fn draw_window(
                     fb.fill(g.pad_x, ry, 4, g.row_h - 4, accent);
                 }
 
+                let isz = if g.row_scale == 1 { 12 } else { 16 };
                 if r == 0 {
+                    draw_icon(
+                        fb,
+                        g.pad_x + 8,
+                        ry + (g.row_h - 4 - isz) / 2,
+                        Icon::Up,
+                        isz,
+                        if selected { accent } else { label_col },
+                    );
                     draw_str(
                         fb,
-                        g.pad_x + 10,
+                        g.pad_x + 12 + isz,
                         ry + text_pad_y,
                         "../",
                         g.row_scale,
@@ -481,11 +501,24 @@ pub fn draw_window(
                     }
                 } else if let Some(gidx) = app.global_idx_for_row(app.level, r) {
                     let entry = &app.entries[gidx];
+                    let row_icon = if entry.is_image() {
+                        Icon::Image
+                    } else {
+                        Icon::Document
+                    };
+                    draw_icon(
+                        fb,
+                        g.pad_x + 8,
+                        ry + (g.row_h - 4 - isz) / 2,
+                        row_icon,
+                        isz,
+                        if selected { accent } else { label_col },
+                    );
                     let name = entry.base_name();
                     let max_name = if show_meta {
-                        20
+                        18
                     } else {
-                        ((row_w - 16) / (6 * g.row_scale)).max(8) as usize
+                        ((row_w - 20 - isz) / (6 * g.row_scale)).max(8) as usize
                     };
                     let name_clamped = if name.len() > max_name {
                         &name[..max_name]
@@ -494,7 +527,7 @@ pub fn draw_window(
                     };
                     draw_str(
                         fb,
-                        g.pad_x + 10,
+                        g.pad_x + 12 + isz,
                         ry + text_pad_y,
                         name_clamped,
                         g.row_scale,
@@ -654,9 +687,9 @@ fn draw_preview_control_bar(
     fb.border(am_x, 8, am_w, 24, 1, rgb(0x2e, 0x3f, 0x50));
     draw_str_centered(fb, am_x, 8, am_w, 24, "[ A- ]", 1, text_col);
 
-    // 3) TTS button: [ ▶ TTS ] (idle) or [ ■ STOP ] (active)
+    // 3) TTS button: [ ▶ TTS ] (idle) or [ ⏹ STOP ] (active)
     let tts_btn_txt = if app.tts_active {
-        "[ ■ STOP ]"
+        "[ ⏹ STOP ]"
     } else {
         "[ ▶ TTS ]"
     };
@@ -1063,7 +1096,7 @@ pub fn click_window(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_
 
             // 3. Check TTS button hit
             let tts_btn_txt = if app.tts_active {
-                "[ ■ STOP ]"
+                "[ ⏹ STOP ]"
             } else {
                 "[ ▶ TTS ]"
             };
@@ -1236,11 +1269,12 @@ pub fn draw_dock_tile(
     fb.border(x, y, w, h, 2, border);
     fb.fill(x + 2, y + 2, w - 4, 4, rgb(0x2d, 0xd4, 0xbf));
 
-    draw_str_centered(fb, x, y + 14, w, 24, "FILES", 2, rgb(0xf0, 0xf6, 0xfc));
+    draw_icon(fb, x + 10, y + 24, Icon::Files, 32, rgb(0x2d, 0xd4, 0xbf));
+    draw_str_prop(fb, x + 48, y + 18, "FILES", 2, rgb(0xf0, 0xf6, 0xfc));
 
     let mut sub_buf = [b' '; 16];
     let sub_str = fmt_mount_count(&mut sub_buf, app.count as u32);
-    draw_str_centered(fb, x, y + 42, w, 16, sub_str, 1, rgb(0x2d, 0xd4, 0xbf));
+    draw_str_prop(fb, x + 48, y + 42, sub_str, 1, rgb(0x2d, 0xd4, 0xbf));
 }
 
 fn fmt_items(buf: &mut [u8; 16], count: u32) -> &str {

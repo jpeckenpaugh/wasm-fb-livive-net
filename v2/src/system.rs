@@ -1,15 +1,17 @@
 //! The "System" Appliance Application (`system.rs`).
 //!
 //! Consolidates environment inspection into three flat, non-nested sections
-//! selectable from the `SYSTEM` Title Bar menu (or keys `1`, `2`, `3`):
+//! selectable from the `SYSTEM` Title Bar menu (or keys `1`..`4`):
 //! - `0` (`About`): Build & binary attestation
 //! - `1` (`Locale`): UTC clock, timezone offset, and language/encoding
 //! - `2` (`Fonts`): `FiveSeven` glyph repertoire, scale ladder, and styles
+//! - `3` (`Icons`): `Icons32` gallery (32x32, 2-bit), size ladder, inline-in-text demo
 
 use crate::fb::{rgb, Framebuffer};
 use crate::font::{
-    draw_str, draw_str_centered, draw_str_styled, FontStyle, FIVESEVEN_US_LATIN,
+    draw_str, draw_str_prop, draw_str_styled, text_width_prop, FontStyle, FIVESEVEN_US_LATIN,
 };
+use crate::icon::{draw_icon, Icon};
 
 pub const RUSTC_VER: &str = env!("APPLIANCE_RUSTC");
 pub const TARGET_TRIPLE: &str = env!("APPLIANCE_TARGET");
@@ -22,13 +24,17 @@ pub enum SystemSection {
     About = 0,
     Locale = 1,
     Fonts = 2,
+    Icons = 3,
 }
 
 impl SystemSection {
+    pub const COUNT: usize = 4;
+
     pub fn from_index(idx: usize) -> Self {
         match idx {
             1 => SystemSection::Locale,
             2 => SystemSection::Fonts,
+            3 => SystemSection::Icons,
             _ => SystemSection::About,
         }
     }
@@ -38,6 +44,7 @@ impl SystemSection {
             SystemSection::About => "ABOUT",
             SystemSection::Locale => "LOCALE",
             SystemSection::Fonts => "FONTS",
+            SystemSection::Icons => "ICONS",
         }
     }
 }
@@ -76,6 +83,86 @@ pub fn draw_window(fb: &mut Framebuffer, app: &SystemApp, session_w: i32, sessio
         SystemSection::About => draw_about(fb, app, session_w, session_h),
         SystemSection::Locale => draw_locale(fb, app),
         SystemSection::Fonts => draw_fonts(fb),
+        SystemSection::Icons => draw_icons(fb),
+    }
+}
+
+/// `Icons32` gallery: all icons at native 32px with labels, a size ladder showing
+/// box-filtered downscaling / integer upscaling, two-tone backgrounds, and icons
+/// embedded inline in text.
+fn draw_icons(fb: &mut Framebuffer) {
+    fb.clear(rgb(0x0b, 0x10, 0x16));
+    let (x0, w, _, _, _) = layout_margins(fb.w, fb.h);
+    let label_col = rgb(0x7b, 0x8b, 0x98);
+    let ink = rgb(0xe6, 0xf1, 0xf8);
+    let rule_col = rgb(0x18, 0x22, 0x2d);
+    let compact = fb.h < 520 || fb.w < 540;
+    let head_scale = if compact { 2 } else { 3 };
+    let body_scale = if fb.w < 480 { 1 } else { 2 };
+
+    let mut y = if compact { 16 } else { 36 };
+    draw_str(fb, x0, y, "Icons32", head_scale, rgb(0xf0, 0xf6, 0xfc));
+    if fb.w >= 640 {
+        draw_str(fb, x0 + 320, y + 7, "32X32 2-BIT  U+E000..U+E01F", 1, label_col);
+    }
+    y += 7 * head_scale + if compact { 10 } else { 18 };
+
+    // 1. Gallery grid at native size.
+    let cell_w = if compact { 64 } else { 96 };
+    let cell_h = if compact { 48 } else { 58 };
+    let cols = (w / cell_w).max(1);
+    for (i, icon) in Icon::ALL.iter().enumerate() {
+        let cx = x0 + (i as i32 % cols) * cell_w;
+        let cy = y + (i as i32 / cols) * cell_h;
+        if cy + cell_h > fb.h {
+            break;
+        }
+        draw_icon(fb, cx + (cell_w - 32) / 2, cy, *icon, 32, ink);
+        let lbl = icon.label();
+        let lw = text_width_prop(lbl, 1);
+        draw_str_prop(fb, cx + (cell_w - lw) / 2, cy + 36, lbl, 1, label_col);
+    }
+    let rows = (Icon::ALL.len() as i32 + cols - 1) / cols;
+    y += rows * cell_h + 4;
+    fb.fill(x0, y, w, 1, rule_col);
+    y += if compact { 8 } else { 14 };
+
+    // 2. Size ladder on dark and light backgrounds (4-step coverage blending).
+    let sizes = [8, 12, 16, 24, 32, 48, 64];
+    let ladder_h = 64 + 8;
+    if y + ladder_h + 20 < fb.h {
+        let mut lx = x0;
+        for &sz in &sizes {
+            draw_icon(fb, lx, y + (64 - sz), Icon::Home, sz, ink);
+            lx += sz + 12;
+        }
+        let light_x = lx + 12;
+        let light_w = (x0 + w - light_x).min(sizes.iter().sum::<i32>() + 12 * 7 + 16);
+        if light_w > 80 {
+            fb.fill(light_x, y - 4, light_w, 72, rgb(0xff, 0xff, 0xff));
+            let mut lx2 = light_x + 8;
+            for &sz in &sizes {
+                if lx2 + sz > light_x + light_w {
+                    break;
+                }
+                draw_icon(fb, lx2, y + (64 - sz), Icon::Games, sz, rgb(0, 0, 0));
+                lx2 += sz + 12;
+            }
+        }
+        y += ladder_h + 4;
+        fb.fill(x0, y, w, 1, rule_col);
+        y += if compact { 8 } else { 14 };
+    }
+
+    // 3. Inline icons in text (monospace + proportional).
+    if y + 40 < fb.h {
+        let mono = "\u{E000} HOME  \u{E001} BACK  \u{E004} CANCEL  \u{E015} GAMES";
+        draw_str(fb, x0, y, mono, body_scale, ink);
+        let y2 = y + 7 * body_scale + 12;
+        if y2 + 7 * body_scale < fb.h {
+            let prop = "\u{2302} Home \u{2190} Back \u{2715} Cancel \u{1F3AE} Games (proportional)";
+            draw_str_prop(fb, x0, y2, prop, body_scale, ink);
+        }
     }
 }
 
@@ -151,7 +238,7 @@ fn draw_locale(fb: &mut Framebuffer, app: &SystemApp) {
         w,
         val_off,
         "CHARSET",
-        "ASCII / BASIC LATIN (U+0020..U+007E)",
+        "UTF-8 (LATIN / GREEK / CYRILLIC / SYMBOLS)",
     );
 
     let mut utc_buf = [b' '; 24];
@@ -169,6 +256,15 @@ fn draw_locale(fb: &mut Framebuffer, app: &SystemApp) {
     let mut tz_buf = [b' '; 24];
     let tz_str = fmt_tz_offset(&mut tz_buf, app.tz_offset_min);
     draw_row(fb, x0, rows_y + row_h * 3, w, val_off, "UTC OFFSET", tz_str);
+    draw_row(
+        fb,
+        x0,
+        rows_y + row_h * 4,
+        w,
+        val_off,
+        "SCRIPTS",
+        "¡Hola España! · Γεια σας · Привет мир · ┌─┼─┐",
+    );
 }
 
 fn draw_fonts(fb: &mut Framebuffer) {
@@ -205,8 +301,8 @@ fn draw_fonts(fb: &mut Framebuffer) {
     fb.fill(x0, y0 + 12 * head_scale, w, 2, accent);
 
     // 1. Character Set
-    let y_cs = y0 + 12 * head_scale + (if compact { 12 } else { 24 });
-    let cs_step = if compact { 18 } else { 26 };
+    let y_cs = y0 + 12 * head_scale + (if compact { 10 } else { 18 });
+    let cs_step = if compact { 16 } else { 22 };
     draw_str(fb, x0, y_cs, "UPPER", body_scale, label_col);
     draw_str(
         fb,
@@ -227,16 +323,36 @@ fn draw_fonts(fb: &mut Framebuffer) {
         val_col,
     );
 
-    draw_str(fb, x0, y_cs + cs_step * 2, "SYMBOLS", body_scale, label_col);
+    draw_str(fb, x0, y_cs + cs_step * 2, "LATIN+", body_scale, label_col);
     draw_str(
         fb,
         x0 + val_off,
         y_cs + cs_step * 2,
-        "0123456789 .,:-/()+=!?<>[]{}@#$%",
+        "¡¿ÀÁÂÃÄÅÆÇÈÉÊËÑÒÓÔÕÖØÙÚÛÜÝßàáéíñóúüąćęłńśźż",
         body_scale,
         val_col,
     );
-    let div1_y = y_cs + cs_step * 3;
+
+    draw_str(fb, x0, y_cs + cs_step * 3, "GREEK/CYR", body_scale, label_col);
+    draw_str(
+        fb,
+        x0 + val_off,
+        y_cs + cs_step * 3,
+        "ΑΒΓΔΕΖΗΘΛΞΠΣΦΨΩ αβγδεζηθλμπσφω · АБГДЖЗИЙЛПФЦЧШЩЯ",
+        body_scale,
+        val_col,
+    );
+
+    draw_str(fb, x0, y_cs + cs_step * 4, "SYMBOLS", body_scale, label_col);
+    draw_str(
+        fb,
+        x0 + val_off,
+        y_cs + cs_step * 4,
+        "0123456789 ±×÷≠≤≥√∞∑∫€£¥ •…–— ┌─┬─┐│┼│└─┴─┘░▒▓█★♥",
+        body_scale,
+        val_col,
+    );
+    let div1_y = y_cs + cs_step * 5;
     fb.fill(x0, div1_y, w, 1, rule_col);
 
     // 2. Scale Ladder (1x .. 5x)
@@ -298,10 +414,9 @@ fn draw_row(fb: &mut Framebuffer, x: i32, y: i32, w: i32, val_off: i32, key: &st
     draw_str(fb, x, y, key, scale, rgb(0x7b, 0x8b, 0x98));
 
     let max_chars = ((w - val_off) / char_w).max(6) as usize;
-    let v_clamped = if val.len() > max_chars {
-        &val[..max_chars]
-    } else {
-        val
+    let v_clamped = match val.char_indices().nth(max_chars) {
+        Some((idx, _)) => &val[..idx],
+        None => val,
     };
     draw_str(fb, x + val_off, y, v_clamped, scale, rgb(0xe6, 0xf1, 0xf8));
     fb.fill(x, y + 12 * scale + 6, w, 1, rgb(0x18, 0x22, 0x2d));
@@ -348,13 +463,12 @@ pub fn draw_dock_tile(
     fb.border(x, y, w, h, 2, border);
     fb.fill(x + 2, y + 2, w - 4, 4, rgb(0x2d, 0xd4, 0xbf));
 
-    draw_str_centered(fb, x, y + 14, w, 24, "SYSTEM", 2, rgb(0xf0, 0xf6, 0xfc));
-    draw_str_centered(
+    draw_icon(fb, x + 10, y + 24, Icon::System, 32, rgb(0x2d, 0xd4, 0xbf));
+    draw_str_prop(fb, x + 48, y + 18, "SYSTEM", 2, rgb(0xf0, 0xf6, 0xfc));
+    draw_str_prop(
         fb,
-        x,
+        x + 48,
         y + 42,
-        w,
-        16,
         app.section.label(),
         1,
         rgb(0x2d, 0xd4, 0xbf),

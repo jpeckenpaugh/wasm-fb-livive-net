@@ -109,6 +109,41 @@ impl<'a> Framebuffer<'a> {
         }
     }
 
+    /// Blend `color` over the region with coverage `alpha` (0 = untouched, 255 = opaque fill).
+    /// Used for 2-bit (4-step) icon glyphs and box-filtered downscaling.
+    pub fn blend(&mut self, x: i32, y: i32, w: i32, h: i32, color: u32, alpha: u32) {
+        let a = alpha.min(255);
+        if a == 0 {
+            return;
+        }
+        if a == 255 {
+            self.fill(x, y, w, h, color);
+            return;
+        }
+        if w <= 0 || h <= 0 {
+            return;
+        }
+        let x0 = x.max(0);
+        let y0 = y.max(0);
+        let x1 = (x + w).min(self.w);
+        let y1 = (y + h).min(self.h);
+        if x0 >= x1 || y0 >= y1 {
+            return;
+        }
+        let inv = 255 - a;
+        let (cr, cg, cb) = (color & 0xff, (color >> 8) & 0xff, (color >> 16) & 0xff);
+        for row in y0..y1 {
+            let base = (row as usize) * self.stride;
+            for col in (x0 as usize)..(x1 as usize) {
+                let p = self.px[base + col];
+                let r = ((p & 0xff) * inv + cr * a + 127) / 255;
+                let g = (((p >> 8) & 0xff) * inv + cg * a + 127) / 255;
+                let b = (((p >> 16) & 0xff) * inv + cb * a + 127) / 255;
+                self.px[base + col] = 0xff00_0000 | (b << 16) | (g << 8) | r;
+            }
+        }
+    }
+
     /// Compute 32-bit FNV-1a checksum over the RGBA bytes of the framebuffer.
     pub fn fnv1a_32(&self) -> u32 {
         let mut h: u32 = 0x811c_9dc5;
