@@ -65,7 +65,7 @@ pub const MISSING_ROWS: [u8; 7] = [0x1F, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1F];
 /// masks from these rows at render time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TextGlyph {
-    pub rows: &'static [u8; 7],
+    pub rows: [u8; 7],
     /// Rows to shift the glyph down (descender bump), 0..=3.
     pub dy: u8,
     /// Leftmost inked column.
@@ -115,17 +115,48 @@ pub fn lookup_fiveseven(cp: u32) -> Option<TextGlyph> {
             lo = mid + 1;
         } else {
             let idx = base as usize + (cp - first) as usize;
-            let m = FIVESEVEN_METRICS[idx];
+            let (rows, dy) = unpack_glyph(&FIVESEVEN_PACKED[idx]);
+            let (lsb, ink_w) = derive_metrics(&rows);
             return Some(TextGlyph {
-                rows: &FIVESEVEN_ROWS[idx],
-                dy: m >> 6,
-                lsb: (m >> 3) & 0x7,
-                ink_w: m & 0x7,
+                rows,
+                dy,
+                lsb,
+                ink_w,
                 index: idx as u16,
             });
         }
     }
     None
+}
+
+/// Decode one packed glyph: 35 row bits (5 per row, LSB-first) plus 2 `dy` bits.
+pub fn unpack_glyph(p: &[u8; 5]) -> ([u8; 7], u8) {
+    let w = (p[0] as u64)
+        | ((p[1] as u64) << 8)
+        | ((p[2] as u64) << 16)
+        | ((p[3] as u64) << 24)
+        | ((p[4] as u64) << 32);
+    let mut rows = [0u8; 7];
+    for (r, row) in rows.iter_mut().enumerate() {
+        *row = ((w >> (5 * r)) & 0x1F) as u8;
+    }
+    (rows, ((w >> 35) & 0x3) as u8)
+}
+
+/// Left bearing and ink width derived from the row masks.
+pub fn derive_metrics(rows: &[u8; 7]) -> (u8, u8) {
+    let mask = rows.iter().fold(0u8, |a, &r| a | r);
+    if mask == 0 {
+        return (0, 0);
+    }
+    let left = (0..5)
+        .find(|&c| mask & (1 << (4 - c)) != 0)
+        .unwrap_or(0);
+    let right = (0..5)
+        .rev()
+        .find(|&c| mask & (1 << (4 - c)) != 0)
+        .unwrap_or(4);
+    (left as u8, (right - left + 1) as u8)
 }
 
 /// Real Unicode symbols that render with an Icons32 glyph when FiveSeven has no
@@ -226,5 +257,48 @@ pub fn draw_icon_index(fb: &mut Framebuffer, x: i32, y: i32, index: u16, size: i
                 fb.blend(x + dx, y + dy, 1, 1, color, alpha);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packed_glyphs_decode() {
+        let a = lookup_fiveseven(0x41).unwrap();
+        assert_eq!(a.rows, [0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11]);
+        assert_eq!(a.dy, 0);
+
+        let g = lookup_fiveseven(0x67).unwrap();
+        assert_eq!(g.rows, [0x0F, 0x11, 0x11, 0x11, 0x0F, 0x01, 0x0E]);
+        assert_eq!(g.dy, 2);
+
+        let x = lookup_fiveseven(0x58).unwrap();
+        assert_eq!(x.rows, [0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11]);
+    }
+
+    #[test]
+    fn metrics_are_derived_from_rows() {
+        // single stroke in column 2
+        assert_eq!(
+            derive_metrics(&[0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04]),
+            (2, 1)
+        );
+        // all five columns inked
+        assert_eq!(
+            derive_metrics(&[0x1E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11]),
+            (0, 5)
+        );
+        // blank (SPACE)
+        assert_eq!(derive_metrics(&[0; 7]), (0, 0));
+    }
+
+    #[test]
+    fn unpack_round_trips_dy() {
+        // rows all 0x1F (bits 0..34), dy = 2 (bits 35..36)
+        let (rows, dy) = unpack_glyph(&[0xFF, 0xFF, 0xFF, 0xFF, 0x17]);
+        assert_eq!(dy, 2);
+        assert_eq!(rows, [0x1F; 7]);
     }
 }

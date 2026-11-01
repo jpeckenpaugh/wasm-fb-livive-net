@@ -67,6 +67,21 @@ steps 5-8 use 8-bit masks with border-gated rings and a 12-slot evictable cache.
 Nothing is baked into the wasm binary. The mode is selected from
 **System → Fonts → Rendering**.
 
+## Compiled form
+
+`build.rs` packs each glyph into **5 bytes** (`FIVESEVEN_PACKED`):
+
+```text
+bits  0..34   7 rows x 5 bits (row 0 first, LSB = leftmost pixel)
+bits 35..36   dy (0..2)
+bits 37..39   unused
+```
+
+Left bearing and ink width are derived from the rows at lookup time
+(`glyph::derive_metrics`), so they are not stored. The table is
+532 x 5 = 2,660 bytes versus 4,256 for the previous 7-byte rows plus metric
+byte. `FIVESEVEN_RANGES` remains the 67-run binary-search index.
+
 ## Codepoint resolution
 
 1. **FiveSeven** sheets (`glyphs/fiveseven/*.txt`), binary search over contiguous ranges.

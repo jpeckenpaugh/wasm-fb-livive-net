@@ -451,7 +451,7 @@ mod tests {
     fn x_masks_keep_three_levels() {
         let g = glyph::lookup_fiveseven('X' as u32).unwrap();
         for step in 0..STEPS {
-            let m = glyph(0, g.index, g.rows, g.dy, step);
+            let m = glyph(0, g.index, &g.rows, g.dy, step);
             let w = mask_w(step);
             let h = mask_h(step);
             let (mut solid, mut mid) = (0, 0);
@@ -472,8 +472,8 @@ mod tests {
     #[test]
     fn mask_cache_is_stable() {
         let g = glyph::lookup_fiveseven('g' as u32).unwrap();
-        let a = glyph(0, g.index, g.rows, g.dy, 1).to_vec();
-        let b = glyph(0, g.index, g.rows, g.dy, 1).to_vec();
+        let a = glyph(0, g.index, &g.rows, g.dy, 1).to_vec();
+        let b = glyph(0, g.index, &g.rows, g.dy, 1).to_vec();
         assert_eq!(a, b);
     }
 
@@ -515,7 +515,7 @@ mod tests {
         ];
         for (ch, step, want) in pinned {
             let g = glyph::lookup_fiveseven(ch as u32).unwrap();
-            let got = fnv_used(glyph(0, g.index, g.rows, g.dy, step), step);
+            let got = fnv_used(glyph(0, g.index, &g.rows, g.dy, step), step);
             assert_eq!(got, want, "mask drift for {} step {}", ch, step);
         }
     }

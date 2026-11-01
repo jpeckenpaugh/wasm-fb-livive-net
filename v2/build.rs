@@ -234,39 +234,34 @@ fn generate_glyph_tables() -> Vec<String> {
         writeln!(o, "    (0x{:04X}, 0x{:04X}, {}),", r.0, r.1, r.2).unwrap();
     }
     writeln!(o, "];").unwrap();
+    // Packed glyph, 5 bytes: rows 0..6 are 5 bits each (LSB-first, bit 5r),
+    // `dy` is bits 35..36, and the top 3 bits are unused. Left bearing and ink
+    // width are derived from the rows at runtime.
     writeln!(
         o,
-        "pub static FIVESEVEN_ROWS: [[u8; 7]; {}] = [",
+        "pub static FIVESEVEN_PACKED: [[u8; 5]; {}] = [",
         glyphs.len()
     )
     .unwrap();
     for g in &glyphs {
-        let r = g.rows;
+        let mut w: u64 = 0;
+        for (r, &row) in g.rows.iter().enumerate() {
+            w |= (row as u64) << (5 * r);
+        }
+        w |= (g.dy as u64) << 35;
+        let b = [
+            w as u8,
+            (w >> 8) as u8,
+            (w >> 16) as u8,
+            (w >> 24) as u8,
+            (w >> 32) as u8,
+        ];
         writeln!(
             o,
-            "    [0x{:02X}, 0x{:02X}, 0x{:02X}, 0x{:02X}, 0x{:02X}, 0x{:02X}, 0x{:02X}], // U+{:04X}",
-            r[0], r[1], r[2], r[3], r[4], r[5], r[6], g.cp
+            "    [0x{:02X}, 0x{:02X}, 0x{:02X}, 0x{:02X}, 0x{:02X}], // U+{:04X}",
+            b[0], b[1], b[2], b[3], b[4], g.cp
         )
         .unwrap();
-    }
-    writeln!(o, "];").unwrap();
-    // Metrics byte: dy (bits 6-7) | left bearing (bits 3-5) | ink width (bits 0-2)
-    writeln!(
-        o,
-        "pub static FIVESEVEN_METRICS: [u8; {}] = [",
-        glyphs.len()
-    )
-    .unwrap();
-    for g in &glyphs {
-        let mask = g.rows.iter().fold(0u8, |a, &r| a | r);
-        let (lsb, w) = if mask == 0 {
-            (0u8, 0u8)
-        } else {
-            let left = (0..5).find(|&c| mask & (1 << (4 - c)) != 0).unwrap();
-            let right = (0..5).rev().find(|&c| mask & (1 << (4 - c)) != 0).unwrap();
-            (left as u8, (right - left + 1) as u8)
-        };
-        writeln!(o, "    0x{:02X},", (g.dy << 6) | (lsb << 3) | w).unwrap();
     }
     writeln!(o, "];").unwrap();
 

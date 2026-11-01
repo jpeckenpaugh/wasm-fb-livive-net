@@ -20,6 +20,7 @@ fn write_ppm(path: &str, w: usize, h: usize) {
 
 fn shot(name: &str, w: usize, h: usize) {
     write_ppm(&format!("rendered/{}", name), w, h);
+    println!("HASH {} {:08x}", name, appliance::app_fb_hash());
 }
 
 fn main() {

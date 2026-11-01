@@ -452,7 +452,7 @@ pub fn draw_char_styled(
 
 fn missing() -> TextGlyph {
     TextGlyph {
-        rows: &MISSING_ROWS,
+        rows: MISSING_ROWS,
         dy: 0,
         lsb: 0,
         ink_w: 5,
@@ -485,7 +485,7 @@ fn draw_text_glyph(
         let step = smooth::step_for_scale(scale).unwrap_or(0);
         let w = smooth::mask_w(step);
         let h = smooth::mask_h(step);
-        let mask = smooth::glyph(glyph::font() as u8, t.index, t.rows, t.dy, step);
+        let mask = smooth::glyph(glyph::font() as u8, t.index, &t.rows, t.dy, step);
         let bold_extra = i32::from(style == FontStyle::Bold);
         for row in 0..h {
             let shear_dx = match style {
@@ -547,7 +547,7 @@ fn draw_text_glyph(
 /// Resolve a Unicode codepoint to FiveSeven rows (missing box when unavailable).
 pub fn resolve_glyph(code: u32) -> [u8; 7] {
     glyph::lookup_fiveseven(code)
-        .map(|t| *t.rows)
+        .map(|t| t.rows)
         .unwrap_or(MISSING_ROWS)
 }
 
@@ -613,7 +613,7 @@ mod tests {
     fn smooth_mask_has_full_and_partial_coverage() {
         let g = glyph::lookup_fiveseven('A' as u32).unwrap();
         for step in 0..smooth::STEPS {
-            let mask = smooth::glyph(0, g.index, g.rows, g.dy, step);
+            let mask = smooth::glyph(0, g.index, &g.rows, g.dy, step);
             let (mut solid, mut mid) = (0, 0);
             for y in 0..smooth::mask_h(step) {
                 for x in 0..smooth::mask_w(step) {
