@@ -97,9 +97,20 @@ strip. With a control focused, `Left`/`Right` move along the strip and `Esc`,
 
 | Key | Action |
 |---|---|
-| `1..4` or `Left` / `Right` | Select About / Locale / Fonts / Icons |
+| `1..5` or `Left` / `Right` | Select About / Locale / Fonts / Icons / Theme |
 | `Tab` / `Shift+Tab` | Cycle the section tabs |
 | `Home` / `End` | First / last section |
+
+### Theme page
+
+| Key | Action |
+|---|---|
+| `Up` / `Down` | Move the theme cursor |
+| `Home` / `End` | First / last theme |
+| `Enter` / `Space` | Apply the selected theme |
+| `Left` / `Right` | Select Native / Smooth 12x16 rendering |
+| `1..5` | Jump to a System section |
+| Tab | Cycle System sections |
 
 ## Casing
 
@@ -145,3 +156,5 @@ Files rows, Files controls, and System tabs all share this hover path.
 - `app_files_focus()` returns the `FilesFocus` discriminant.
 - `app_files_context_mode()` returns `0` for Raw and `1` for Context.
 - `app_dock_visible()` reports whether the App Home drawer is open.
+- `app_theme()` returns the active theme index (`0..9`).
+- `app_font_family()` returns `0` for Native 5x7 and `1` for Smooth 12x16.

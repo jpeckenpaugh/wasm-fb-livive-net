@@ -10,6 +10,23 @@ into static tables by `v2/build.rs` (`$OUT_DIR/glyph_tables.rs`, pulled in by `s
 | `src/icon.rs` | Typed `Icon` enum, `draw_icon(fb, x, y, icon, size, color)` |
 | `tools/gen_icons.py` | Starting-point generator for the icon art (re-running overwrites hand edits) |
 
+## Smooth 12x16 render mode
+
+`Smooth 12x16` is not a baked face and is the default render mode. It is
+generated at render time from the FiveSeven source: each 5x7 pixel becomes a
+solid 2x2 block in a 10x14 core, and the source `dy` is doubled as the glyph
+offset inside a 19-row line — the same model as FiveSeven's 7-row glyph inside
+a 9-row line. Three sequential 4-neighbor passes then fill empty cells:
+
+1. more than one non-empty neighbor -> 100%;
+2. more than one non-empty neighbor -> 66%;
+3. more than zero non-empty neighbors -> 33%.
+
+Each pass sees the pixels written by earlier passes. The generated mask is
+cached lazily in guest linear memory (57 bytes per glyph), so the wasm binary
+does not carry a second glyph table. The mode is selected from
+**System → Theme → Rendering**.
+
 ## Codepoint resolution
 
 1. **FiveSeven** sheets (`glyphs/fiveseven/*.txt`), binary search over contiguous ranges.

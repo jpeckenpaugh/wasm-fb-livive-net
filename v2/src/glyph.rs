@@ -15,8 +15,43 @@
 //! (`U+E000..`) -> Unicode alias table (e.g. `U+2302 ⌂` -> Home) -> missing box.
 
 use crate::fb::Framebuffer;
+use core::sync::atomic::{AtomicU8, Ordering};
 
 include!(concat!(env!("OUT_DIR"), "/glyph_tables.rs"));
+
+/// Available bitmap families. Add a variant here when another family ships.
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum FontFamily {
+    FiveSeven = 0,
+    #[default]
+    TwelveSixteen = 1,
+}
+
+impl FontFamily {
+    pub const ALL: [FontFamily; 2] = [FontFamily::FiveSeven, FontFamily::TwelveSixteen];
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            FontFamily::FiveSeven => "FiveSeven",
+            FontFamily::TwelveSixteen => "TwelveSixteen",
+        }
+    }
+}
+
+static FAMILY: AtomicU8 = AtomicU8::new(FontFamily::TwelveSixteen as u8);
+
+pub fn family() -> FontFamily {
+    match FAMILY.load(Ordering::Relaxed) {
+        1 => FontFamily::TwelveSixteen,
+        _ => FontFamily::FiveSeven,
+    }
+}
+
+pub fn set_family(family: FontFamily) -> bool {
+    FAMILY.store(family as u8, Ordering::Relaxed);
+    true
+}
 
 /// First Private Use Area codepoint assigned to Icons32.
 pub const ICON_PUA_BASE: u32 = 0xE000;
@@ -25,16 +60,19 @@ pub const ICON_SIZE: i32 = 32;
 /// Missing-glyph box (5x7).
 pub const MISSING_ROWS: [u8; 7] = [0x1F, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1F];
 
-/// A 5x7 text glyph plus its metrics.
+/// A 5x7 source glyph plus its metrics. The smoothed 12x16 face is derived
+/// from these rows at render time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TextGlyph {
     pub rows: &'static [u8; 7],
     /// Rows to shift the glyph down (descender bump), 0..=3.
     pub dy: u8,
-    /// Leftmost inked column (0..=4).
+    /// Leftmost inked column.
     pub lsb: u8,
     /// Inked column span (0 for blank glyphs such as SPACE).
     pub ink_w: u8,
+    /// Index into the FiveSeven table, used as the smooth-cache key.
+    pub index: u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,8 +83,14 @@ pub enum Glyph {
     Missing,
 }
 
-/// Resolve a Unicode scalar value to a glyph.
+/// Resolve a Unicode scalar value using the active font family.
 pub fn resolve(cp: u32) -> Glyph {
+    resolve_for(family(), cp)
+}
+
+/// Resolve a Unicode scalar value for a specific family. Both current families
+/// use the same FiveSeven source; TwelveSixteen is a render mode over it.
+pub fn resolve_for(_family: FontFamily, cp: u32) -> Glyph {
     if let Some(t) = lookup_fiveseven(cp) {
         return Glyph::Text(t);
     }
@@ -74,6 +118,7 @@ pub fn lookup_fiveseven(cp: u32) -> Option<TextGlyph> {
                 dy: m >> 6,
                 lsb: (m >> 3) & 0x7,
                 ink_w: m & 0x7,
+                index: idx as u16,
             });
         }
     }

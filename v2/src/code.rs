@@ -6,7 +6,7 @@
 
 use crate::fb::Framebuffer;
 use crate::fmt as f;
-use crate::font::{draw_str, text_width};
+use crate::font::{char_advance, draw_str, line_height, text_width};
 use crate::layout::Metrics;
 use crate::theme as t;
 
@@ -898,18 +898,14 @@ pub fn draw_code_preview(
     col_scroll: usize,
 ) {
     let scale = scale.clamp(1, 3);
-    let char_adv = 6 * scale;
-    let line_h = 10 * scale + 2;
+    let char_adv = char_advance(scale);
+    let line_h = line_height(scale) + 2 * scale;
     let pad_top = if Metrics::new(w, h).is_compact() {
         12
     } else {
         20
     };
-    let gutter_w = match scale {
-        1 => 34,
-        2 => 56,
-        _ => 78,
-    };
+    let gutter_w = (4 * char_adv + 8).max(34);
     let text_x = x + gutter_w + (if scale == 1 { 10 } else { 16 });
     let max_cols = ((w - gutter_w - 20).max(0) / char_adv) as usize;
     let visible_lines = ((h - 2 * pad_top).max(0) / line_h) as usize;

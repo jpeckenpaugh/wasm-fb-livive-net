@@ -12,6 +12,7 @@ pub mod input;
 pub mod layout;
 pub mod mine_sm;
 pub mod mines;
+pub mod smooth;
 pub mod system;
 pub mod theme;
 pub mod ui;
@@ -281,6 +282,16 @@ pub extern "C" fn app_files_context_mode() -> i32 {
 }
 
 #[no_mangle]
+pub extern "C" fn app_theme() -> i32 {
+    crate::theme::theme_index() as i32
+}
+
+#[no_mangle]
+pub extern "C" fn app_font_family() -> i32 {
+    crate::glyph::family() as i32
+}
+
+#[no_mangle]
 pub extern "C" fn app_set_time(hour: i32, minute: i32, second: i32, _msec: i32) {
     unsafe {
         let wm = &mut *GUEST.wm.get();
@@ -514,6 +525,7 @@ pub extern "C" fn app_destroy() {
 mod tests {
     use super::*;
     use crate::fb::rgb;
+    use crate::glyph::FontFamily;
     use crate::wm::{
         dock_icon_y, CLICK_CHANGED, CLICK_NOOP, CLICK_SNAPSHOT, CLICK_TTS, DOCK_ICON_H,
         DOCK_ICON_W, DOCK_X, DOCK_Y, TITLE_H,
@@ -521,6 +533,7 @@ mod tests {
 
     #[test]
     fn step1_pipeline_system_calc_files_mount_and_test_pattern() {
+        crate::font::set_family(FontFamily::FiveSeven);
         app_set_session(1);
         app_set_date(2026, 10, 30, 5);
         app_set_time(6, 45, 0, 0);
@@ -645,6 +658,7 @@ mod tests {
 
     #[test]
     fn test_github_mount_and_context_staging_and_key_paging() {
+        crate::font::set_family(FontFamily::FiveSeven);
         app_set_session(1);
         assert_eq!(app_init(1280, 720), 1);
 
@@ -747,9 +761,9 @@ mod tests {
         // mode_x = 1280 - 84 - 12 = 1184
         // ap_w = 44, ap_x = 1184 - 44 - 8 = 1132
         // am_w = 44, am_x = 1132 - 44 - 4 = 1084
-        // tts_w = 10 * 6 + 10 = 70, tts_x = 1084 - 70 - 8 = 1006
-        // Click inside TTS button: x = 1020, y = TITLE_H + 16 = 48
-        let tts_click_x = 1020;
+        // Click inside the TTS button (layout-dependent).
+        // y = TITLE_H + 16 = 48
+        let tts_click_x = 1040;
         let tts_click_y = TITLE_H + 16;
         assert_eq!(app_click(tts_click_x, tts_click_y), CLICK_TTS);
         assert_eq!(app_tts_active(), 1);
@@ -767,6 +781,7 @@ mod tests {
 
     #[test]
     fn keyboard_focus_traversal_and_activation() {
+        crate::font::set_family(FontFamily::FiveSeven);
         app_set_session(1);
         assert_eq!(app_init(1280, 720), 1);
         assert_eq!(app_focus(), 0);
@@ -813,6 +828,27 @@ mod tests {
         assert_eq!(app_files_focus(), 1);
         assert_eq!(app_key_mods(33, 1), CLICK_CHANGED);
         assert_eq!(app_files_focus(), 0);
+    }
+
+    #[test]
+    fn theme_page_updates_global_font_and_palette() {
+        app_set_session(1);
+        assert_eq!(app_init(1280, 720), 1);
+        assert_eq!(app_key_mods(11, 2), CLICK_CHANGED); // Ctrl+1 -> System
+        assert_eq!(app_key(15), CLICK_CHANGED); // 5 -> Theme
+        assert_eq!(app_active_page(), 4);
+        assert_eq!(app_key(51), CLICK_CHANGED); // next theme
+        assert_eq!(app_key(24), CLICK_CHANGED); // apply
+        assert_eq!(app_theme(), 1);
+        assert_eq!(app_key(2), CLICK_CHANGED); // right -> TwelveSixteen
+        assert_eq!(app_font_family(), 1);
+        assert_eq!(app_key(1), CLICK_CHANGED); // left -> FiveSeven
+        assert_eq!(app_font_family(), 0);
+        assert_eq!(app_key(41), CLICK_CHANGED); // Home -> first theme
+        assert_eq!(app_key(24), CLICK_CHANGED); // apply
+        assert_eq!(app_theme(), 0);
+        assert_eq!(app_key(13), CLICK_CHANGED); // 3 -> Fonts
+        assert_eq!(app_active_page(), 2);
     }
 
     #[test]

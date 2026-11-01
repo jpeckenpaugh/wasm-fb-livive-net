@@ -1,6 +1,6 @@
 # Appliance v2: Minimalist `no_std` Rust Wasm Window Manager & Appliance
 
-`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~99 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, and built-in system attestation.
+`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~109 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, a 5x7 bitmap source with native/smooth 12x16 rendering, ten color themes, and built-in system attestation.
 
 ```
 Browser Host (web/v2/host.js)
@@ -26,7 +26,7 @@ Browser Host (web/v2/host.js)
 
 ### 1.1 Pure `#![no_std]` on `wasm32-unknown-unknown`
 - Zero external runtime dependencies, zero standard library (`no_std`), and panic = abort.
-- Compiles down to **~99 KiB** of Wasm bytecode.
+- Compiles down to **~109 KiB** of Wasm bytecode.
 - Linear memory is dynamically grown via `memory_grow` above `__heap_base` in `app_init(width, height)` to support dynamic resolutions ranging from mobile (`360x800`) to 1080p (`1920x1080`).
 
 ### 1.2 Upstream Host Decoding vs. Zero Static Bloat
@@ -44,9 +44,10 @@ Browser Host (web/v2/host.js)
 - Surfaced via the **System** app alongside target architecture, compiler version, and profile.
 
 ### 1.5 Standardized UI Core
-- `theme.rs`: semantic color tokens; apps no longer carry literal palette values.
+- `theme.rs`: runtime semantic palette with ten built-in themes; apps draw sentinel tokens resolved by the framebuffer.
 - `layout.rs`: shared `Rect`, `SizeClass` (`Compact` / `Medium` / `Full`), and metrics helpers.
 - `ui.rs`: panel, toolbar, button, dock-tile, separator, and key/value-row widgets.
+- `font.rs`: `FiveSeven` 5x7 source with `Native` and `Smooth 12x16` runtime render modes (Smooth is the default); the smooth mask is generated lazily and cached in guest memory.
 - `fmt.rs`: the single allocation-free numeric / date / size / title formatter.
 - `input.rs`: `Key`, `Mods`, and `InputResult` (`0` noop, `1` changed, `2` snapshot, `3` TTS, `4` handled); the host only prevents browser defaults for consumed keys.
 - `wm.rs` menu labels map to `Command` values, and `WmLayout` is shared by drawing and hit testing.
@@ -59,7 +60,7 @@ Browser Host (web/v2/host.js)
 
 | Application | Modules | Description |
 |---|---|---|
-| **System** | `system.rs` | System overview, hardware/build attestation, performance telemetry, and test patterns. |
+| **System** | `system.rs` | System overview, hardware/build attestation, performance telemetry, font/icon galleries, the Theme page, and test patterns. |
 | **Calculator** | `calc.rs` | Interactive desk calculator with integer/decimal entry, thousands grouping, and keyboard entry. |
 | **Minesweeper** | `mines.rs`, `mine_sm.rs` | High-performance 8×8 bitboard engine (`u64` bitmasks for mines, flags, reveals) with SplitMix64 PRNG, RL observation tensor exports (`[f32; 64]`), and Classic/Shielded strike rules. |
 | **Files & Preview** | `files.rs`, `code.rs` | Two-panel explorer (Left 1/3 folder navigation, Right 2/3 live preview) supporting wallpapers, general code samples, task-scoped GitHub repo mounts (`gh://`), syntax highlighting, and TTS. |

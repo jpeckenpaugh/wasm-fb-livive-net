@@ -7,7 +7,9 @@
 //! - Accepts client-relative clicks (`click_window`) and logical keys (`key_window`).
 
 use crate::fb::Framebuffer;
-use crate::font::{draw_str, draw_str_centered, draw_str_prop, text_width};
+use crate::font::{
+    char_advance, draw_str, draw_str_centered, draw_str_prop, glyph_height, text_width,
+};
 use crate::icon::{draw_icon, Icon};
 use crate::input::{InputResult, Key};
 use crate::layout::{Metrics, Rect};
@@ -422,7 +424,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
         draw_str(
             fb,
             g.pad_x + 8,
-            g.disp_y + (g.disp_h - 7 * op_scale) / 2,
+            g.disp_y + (g.disp_h - glyph_height(op_scale)) / 2,
             op_str,
             op_scale,
             t::ACCENT,
@@ -442,7 +444,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
     draw_str(
         fb,
         g.pad_x + g.grid_w - tw,
-        g.disp_y + (g.disp_h - 7 * scale) / 2,
+        g.disp_y + (g.disp_h - glyph_height(scale)) / 2,
         disp_str,
         scale,
         t::TEXT,
@@ -480,12 +482,8 @@ pub fn draw_dock_tile(
 
     let mut disp_buf = [0u8; 24];
     let disp_str = app.format_display(&mut disp_buf);
-    let max_chars = 12;
-    let clamped = if disp_str.len() > max_chars {
-        &disp_str[..max_chars]
-    } else {
-        disp_str
-    };
+    let max_chars = (((w - 48) / char_advance(1)).max(1) as usize).min(12);
+    let clamped = crate::ui::truncate_chars(disp_str, max_chars);
     draw_str(fb, x + 48, y + 42, clamped, 1, t::ACCENT);
 }
 

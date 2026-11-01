@@ -2,6 +2,10 @@
 //!
 //! Byte order in memory is R,G,B,A (what HTML Canvas ImageData expects).
 //! On little-endian wasm32, a `u32` word is `0xAABBGGRR`, which [`rgba`] builds.
+//! Theme sentinel colors are resolved here so every draw call sees the active
+//! palette without threading a palette reference through every widget.
+
+use crate::theme;
 
 pub const DEFAULT_W: i32 = 1280;
 pub const DEFAULT_H: i32 = 720;
@@ -59,6 +63,7 @@ impl<'a> Framebuffer<'a> {
         if w <= 0 || h <= 0 {
             return;
         }
+        let color = theme::resolve(color);
         let x0 = x.max(0);
         let y0 = y.max(0);
         let x1 = (x + w).min(self.w);
@@ -116,6 +121,7 @@ impl<'a> Framebuffer<'a> {
         if a == 0 {
             return;
         }
+        let color = theme::resolve(color);
         if a == 255 {
             self.fill(x, y, w, h, color);
             return;

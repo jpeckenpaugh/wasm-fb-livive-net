@@ -8,7 +8,7 @@
 
 use crate::fb::Framebuffer;
 use crate::fmt as f;
-use crate::font::{draw_str, draw_str_centered, draw_str_prop};
+use crate::font::{draw_str, draw_str_centered, draw_str_prop, line_height};
 use crate::icon::{draw_icon, Icon};
 use crate::input::{InputResult, Key};
 use crate::layout::{Metrics, Rect};
@@ -269,13 +269,19 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     } else {
         accent
     };
-    fb.fill(g.info_x, g.info_y + 10 * head_sc + 2, g.info_w, 2, bar_col);
+    fb.fill(
+        g.info_x,
+        g.info_y + line_height(head_sc) + 2,
+        g.info_w,
+        2,
+        bar_col,
+    );
 
     let safe_total = 64u32.saturating_sub(b.num_bombs as u32);
     let safe_rev = (b.revealed_mask & !b.mine_mask).count_ones();
     let flags_placed = b.flagged_mask.count_ones();
 
-    let mut y = g.info_y + 10 * head_sc + 14;
+    let mut y = g.info_y + line_height(head_sc) + 14;
     let step_y = if row_sc == 1 { 16 } else { 28 };
 
     let row = |y: i32| Rect::new(g.info_x, y, g.info_w, step_y);
@@ -436,12 +442,12 @@ pub fn draw_dock_tile(
 
     let sub = if app.board.is_terminal {
         if app.board.is_won {
-            "8x8 Won"
+            "Won"
         } else {
-            "8x8 Boom"
+            "Boom"
         }
     } else {
-        "8x8 Seeded"
+        "Seeded"
     };
     draw_str_prop(fb, x + 48, y + 42, sub, 1, t::ACCENT);
 }

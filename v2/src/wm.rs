@@ -344,12 +344,13 @@ impl WmLayout {
     pub fn new(width: i32) -> Self {
         let m = Metrics::new(width, 720);
         let menu_scale = if m.is_compact() { 1 } else { 2 };
+        let text_y = ((TITLE_H - crate::font::glyph_height(menu_scale)) / 2).max(0);
         Self {
             header_w: menu_header_w(width),
             menu_scale,
-            menu_text_y: if menu_scale == 1 { 12 } else { 9 },
+            menu_text_y: text_y,
             right_scale: menu_scale,
-            right_text_y: if menu_scale == 1 { 12 } else { 9 },
+            right_text_y: text_y,
             right_compact: width < 680,
         }
     }
@@ -536,7 +537,7 @@ impl WmState {
                 }
                 AppSlot::System => {
                     self.system.focus_visible = self.focus_visible && self.focus == Focus::Client;
-                    system::draw_window(&mut client_fb, &self.system, self.width, self.height)
+                    system::draw_window(&mut client_fb, &mut self.system, self.width, self.height)
                 }
                 AppSlot::Calc => calc::draw_window(&mut client_fb, &self.calc),
                 AppSlot::Files => {
@@ -661,14 +662,17 @@ impl WmState {
             layout.right_compact,
         );
         let rw = text_width_prop(right_str, layout.right_scale);
-        draw_str_prop(
-            fb,
-            fb.w - rw - 10,
-            layout.right_text_y,
-            right_str,
-            layout.right_scale,
-            t::TEXT_MUTED,
-        );
+        let menu_end = layout.header_rect(MenuId::Testing).right() + 8;
+        if menu_end + rw + 10 <= fb.w {
+            draw_str_prop(
+                fb,
+                fb.w - rw - 10,
+                layout.right_text_y,
+                right_str,
+                layout.right_scale,
+                t::TEXT_MUTED,
+            );
+        }
     }
 
     fn draw_home_menu(&self, fb: &mut Framebuffer) {
@@ -1246,14 +1250,51 @@ impl WmState {
 
     fn key_system(&mut self, key: Key, mods: Mods) -> InputResult {
         match key {
-            Key::Digit1 | Key::Digit2 | Key::Digit3 | Key::Digit4 => {
+            Key::Digit1 | Key::Digit2 | Key::Digit3 | Key::Digit4 | Key::Digit5 => {
                 let idx = key as i32 - Key::Digit1 as i32;
                 let target = SystemSection::from_index(idx as usize);
                 if self.system.section != target {
                     self.system.section = target;
+                    if target == SystemSection::Theme {
+                        self.system.theme_cursor_ready = false;
+                    }
                     InputResult::Changed
                 } else {
                     InputResult::Handled
+                }
+            }
+            Key::Left | Key::Right | Key::Tab | Key::Up | Key::Down
+                if self.system.section == SystemSection::Theme =>
+            {
+                match key {
+                    Key::Up | Key::Down => {
+                        let step = if key == Key::Up { -1 } else { 1 };
+                        let cur = self.system.theme_focus as i32;
+                        let next = (cur + step).clamp(0, t::THEME_COUNT as i32 - 1);
+                        self.system.theme_focus = next as usize;
+                        InputResult::Changed
+                    }
+                    Key::Left => {
+                        system::apply_family(&mut self.system, crate::glyph::FontFamily::FiveSeven)
+                    }
+                    Key::Right => system::apply_family(
+                        &mut self.system,
+                        crate::glyph::FontFamily::TwelveSixteen,
+                    ),
+                    Key::Tab => {
+                        let cur = self.system.section as usize;
+                        let next = if mods.shift() {
+                            (cur + SystemSection::COUNT - 1) % SystemSection::COUNT
+                        } else {
+                            (cur + 1) % SystemSection::COUNT
+                        };
+                        self.system.section = SystemSection::from_index(next);
+                        if self.system.section == SystemSection::Theme {
+                            self.system.theme_cursor_ready = false;
+                        }
+                        InputResult::Changed
+                    }
+                    _ => InputResult::Noop,
                 }
             }
             Key::Left | Key::Right | Key::Tab | Key::Up | Key::Down => {
@@ -1268,12 +1309,25 @@ impl WmState {
                 self.system.section = SystemSection::from_index(next);
                 InputResult::Changed
             }
+            Key::Home if self.system.section == SystemSection::Theme => {
+                self.system.theme_focus = 0;
+                InputResult::Changed
+            }
+            Key::End if self.system.section == SystemSection::Theme => {
+                self.system.theme_focus = t::THEME_COUNT - 1;
+                InputResult::Changed
+            }
+            Key::Enter | Key::Space if self.system.section == SystemSection::Theme => {
+                let idx = self.system.theme_focus;
+                system::apply_theme(&mut self.system, idx)
+            }
             Key::Home => {
                 self.system.section = SystemSection::About;
                 InputResult::Changed
             }
             Key::End => {
-                self.system.section = SystemSection::Icons;
+                self.system.section = SystemSection::Theme;
+                self.system.theme_cursor_ready = false;
                 InputResult::Changed
             }
             _ => InputResult::Noop,

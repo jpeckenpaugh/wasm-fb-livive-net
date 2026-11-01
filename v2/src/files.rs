@@ -13,7 +13,10 @@
 use crate::code::{count_total_lines, draw_code_preview, is_image_filename, lang_for_filename};
 use crate::fb::Framebuffer;
 use crate::fmt as f;
-use crate::font::{draw_str, draw_str_centered, draw_str_prop, text_width};
+use crate::font::{
+    self as font, char_advance, draw_str, draw_str_centered, draw_str_prop, glyph_height,
+    line_height, text_width, FontFamily,
+};
 use crate::icon::{draw_icon, Icon};
 use crate::input::{InputResult, Key, Mods};
 use crate::layout::{Metrics, Rect};
@@ -41,7 +44,12 @@ pub struct FilesGeom {
 
 pub fn files_geom(client_w: i32, client_h: i32) -> FilesGeom {
     let m = Metrics::new(client_w, client_h);
-    let left_w = (client_w / 3).max(120);
+    let ratio = if font::family() == FontFamily::TwelveSixteen && client_w < 700 {
+        48
+    } else {
+        33
+    };
+    let left_w = (client_w * ratio / 100).max(120);
     let div_x = left_w;
     let right_x = left_w + 2;
     let right_w = (client_w - right_x).max(160);
@@ -467,14 +475,14 @@ pub fn draw_window(
     draw_str(fb, g.pad_x, g.head_y, path_title, head_scale, t::TEXT);
     fb.fill(
         g.pad_x,
-        g.head_y + 10 * head_scale + 2,
+        g.head_y + line_height(head_scale) + 2,
         g.left_w - 2 * g.pad_x,
         2,
         accent,
     );
 
     let row_w = g.left_w - 2 * g.pad_x;
-    let text_pad_y = (g.row_h - 4 - 7 * g.row_scale) / 2;
+    let text_pad_y = (g.row_h - 4 - glyph_height(g.row_scale)) / 2;
     let show_meta = g.left_w >= 260;
 
     match app.level {
@@ -510,11 +518,12 @@ pub fn draw_window(
                     if selected { accent } else { label_col },
                 );
 
+                let max_name = ((row_w - 20 - isz) / char_advance(g.row_scale)).max(4) as usize;
                 draw_str(
                     fb,
                     g.pad_x + 12 + isz,
                     ry + text_pad_y,
-                    fname,
+                    ui::truncate_chars(fname, max_name),
                     g.row_scale,
                     if selected { t::TEXT } else { text_col },
                 );
@@ -602,7 +611,7 @@ pub fn draw_window(
                     let max_name = if show_meta {
                         18
                     } else {
-                        ((row_w - 20 - isz) / (6 * g.row_scale)).max(8) as usize
+                        ((row_w - 20 - isz) / char_advance(g.row_scale)).max(8) as usize
                     };
                     let name_clamped = if name.len() > max_name {
                         &name[..max_name]
@@ -763,35 +772,68 @@ fn show_paging(app: &FilesApp, is_image: bool) -> bool {
 
 /// One source of truth for the right-pane control bar geometry. Draw and hit
 /// testing both use this layout so they cannot drift apart.
+struct ControlLabels {
+    mode: &'static str,
+    tts: &'static str,
+    ap: &'static str,
+    am: &'static str,
+    prev: &'static str,
+    next: &'static str,
+}
+
+fn control_labels(app: &FilesApp, compact: bool, narrow: bool) -> ControlLabels {
+    if compact {
+        ControlLabels {
+            mode: if app.context_mode {
+                "Raw"
+            } else if narrow {
+                "Ctx"
+            } else {
+                "Context"
+            },
+            tts: if app.tts_active { "Stop" } else { "TTS" },
+            ap: "A+",
+            am: "A-",
+            prev: "<",
+            next: ">",
+        }
+    } else {
+        ControlLabels {
+            mode: if app.context_mode {
+                "[ Raw View ]"
+            } else {
+                "[ Context ]"
+            },
+            tts: if app.tts_active {
+                "[\u{23f9} Stop ]"
+            } else {
+                "[\u{25b6} TTS ]"
+            },
+            ap: "[ A+ ]",
+            am: "[ A- ]",
+            prev: "[\u{25b2} Prev]",
+            next: "[\u{25bc} Next]",
+        }
+    }
+}
+
 fn preview_controls(app: &FilesApp, g: &FilesGeom, is_image: bool) -> PreviewControls {
-    let mode_w = text_width(
-        if app.context_mode {
-            "[ Raw View ]"
-        } else {
-            "[ Context ]"
-        },
-        1,
-    ) + 12;
+    let compact = g.right_w < 620 || font::family() == FontFamily::TwelveSixteen;
+    let labels = control_labels(app, compact, g.right_w < 420);
+    let mode_w = text_width(labels.mode, 1) + 12;
     let mode_x = g.right_x + g.right_w - mode_w - 12;
 
-    let ap_w = text_width("[ A+ ]", 1) + 8;
-    let am_w = text_width("[ A- ]", 1) + 8;
+    let ap_w = text_width(labels.ap, 1) + 8;
+    let am_w = text_width(labels.am, 1) + 8;
     let ap_x = mode_x - ap_w - 8;
     let am_x = ap_x - am_w - 4;
 
-    let tts_w = text_width(
-        if app.tts_active {
-            "[ \u{23f9} Stop ]"
-        } else {
-            "[ \u{25b6} TTS ]"
-        },
-        1,
-    ) + 10;
+    let tts_w = text_width(labels.tts, 1) + 10;
     let tts_x = am_x - tts_w - 8;
 
     let (prev, next) = if show_paging(app, is_image) {
-        let next_w = text_width("[\u{25bc} Next]", 1) + 8;
-        let prev_w = text_width("[\u{25b2} Prev]", 1) + 8;
+        let next_w = text_width(labels.next, 1) + 8;
+        let prev_w = text_width(labels.prev, 1) + 8;
         let next_x = tts_x - next_w - 8;
         let prev_x = next_x - prev_w - 4;
         (
@@ -821,32 +863,28 @@ fn draw_preview_control_bar(
 ) {
     ui::toolbar(fb, Rect::new(g.right_x, 0, g.right_w, 40));
 
+    let c = preview_controls(app, g, entry.is_image());
+    let compact = g.right_w < 620 || font::family() == FontFamily::TwelveSixteen;
+    let labels = control_labels(app, compact, g.right_w < 420);
+    let mut controls_left = c.mode.x.min(c.ap.x).min(c.am.x).min(c.tts.x);
+    if let Some(prev) = c.prev {
+        controls_left = controls_left.min(prev.x);
+    }
+    if let Some(next) = c.next {
+        controls_left = controls_left.min(next.x);
+    }
     let mut title_buf = [0u8; 64];
     let title = fmt_file_title(&mut title_buf, app.level, entry.base_name());
+    let max_chars = (((controls_left - (g.right_x + 12) - 8) / char_advance(1)).max(3)) as usize;
+    let title = ui::truncate_chars(title, max_chars);
     draw_str(fb, g.right_x + 12, 14, title, 1, t::TEXT);
-
-    let c = preview_controls(app, g, entry.is_image());
-    ui::button(
-        fb,
-        c.mode,
-        if app.context_mode {
-            "[ Raw View ]"
-        } else {
-            "[ Context ]"
-        },
-        ui::Tone::Accent,
-        1,
-    );
-    ui::button(fb, c.ap, "[ A+ ]", ui::Tone::Neutral, 1);
-    ui::button(fb, c.am, "[ A- ]", ui::Tone::Neutral, 1);
+    ui::button(fb, c.mode, labels.mode, ui::Tone::Accent, 1);
+    ui::button(fb, c.ap, labels.ap, ui::Tone::Neutral, 1);
+    ui::button(fb, c.am, labels.am, ui::Tone::Neutral, 1);
     ui::button(
         fb,
         c.tts,
-        if app.tts_active {
-            "[ \u{23f9} Stop ]"
-        } else {
-            "[ \u{25b6} TTS ]"
-        },
+        labels.tts,
         if app.tts_active {
             ui::Tone::Success
         } else {
@@ -871,8 +909,8 @@ fn draw_preview_control_bar(
         if range_x > g.right_x + text_width(title, 1) + 16 {
             draw_str(fb, range_x, 14, range_str, 1, t::TEXT_DIM);
         }
-        ui::button(fb, prev, "[\u{25b2} Prev]", ui::Tone::Neutral, 1);
-        ui::button(fb, next, "[\u{25bc} Next]", ui::Tone::Neutral, 1);
+        ui::button(fb, prev, labels.prev, ui::Tone::Neutral, 1);
+        ui::button(fb, next, labels.next, ui::Tone::Neutral, 1);
     }
 
     if let Some(hover) = app.hover_control {
@@ -1047,14 +1085,14 @@ pub fn draw_word_wrapped_paragraph(
     scale: i32,
 ) -> i32 {
     let scale = scale.clamp(1, 3);
-    let char_w = 6 * scale;
-    let line_step = 10 * scale + 4;
+    let char_w = char_advance(scale);
+    let line_step = line_height(scale) + 4;
     let max_chars_per_line = (max_w / char_w).max(8) as usize;
     let bytes = text.as_bytes();
     let mut start = 0;
 
     while start < bytes.len() {
-        if y + 10 * scale > fb.h {
+        if y + line_height(scale) > fb.h {
             break;
         }
 
@@ -1117,16 +1155,25 @@ fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, fold
 
     let head_sc = if g.right_w < 360 { 2 } else { 3 };
     let body_sc = if g.right_w < 360 { 1 } else { 2 };
-    draw_str(fb, rx, g.head_y, title, head_sc, t::TEXT);
+    let max_title = ((g.right_w - 2 * pad) / char_advance(head_sc)).max(4) as usize;
+    let max_sub = ((g.right_w - 2 * pad) / char_advance(body_sc)).max(4) as usize;
     draw_str(
         fb,
         rx,
-        g.head_y + 10 * head_sc + 4,
-        subtitle,
+        g.head_y,
+        ui::truncate_chars(title, max_title),
+        head_sc,
+        t::TEXT,
+    );
+    draw_str(
+        fb,
+        rx,
+        g.head_y + line_height(head_sc) + 4,
+        ui::truncate_chars(subtitle, max_sub),
         body_sc,
         accent,
     );
-    let rule_y = g.head_y + 10 * head_sc + 4 + 10 * body_sc + 4;
+    let rule_y = g.head_y + line_height(head_sc) + 4 + line_height(body_sc) + 4;
     fb.fill(rx, rule_y, (g.right_w - 2 * pad).max(40), 1, t::BORDER);
 
     let mut row = 0i32;
@@ -1140,7 +1187,15 @@ fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, fold
             break;
         }
         let entry = &app.entries[i];
-        draw_str(fb, rx, ry, entry.base_name(), body_sc, text_col);
+        let max_name = ((g.right_w - 2 * pad - 90) / char_advance(body_sc)).max(4) as usize;
+        draw_str(
+            fb,
+            rx,
+            ry,
+            ui::truncate_chars(entry.base_name(), max_name),
+            body_sc,
+            text_col,
+        );
 
         let mut sz_buf = [b' '; 16];
         let sz_str = f::size_str(&mut sz_buf, entry.byte_size);

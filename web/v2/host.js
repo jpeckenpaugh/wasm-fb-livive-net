@@ -229,7 +229,15 @@ const selectionLabel = (guest) => {
   if (sel === 1) {
     const page = guest.exports.app_active_page();
     const sec =
-      page === 1 ? 'Locale' : page === 2 ? 'Fonts' : page === 3 ? 'Icons' : 'About';
+      page === 1
+        ? 'Locale'
+        : page === 2
+          ? 'Fonts'
+          : page === 3
+            ? 'Icons'
+            : page === 4
+              ? 'Theme'
+              : 'About';
     return `System (${sec})`;
   }
   if (sel === 2) return 'Calc';
@@ -1000,6 +1008,8 @@ window.__appliance = {
     fbHash: guest.fbHash,
     fbHashHex: fmtHex32(guest.fbHash),
     focus: guest.exports ? guest.exports.app_focus() : 0,
+    theme: guest.exports ? guest.exports.app_theme() : 0,
+    fontFamily: guest.exports ? guest.exports.app_font_family() : 0,
   })),
   click: (id, x, y) => {
     const guest = guests.find((candidate) => candidate.id === id) || guests[0];
@@ -1012,6 +1022,8 @@ window.__appliance = {
       rc,
       view: selectionLabel(guest),
       focus: guest.exports.app_focus(),
+      theme: guest.exports.app_theme(),
+      fontFamily: guest.exports.app_font_family(),
       dockVisible: Boolean(guest.exports.app_dock_visible()),
       fbHash: guest.fbHash,
       fbHashHex: fmtHex32(guest.fbHash),
