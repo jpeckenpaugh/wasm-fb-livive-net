@@ -1,6 +1,6 @@
 # Appliance v2: Minimalist `no_std` Rust Wasm Window Manager & Appliance
 
-`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~109 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, a 5x7 bitmap font with Native/Smooth render modes, ten color themes, and built-in system attestation.
+`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~126 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, a 5x7 bitmap font with Native/Smooth render modes, ten color themes, and built-in system attestation.
 
 ```
 Browser Host (web/v2/host.js)
@@ -26,7 +26,7 @@ Browser Host (web/v2/host.js)
 
 ### 1.1 Pure `#![no_std]` on `wasm32-unknown-unknown`
 - Zero external runtime dependencies, zero standard library (`no_std`), and panic = abort.
-- Compiles down to **~109 KiB** of Wasm bytecode.
+- Compiles down to **~126 KiB** of Wasm bytecode (128,591 B in the current release build).
 - Linear memory is dynamically grown via `memory_grow` above `__heap_base` in `app_init(width, height)` to support dynamic resolutions ranging from mobile (`360x800`) to 1080p (`1920x1080`).
 
 ### 1.2 Upstream Host Decoding vs. Zero Static Bloat
@@ -60,7 +60,7 @@ Browser Host (web/v2/host.js)
 
 | Application | Modules | Description |
 |---|---|---|
-| **System** | `system.rs` | System overview, hardware/build attestation, performance telemetry, font/icon galleries, the Theme page, and test patterns. |
+| **System** | `system.rs` | System overview, hardware/build attestation, performance telemetry, a Fonts page with a 1x-8x selectable specimen and style ladder, icon galleries, the Theme page, and test patterns. |
 | **Calculator** | `calc.rs` | Interactive desk calculator with integer/decimal entry, thousands grouping, and keyboard entry. |
 | **Minesweeper** | `mines.rs`, `mine_sm.rs` | High-performance 8×8 bitboard engine (`u64` bitmasks for mines, flags, reveals) with SplitMix64 PRNG, RL observation tensor exports (`[f32; 64]`), and Classic/Shielded strike rules. |
 | **Files & Preview** | `files.rs`, `code.rs` | Two-panel explorer (Left 1/3 folder navigation, Right 2/3 live preview) supporting wallpapers, general code samples, task-scoped GitHub repo mounts (`gh://`), syntax highlighting, and TTS. |

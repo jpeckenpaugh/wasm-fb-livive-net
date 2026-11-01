@@ -69,6 +69,7 @@ pub struct SystemApp {
     pub theme_index: usize,
     pub theme_focus: usize,
     pub render_focus: usize,
+    pub preview_idx: usize,
     pub theme_cursor_ready: bool,
     // UTC wall clock + timezone offset (minutes East of UTC, e.g. -240 for UTC-04:00)
     pub utc_year: u16,
@@ -90,6 +91,7 @@ impl SystemApp {
             theme_index: 0,
             theme_focus: 0,
             render_focus: 1,
+            preview_idx: 3,
             theme_cursor_ready: false,
             utc_year: 2026,
             utc_month: 10,
@@ -615,11 +617,21 @@ struct FontsGeom {
     y0: i32,
     rule_y: i32,
     y_toggle: i32,
+    toggle_x: i32,
     toggle_h: i32,
     toggle_w: i32,
     body_scale: i32,
     head_scale: i32,
     compact: bool,
+    y_cs: i32,
+    cs_step: i32,
+    y_bottom: i32,
+    ladder_w: i32,
+    native_x: i32,
+    smooth_x: i32,
+    right_x: i32,
+    right_w: i32,
+    ladder_rows: [Rect; 8],
 }
 
 fn fonts_geom(fb_w: i32, fb_h: i32) -> FontsGeom {
@@ -629,8 +641,43 @@ fn fonts_geom(fb_w: i32, fb_h: i32) -> FontsGeom {
     let body_scale = m.body_scale();
     let compact = m.is_compact();
     let rule_y = y0 + line_height(head_scale) + 2 * head_scale;
-    let y_toggle =
-        rule_y + if compact { 8 } else { 12 } + glyph_height(body_scale) + 4;
+
+    let (toggle_x, y_toggle, toggle_w, toggle_h) = if compact {
+        (
+            x0,
+            rule_y + 8 + glyph_height(body_scale) + 4,
+            ((w - 8) / 2).max(80),
+            m.pick(24, 26, 28),
+        )
+    } else {
+        let tw = 120;
+        let th = 28;
+        (x0 + w - 2 * tw - 6, y0 + 3, tw, th)
+    };
+
+    let y_cs = rule_y + 10;
+    let cs_step = if compact { 16 } else { 20 };
+    let divider = y_cs + cs_step * 5;
+    let y_bottom = divider + 12;
+
+    let ladder_w = (w * 52 / 100).max(320);
+    let ladder_label_w = m.pick(100, 124, 140);
+    let col_w = ((ladder_w - ladder_label_w - 10) / 2).max(60);
+    let native_x = x0 + ladder_label_w + 10;
+    let smooth_x = native_x + col_w;
+    let right_x = x0 + ladder_w + 24;
+    let right_w = (w - ladder_w - 24).max(160);
+
+    let mut ladder_rows = [Rect::new(0, 0, 0, 0); 8];
+    if !compact {
+        let mut y = y_bottom + 24;
+        for (idx, &(_, sc)) in FONTS_LADDER.iter().enumerate() {
+            let h = line_height(sc);
+            ladder_rows[idx] = Rect::new(x0, y, ladder_w, h);
+            y += h + 8;
+        }
+    }
+
     FontsGeom {
         x0,
         w,
@@ -638,31 +685,44 @@ fn fonts_geom(fb_w: i32, fb_h: i32) -> FontsGeom {
         y0,
         rule_y,
         y_toggle,
-        toggle_h: m.pick(24, 26, 28),
-        toggle_w: ((w - 8) / 2).max(80),
+        toggle_x,
+        toggle_h,
+        toggle_w,
         body_scale,
         head_scale,
         compact,
+        y_cs,
+        cs_step,
+        y_bottom,
+        ladder_w,
+        native_x,
+        smooth_x,
+        right_x,
+        right_w,
+        ladder_rows,
     }
 }
 
 fn render_toggle_rects(g: &FontsGeom) -> [Rect; 2] {
     [
-        Rect::new(g.x0, g.y_toggle, g.toggle_w, g.toggle_h),
-        Rect::new(g.x0 + g.toggle_w + 8, g.y_toggle, g.toggle_w, g.toggle_h),
+        Rect::new(g.toggle_x, g.y_toggle, g.toggle_w, g.toggle_h),
+        Rect::new(g.toggle_x + g.toggle_w + 6, g.y_toggle, g.toggle_w, g.toggle_h),
     ]
 }
 
 /// `Rendering: [ Native | Smooth ]` — the mode is global to the guest.
 fn draw_render_toggle(fb: &mut Framebuffer, app: &SystemApp, g: &FontsGeom) {
-    draw_str_prop(
-        fb,
-        g.x0,
-        g.y_toggle - glyph_height(g.body_scale) - 4,
-        "Rendering",
-        g.body_scale,
-        t::TEXT_DIM,
-    );
+    let label = "Rendering";
+    let (label_x, label_y) = if g.compact {
+        (g.x0, g.y_toggle - glyph_height(g.body_scale) - 4)
+    } else {
+        (
+            g.toggle_x - text_width_prop(label, g.body_scale) - 10,
+            g.y_toggle + (g.toggle_h - glyph_height(g.body_scale)) / 2,
+        )
+    };
+    draw_str_prop(fb, label_x, label_y, label, g.body_scale, t::TEXT_DIM);
+
     let active = font::render_mode();
     for (idx, mode) in RenderMode::ALL.iter().enumerate() {
         let r = render_toggle_rects(g)[idx];
@@ -690,12 +750,30 @@ fn click_fonts(app: &mut SystemApp, cx: i32, cy: i32, client_w: i32, client_h: i
             return apply_render_mode(app, *mode);
         }
     }
+    if !g.compact {
+        for (idx, r) in g.ladder_rows.iter().enumerate() {
+            if r.contains(cx, cy) {
+                return select_preview(app, idx);
+            }
+        }
+    }
     InputResult::Noop
+}
+
+/// Select the size shown in the Specimen panel. Page-local; does not change
+/// app text or the global scale.
+pub fn select_preview(app: &mut SystemApp, idx: usize) -> InputResult {
+    let idx = idx.min(FONTS_LADDER.len() - 1);
+    if app.preview_idx == idx {
+        return InputResult::Handled;
+    }
+    app.preview_idx = idx;
+    InputResult::Changed
 }
 
 /// Absolute scale ladder. 1x is the 5x7 base in both modes; the smooth mask is
 /// only generated from 2x up.
-const FONTS_LADDER: [(&str, i32); 8] = [
+pub const FONTS_LADDER: [(&str, i32); 8] = [
     ("1x (5x7)", 1),
     ("2x (10x14)", 2),
     ("3x (15x21)", 3),
@@ -713,13 +791,7 @@ fn draw_compact_fonts(fb: &mut Framebuffer, app: &SystemApp) {
     let head = g.head_scale;
 
     draw_str(fb, x0, g.y0, font::spec(font::font()).id, head, t::TEXT);
-    fb.fill(
-        x0,
-        g.rule_y,
-        (fb.w - 2 * x0).max(80),
-        2,
-        t::ACCENT,
-    );
+    fb.fill(x0, g.rule_y, (fb.w - 2 * x0).max(80), 2, t::ACCENT);
 
     draw_render_toggle(fb, app, &g);
 
@@ -789,131 +861,178 @@ fn draw_fonts(fb: &mut Framebuffer, app: &SystemApp) {
 
     fb.clear(t::BG);
     let g = fonts_geom(fb.w, fb.h);
-    let (x0, w, val_off) = (g.x0, g.w, g.val_off);
+    let (x0, w) = (g.x0, g.w);
     let label_col = t::TEXT_DIM;
     let val_col = t::TEXT_BODY;
-    let accent = t::ACCENT;
-    let rule_col = t::BORDER_DARK;
-    let compact = g.compact;
-    let body_scale = g.body_scale;
-    let head_scale = g.head_scale;
-    let y0 = g.y0;
 
-    draw_str(fb, x0, y0, sheet.id, head_scale, t::TEXT);
-    if fb.w >= 640 {
-        let sheet_x = x0 + text_width(sheet.id, head_scale) + 24;
-        if sheet_x + text_width(sheet.range_label, 2) < x0 + w {
-            draw_str(fb, sheet_x, y0 + 7, sheet.range_label, 2, label_col);
-        }
+    draw_str(fb, x0, g.y0, sheet.id, g.head_scale, t::TEXT);
+    let range_x = x0 + text_width(sheet.id, g.head_scale) + 24;
+    if range_x + text_width(sheet.range_label, 2) < g.toggle_x - 12 {
+        draw_str(fb, range_x, g.y0 + 7, sheet.range_label, 2, label_col);
     }
-    fb.fill(x0, g.rule_y, w, 2, accent);
+    fb.fill(x0, g.rule_y, w, 2, t::ACCENT);
 
-    // 1. Rendering mode (moved here from Theme).
     draw_render_toggle(fb, app, &g);
 
-    // 2. Character set, sampled in the active mode.
-    let y_cs = g.y_toggle + g.toggle_h + (if compact { 10 } else { 16 });
-    let cs_step = if compact { 16 } else { 22 };
-    draw_str(fb, x0, y_cs, "Upper", body_scale, label_col);
-    draw_sample(
-        fb,
-        x0 + val_off,
-        y_cs,
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-        body_scale,
-        w - val_off - 8,
-        val_col,
-    );
+    // Character repertoire, full width.
+    let cs: [(&str, &str); 5] = [
+        ("Upper", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+        ("Lower", "abcdefghijklmnopqrstuvwxyz"),
+        (
+            "Latin+",
+            "¡¿ÀÁÂÃÄÅÆÇÈÉÊËÑÒÓÔÕÖØÙÚÛÜÝßàáéíñóúüąćęłńśźż",
+        ),
+        (
+            "Greek/Cyr",
+            "ΑΒΓΔΕΖΗΘΛΞΠΣΦΨΩ αβγδεζηθλμπσφω · АБГДЖЗИЙЛПФЦЧШЩЯ",
+        ),
+        (
+            "Symbols",
+            "0123456789 ±×÷≠≤≥√∞∑∫€£¥ •…–— ┌─┬─┐│┼│└─┴─┘░▒▓█★♥",
+        ),
+    ];
+    for (i, (label, sample)) in cs.iter().enumerate() {
+        let y = g.y_cs + i as i32 * g.cs_step;
+        draw_str(fb, x0, y, label, g.body_scale, label_col);
+        draw_sample(
+            fb,
+            x0 + g.val_off,
+            y,
+            sample,
+            g.body_scale,
+            w - g.val_off - 8,
+            val_col,
+        );
+    }
+    let divider = g.y_cs + g.cs_step * 5;
+    fb.fill(x0, divider, w, 1, t::BORDER_DARK);
 
-    draw_str(fb, x0, y_cs + cs_step, "Lower", body_scale, label_col);
-    draw_sample(
-        fb,
-        x0 + val_off,
-        y_cs + cs_step,
-        "abcdefghijklmnopqrstuvwxyz",
-        body_scale,
-        w - val_off - 8,
-        val_col,
-    );
-
-    draw_str(fb, x0, y_cs + cs_step * 2, "Latin+", body_scale, label_col);
-    draw_sample(
-        fb,
-        x0 + val_off,
-        y_cs + cs_step * 2,
-        "¡¿ÀÁÂÃÄÅÆÇÈÉÊËÑÒÓÔÕÖØÙÚÛÜÝßàáéíñóúüąćęłńśźż",
-        body_scale,
-        w - val_off - 8,
-        val_col,
-    );
-
+    // Size ladder (left) with a selectable row.
+    draw_str(fb, x0, g.y_bottom, "Size", g.body_scale, label_col);
     draw_str(
         fb,
-        x0,
-        y_cs + cs_step * 3,
-        "Greek/Cyr",
-        body_scale,
+        g.native_x,
+        g.y_bottom,
+        "Native",
+        g.body_scale,
         label_col,
     );
-    draw_sample(
+    draw_str(
         fb,
-        x0 + val_off,
-        y_cs + cs_step * 3,
-        "ΑΒΓΔΕΖΗΘΛΞΠΣΦΨΩ αβγδεζηθλμπσφω · АБГДЖЗИЙЛПФЦЧШЩЯ",
-        body_scale,
-        w - val_off - 8,
-        val_col,
+        g.smooth_x,
+        g.y_bottom,
+        "Smooth",
+        g.body_scale,
+        label_col,
     );
-
-    draw_str(fb, x0, y_cs + cs_step * 4, "Symbols", body_scale, label_col);
-    draw_sample(
-        fb,
-        x0 + val_off,
-        y_cs + cs_step * 4,
-        "0123456789 ±×÷≠≤≥√∞∑∫€£¥ •…–— ┌─┬─┐│┼│└─┴─┘░▒▓█★♥",
-        body_scale,
-        w - val_off - 8,
-        val_col,
-    );
-    let div1_y = y_cs + cs_step * 5;
-    fb.fill(x0, div1_y, w, 1, rule_col);
-
-    // 3. Absolute scale ladder. Both modes are drawn at the same scale so the
-    // 1x row is visibly identical and the mode never changes the box.
-    let mut y_scale = div1_y + (if compact { 10 } else { 16 });
-    let col_gap = if compact { 96 } else { 128 };
-    let native_x = x0 + val_off;
-    let smooth_x = native_x + col_gap;
-    if y_scale + line_height(body_scale) < fb.h {
-        draw_str(fb, x0, y_scale, "Size", body_scale, label_col);
-        draw_str(fb, native_x, y_scale, "Native", body_scale, label_col);
-        draw_str(fb, smooth_x, y_scale, "Smooth", body_scale, label_col);
-        y_scale += line_height(body_scale) + 4;
-    }
-    let scale_gap = if compact { 6 } else { 10 };
-    for &(label, sc) in FONTS_LADDER.iter() {
-        let row_h = line_height(sc);
-        if y_scale + row_h > fb.h - 56 {
+    let sel = app.preview_idx.min(FONTS_LADDER.len() - 1);
+    let ladder_sample = if g.ladder_w >= 480 { "Aa0" } else { "Aa" };
+    for (idx, &(label, sc)) in FONTS_LADDER.iter().enumerate() {
+        let r = g.ladder_rows[idx];
+        if r.bottom() > fb.h - 8 {
             break;
         }
+        if idx == sel {
+            fb.fill(r.x, r.y, r.w, r.h, t::SURFACE_SELECTED);
+            fb.fill(r.x, r.y, 4, r.h, t::ACCENT);
+        }
+        let ly = r.y + (r.h - glyph_height(g.body_scale)).max(0) / 2;
         draw_str(
             fb,
-            x0,
-            y_scale + (row_h - glyph_height(body_scale)) / 2,
+            x0 + 8,
+            ly,
             label,
-            body_scale,
-            label_col,
+            g.body_scale,
+            if idx == sel { t::TEXT } else { label_col },
         );
-        draw_str_mode(fb, RenderMode::Native, native_x, y_scale, "Aa", sc, val_col);
-        draw_str_mode(fb, RenderMode::Smooth, smooth_x, y_scale, "Aa", sc, val_col);
-        y_scale += row_h + scale_gap;
+        let sy = r.y + (r.h - glyph_height(sc)).max(0) / 2;
+        draw_str_mode(
+            fb,
+            RenderMode::Native,
+            g.native_x,
+            sy,
+            ladder_sample,
+            sc,
+            val_col,
+        );
+        draw_str_mode(
+            fb,
+            RenderMode::Smooth,
+            g.smooth_x,
+            sy,
+            ladder_sample,
+            sc,
+            val_col,
+        );
+        if app.focus_visible && idx == sel {
+            ui::focus_ring(fb, r);
+        }
     }
-    fb.fill(x0, y_scale - 2, w, 1, rule_col);
 
-    // 4. Style transforms in the active mode.
-    let y_style = y_scale + (if compact { 6 } else { 10 });
-    let style_sc = if compact { 2 } else { 3 };
-    let style_step = glyph_height(style_sc) + 12;
+    // Specimen panel (right), driven by the selected ladder row.
+    let sel_scale = FONTS_LADDER[sel].1;
+    let sel_line = line_height(sel_scale);
+    let quote_sc = if g.right_w >= 420 { 3 } else { 2 };
+    let quote_h = line_height(quote_sc);
+    let panel_h = 24 + sel_line + 8 + quote_h + 12;
+    let panel = Rect::new(g.right_x, g.y_bottom, g.right_w, panel_h);
+    ui::panel(fb, panel, t::SURFACE, t::BORDER);
+    draw_str(
+        fb,
+        g.right_x + 12,
+        g.y_bottom + 6,
+        "Specimen",
+        g.body_scale,
+        label_col,
+    );
+    let spec_label = FONTS_LADDER[sel].0;
+    draw_str_prop(
+        fb,
+        g.right_x + g.right_w - 12 - text_width_prop(spec_label, g.body_scale),
+        g.y_bottom + 6,
+        spec_label,
+        g.body_scale,
+        t::ACCENT,
+    );
+    draw_sample(
+        fb,
+        g.right_x + 12,
+        g.y_bottom + 24,
+        "Aa 0123",
+        sel_scale,
+        g.right_w - 24,
+        t::TEXT,
+    );
+    let quote = if sel_scale == 1 {
+        "1x is the 5x7 base"
+    } else {
+        "Sphinx of black quartz"
+    };
+    draw_sample(
+        fb,
+        g.right_x + 12,
+        g.y_bottom + 24 + sel_line + 8,
+        quote,
+        quote_sc,
+        g.right_w - 24,
+        t::TEXT_DIM,
+    );
+
+    // Styles (right, below the specimen).
+    let styles_y = g.y_bottom + panel_h + 14;
+    draw_str(
+        fb,
+        g.right_x,
+        styles_y,
+        "Styles",
+        g.body_scale,
+        label_col,
+    );
+    let style_sc = if g.right_w >= 420 { 3 } else { 2 };
+    let style_label_w = 112;
+    let style_sample = "Pack my box";
+    let max_chars = ((g.right_w - style_label_w) / char_advance(style_sc)).max(4);
+    let style_sample = ui::truncate_chars(style_sample, max_chars as usize);
     let styles: [(FontStyle, &str); 5] = [
         (FontStyle::Regular, "Regular"),
         (FontStyle::Bold, "Bold"),
@@ -922,19 +1041,39 @@ fn draw_fonts(fb: &mut Framebuffer, app: &SystemApp) {
         (FontStyle::Underline, "Underline"),
     ];
     for (idx, &(style, name)) in styles.iter().enumerate() {
-        let ry = y_style + (idx as i32) * style_step;
-        if ry + glyph_height(style_sc) > fb.h {
+        let ry = styles_y + 20 + idx as i32 * (glyph_height(style_sc) + 8);
+        if ry + glyph_height(style_sc) > fb.h - 8 {
             break;
         }
-        draw_str(fb, x0, ry + 2, name, body_scale, label_col);
+        draw_str_prop(fb, g.right_x, ry, name, g.body_scale, label_col);
         draw_str_styled(
             fb,
-            x0 + val_off,
+            g.right_x + style_label_w,
             ry,
-            "Pack my box with five dozen jugs",
+            style_sample,
             style_sc,
             style,
             val_col,
+        );
+    }
+
+    let notes_y = styles_y + 20 + 5 * (glyph_height(style_sc) + 8) + 8;
+    if notes_y + glyph_height(g.body_scale) * 2 + 4 < fb.h - 8 {
+        draw_str(
+            fb,
+            g.right_x,
+            notes_y,
+            "Preview size is page-local.",
+            g.body_scale,
+            label_col,
+        );
+        draw_str(
+            fb,
+            g.right_x,
+            notes_y + glyph_height(g.body_scale) + 4,
+            "App text keeps its 2x / 3x scales.",
+            g.body_scale,
+            label_col,
         );
     }
 }

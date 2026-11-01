@@ -210,7 +210,24 @@ The masks are 8-bit, so the draw path blends the level directly (no
 435 KB (4x), 675 KB (5x), 953 KB (6x), 1.22 MB (7x), and 1.58 MB (8x) of
 zero-initialised BSS; none of that is in the wasm file. The wasm memory
 minimum is 6.19 MiB and the guest grows its framebuffer/staging area from
-there.
+there. The current release wasm is 128,591 B, including the redesigned Fonts
+page.
+
+## Fonts screen
+
+`System → Fonts` exposes the ladder:
+
+- the header has the compact `Rendering` control (`Native` / `Smooth`);
+- the character repertoire is five rows across the top;
+- the left column lists `1x`-`8x` with a `Native` and `Smooth` sample per row;
+- the right column is a `Specimen` panel for the selected size, followed by
+  the five style transforms and two short notes.
+
+The selected size is page-local (`SystemApp::preview_idx`, 4x by default).
+Click a ladder row, or use `Up`/`Down`, to change it; the specimen updates
+without touching app text or the global scale. At 720p all eight sizes and all
+five styles fit. Below 560px the page switches to the compact single-column
+layout with the first three sizes.
 
 ## Symmetry
 

@@ -290,6 +290,11 @@ pub extern "C" fn app_files_context_mode() -> i32 {
 }
 
 #[no_mangle]
+pub extern "C" fn app_preview_scale() -> i32 {
+    unsafe { (*GUEST.wm.get()).system.preview_idx as i32 + 1 }
+}
+
+#[no_mangle]
 pub extern "C" fn app_theme() -> i32 {
     crate::theme::theme_index() as i32
 }
@@ -869,6 +874,28 @@ mod tests {
         assert_eq!(crate::font::char_advance(2), 13);
         assert_eq!(crate::font::line_height(2), 20);
         assert_eq!(crate::font::glyph_height(2), 16);
+    }
+
+    #[test]
+    fn fonts_page_selects_preview_size() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        app_set_session(1);
+        assert_eq!(app_init(1280, 720), 1);
+        assert_eq!(app_key_mods(11, 2), CLICK_CHANGED); // Ctrl+1 -> System
+        assert_eq!(app_key(13), CLICK_CHANGED); // 3 -> Fonts
+        assert_eq!(app_preview_scale(), 4); // default 4x
+
+        assert_eq!(app_key(51), CLICK_CHANGED); // Down -> 5x
+        assert_eq!(app_preview_scale(), 5);
+        assert_eq!(app_key(50), CLICK_CHANGED); // Up -> 4x
+        assert_eq!(app_preview_scale(), 4);
+
+        // Click the 2x ladder row (content y 265..285, plus the title bar).
+        assert_eq!(app_click(200, TITLE_H + 270), CLICK_CHANGED);
+        assert_eq!(app_preview_scale(), 2);
+        let h = app_fb_hash();
+        assert_eq!(app_key(51), CLICK_CHANGED); // Down -> 3x
+        assert_ne!(app_fb_hash(), h);
     }
 
     #[test]

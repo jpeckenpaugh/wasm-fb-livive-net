@@ -1262,14 +1262,19 @@ impl WmState {
                     InputResult::Handled
                 }
             }
-            Key::Left | Key::Right | Key::Up | Key::Down
-                if self.system.section == SystemSection::Fonts =>
-            {
-                let mode = match key {
-                    Key::Left | Key::Up => RenderMode::Native,
-                    _ => RenderMode::Smooth,
+            Key::Left | Key::Right if self.system.section == SystemSection::Fonts => {
+                let mode = if key == Key::Left {
+                    RenderMode::Native
+                } else {
+                    RenderMode::Smooth
                 };
                 system::apply_render_mode(&mut self.system, mode)
+            }
+            Key::Up | Key::Down if self.system.section == SystemSection::Fonts => {
+                let step = if key == Key::Up { -1 } else { 1 };
+                let next = (self.system.preview_idx as i32 + step)
+                    .clamp(0, system::FONTS_LADDER.len() as i32 - 1);
+                system::select_preview(&mut self.system, next as usize)
             }
             Key::Left | Key::Right | Key::Tab | Key::Up | Key::Down
                 if self.system.section == SystemSection::Theme =>

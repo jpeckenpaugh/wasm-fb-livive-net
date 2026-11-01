@@ -20,12 +20,12 @@ This repository includes two generations:
 
 ### 1. Appliance v2 (Rust `#![no_std]` Window Manager) — Recommended
 Located in `v2/` and served at `/v2/`:
-- **Size**: **~109 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
+- **Size**: **~126 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
 - **Architecture**: Bare-metal `#![no_std]` Rust (`wasm32-unknown-unknown`), dynamic resolution scaling (360×800 up to 1080p), zero-allocation 2D software rasterizer, and a `FiveSeven` 5×7 bitmap font with Native and Smooth render modes at absolute scales (1× is the 5×7 base in both; Smooth is the default). Shared `theme`, `layout`, `ui`, `fmt`, and `input` modules keep colors, size classes, chrome, formatting, and key/result contracts in one place.
-- **Theme page**: `System → Theme` selects one of ten built-in color themes; `System → Fonts` owns the global render mode. See [docs/v2-themes.md](docs/v2-themes.md) and [docs/glyphs.md](docs/glyphs.md).
+- **Theme page**: `System → Theme` selects one of ten built-in color themes; `System → Fonts` owns the global render mode and a selectable 1×–8× specimen ladder. See [docs/v2-themes.md](docs/v2-themes.md), [docs/v2-smooth.md](docs/v2-smooth.md), and [docs/glyphs.md](docs/glyphs.md).
 - **Window Manager (`wm.rs`)**: 32px Title Bar with `Home`, app, `View`, and `Testing` menus; the App Home drawer is the `Home` dropdown. Mouse and keyboard share one focus model (`F9`/`Alt+D` Home drawer, `F10`/`Alt+M` menu bar, `Tab` client traversal, `Enter`/`Space` activation); see [docs/v2-input.md](docs/v2-input.md).
 - **Applications**:
-  - **System**: FNV-1a 64-bit build attestation (`build.rs`), performance telemetry, and test patterns.
+  - **System**: FNV-1a 64-bit build attestation (`build.rs`), performance telemetry, a Fonts page with a live 1×–8× specimen and style ladder, icon galleries, a theme picker, and test patterns.
   - **Calculator**: Interactive desk calculator with formatted separators.
   - **Minesweeper**: High-performance 8×8 bitboard engine with Classic/Shielded modes and RL observation tensors (`[f32; 64]`).
   - **Files & Preview**: Two-panel finder browsing `~/wallpapers`, `~/samples`, and upstream GitHub repositories (`gh://mines-sm`). Includes **dynamic font scaling (`+`/`-`)**, **2D scrolling**, **enriched `.context.xml` knowledge graphs**, and **in-browser Text-to-Speech (TTS) narration**.

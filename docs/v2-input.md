@@ -100,19 +100,22 @@ strip. With a control focused, `Left`/`Right` move along the strip and `Esc`,
 | `1..5` | Select About / Locale / Fonts / Icons / Theme |
 | `Tab` / `Shift+Tab` | Cycle the section tabs |
 | `Left` / `Right` | Section-dependent (Fonts: render mode; Theme: no-op) |
+| `Up` / `Down` | Section-dependent (Fonts: specimen size) |
 | `Home` / `End` | First / last section |
 
 ### Fonts page
 
 | Key | Action |
 |---|---|
-| `Left` / `Up` | Select Native rendering |
-| `Right` / `Down` | Select Smooth rendering |
+| `Left` / `Right` | Select Native / Smooth rendering |
+| `Up` / `Down` | Move the specimen size through 1x..8x |
 | `1..5` | Jump to a System section |
 | `Tab` | Cycle System sections |
 
-Render mode is global and never changes layout: `1x` is the 5x7 base in both
-modes, and the two modes occupy the same box at every scale.
+Clicking a ladder row also selects that size. The specimen size is page-local:
+it changes the preview only, not app text. Render mode is global and never
+changes layout: `1x` is the 5x7 base in both modes, and the two modes occupy
+the same box at every scale.
 
 ### Theme page
 
@@ -171,3 +174,4 @@ Files rows, Files controls, and System tabs all share this hover path.
 - `app_theme()` returns the active theme index (`0..9`).
 - `app_render_mode()` returns `0` for Native and `1` for Smooth (`app_font_family()` is a deprecated alias).
 - `app_font()` returns the active font index (`0` = FiveSeven).
+- `app_preview_scale()` returns the Fonts specimen size (`1`..`8`).
