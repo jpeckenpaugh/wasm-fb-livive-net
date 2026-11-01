@@ -1,180 +1,221 @@
-//! Runtime FiveSeven -> smooth 12x19-line renderer (`smooth.rs`).
+//! Runtime FiveSeven -> smooth `TwelveSixteen` renderer (`smooth.rs`).
 //!
-//! The smoothed face is deliberately **not** a baked font family. It is derived
-//! from the 5x7 source at render time:
+//! The family is a ladder of generated faces, one per source magnification:
 //!
-//! 1. every source pixel becomes a solid 2x2 block in a 10x14 core with one
-//!    row/column of padding around it;
-//! 2. the source `dy` is doubled and applied as the glyph offset in a 19-row
-//!    line, exactly like FiveSeven's 7-row glyph inside a 9-row line;
-//! 3. pass 1: an empty cell with >1 non-empty 4-neighbor becomes 100%;
-//! 4. pass 2: an empty cell with >1 non-empty 4-neighbor becomes 66%;
-//! 5. pass 3: an empty cell with >0 non-empty 4-neighbor becomes 33%.
+//! | step | source | core  | cell   | advance |
+//! |------|--------|-------|--------|---------|
+//! | 0    | 2x     | 10x14 | 12x19  | 13      |
+//! | 1    | 3x     | 15x21 | 17x28  | 18      |
+//! | 2    | 4x     | 20x28 | 22x37  | 23      |
 //!
-//! Each pass sees pixels written by earlier passes.
+//! Every step is produced at its own resolution with the same rules:
 //!
-//! Generated masks are cached in guest linear memory (BSS), so the wasm binary
-//! does not carry a second glyph table.
+//! 1. every source pixel becomes a solid `s x s` block in a `5s x 7s` core with
+//!    one row/column of padding around it;
+//! 2. the source `dy` is multiplied by `s` and applied as the glyph offset;
+//! 3. pass 1: empty + `>1` non-empty 4-neighbor -> 100%;
+//! 4. pass 2: empty + `>1` non-empty 4-neighbor -> 66%;
+//! 5. pass 3: empty + `>0` non-empty 4-neighbor -> 33%.
+//!
+//! Packed at 2 bits per pixel and cached lazily in guest linear memory.
 
 use crate::glyph;
 use core::cell::UnsafeCell;
 
-pub const CELL_W: i32 = 12;
-pub const CELL_H: i32 = 19;
-pub const ROW_BYTES: usize = 3;
-pub const GLYPH_BYTES: usize = CELL_H as usize * ROW_BYTES; // 57
+/// Number of ladder steps (2x, 3x, 4x magnification).
+pub const STEPS: usize = 3;
+const MAX_W: usize = 22;
+const MAX_H: usize = 37;
+const MAX_RB: usize = 6;
+pub const MAX_BYTES: usize = MAX_H * MAX_RB; // 222
 
 const COUNT: usize = glyph::FIVESEVEN_GLYPH_COUNT;
 const MISSING_INDEX: u16 = u16::MAX;
 
 struct Cache {
-    masks: UnsafeCell<[[u8; GLYPH_BYTES]; COUNT]>,
-    lsb: UnsafeCell<[u8; COUNT]>,
-    ink: UnsafeCell<[u8; COUNT]>,
-    valid: UnsafeCell<[bool; COUNT]>,
+    masks: UnsafeCell<[[[u8; MAX_BYTES]; STEPS]; COUNT]>,
+    lsb: UnsafeCell<[[u8; STEPS]; COUNT]>,
+    ink: UnsafeCell<[[u8; STEPS]; COUNT]>,
+    valid: UnsafeCell<[[bool; STEPS]; COUNT]>,
 }
 
 // Single-threaded wasm guest / test process.
 unsafe impl Sync for Cache {}
 
 static CACHE: Cache = Cache {
-    masks: UnsafeCell::new([[0u8; GLYPH_BYTES]; COUNT]),
-    lsb: UnsafeCell::new([0u8; COUNT]),
-    ink: UnsafeCell::new([0u8; COUNT]),
-    valid: UnsafeCell::new([false; COUNT]),
+    masks: UnsafeCell::new([[[0u8; MAX_BYTES]; STEPS]; COUNT]),
+    lsb: UnsafeCell::new([[0u8; STEPS]; COUNT]),
+    ink: UnsafeCell::new([[0u8; STEPS]; COUNT]),
+    valid: UnsafeCell::new([[false; STEPS]; COUNT]),
 };
 
-static EMPTY: [u8; GLYPH_BYTES] = [0u8; GLYPH_BYTES];
+static EMPTY: [u8; MAX_BYTES] = [0u8; MAX_BYTES];
 
-#[allow(clippy::needless_range_loop)]
-fn fill_pass(
-    levels: &[[u8; CELL_W as usize]; CELL_H as usize],
-    threshold: u8,
-    value: u8,
-) -> [[u8; CELL_W as usize]; CELL_H as usize] {
-    let mut out = *levels;
-    for y in 0..CELL_H {
-        for x in 0..CELL_W {
-            if levels[y as usize][x as usize] != 0 {
-                continue;
-            }
-            let n = non_empty(levels, x - 1, y) as u8
-                + non_empty(levels, x + 1, y) as u8
-                + non_empty(levels, x, y - 1) as u8
-                + non_empty(levels, x, y + 1) as u8;
-            if n > threshold {
-                out[y as usize][x as usize] = value;
-            }
-        }
+/// Ladder step index for a draw scale (1 -> 2x, 2 -> 3x, 3+ -> 4x).
+pub fn step_for_scale(scale: i32) -> usize {
+    match scale {
+        s if s <= 1 => 0,
+        2 => 1,
+        _ => 2,
     }
-    out
+}
+
+/// Source magnification for a step (2, 3, 4).
+pub fn magnification(step: usize) -> i32 {
+    step as i32 + 2
+}
+
+pub fn cell_w(step: usize) -> i32 {
+    5 * magnification(step) + 2
+}
+
+pub fn cell_h(step: usize) -> i32 {
+    1 + 9 * magnification(step)
+}
+
+pub fn row_bytes(step: usize) -> usize {
+    ((cell_w(step) + 3) / 4) as usize
+}
+
+pub fn descent(step: usize) -> i32 {
+    2 * magnification(step)
 }
 
 #[inline]
-fn non_empty(levels: &[[u8; CELL_W as usize]; CELL_H as usize], x: i32, y: i32) -> bool {
-    if x < 0 || y < 0 || x >= CELL_W || y >= CELL_H {
-        return false;
+pub fn unpack(mask: &[u8], step: usize, x: i32, y: i32) -> u8 {
+    let rb = row_bytes(step);
+    (mask[y as usize * rb + x as usize / 4] >> (6 - 2 * ((x as usize) % 4))) & 0x3
+}
+
+fn fill_pass(levels: &mut [[u8; MAX_W]; MAX_H], w: i32, h: i32, threshold: u8, value: u8) {
+    let mut out = *levels;
+    for y in 0..h as usize {
+        for x in 0..w as usize {
+            if levels[y][x] != 0 {
+                continue;
+            }
+            let mut n = 0u8;
+            if x > 0 && levels[y][x - 1] != 0 {
+                n += 1;
+            }
+            if x + 1 < w as usize && levels[y][x + 1] != 0 {
+                n += 1;
+            }
+            if y > 0 && levels[y - 1][x] != 0 {
+                n += 1;
+            }
+            if y + 1 < h as usize && levels[y + 1][x] != 0 {
+                n += 1;
+            }
+            if n > threshold {
+                out[y][x] = value;
+            }
+        }
     }
-    levels[y as usize][x as usize] != 0
+    *levels = out;
 }
 
 #[allow(clippy::needless_range_loop)]
-fn generate(rows: &[u8; 7], dy: u8) -> ([u8; GLYPH_BYTES], u8, u8) {
-    let mut base = [[0u8; CELL_W as usize]; CELL_H as usize];
+fn generate(rows: &[u8; 7], dy: u8, step: usize) -> ([u8; MAX_BYTES], u8, u8) {
+    let mag = magnification(step);
+    let w = cell_w(step);
+    let h = cell_h(step);
+    let mut levels = [[0u8; MAX_W]; MAX_H];
 
-    // 1. Exact 2x core. The source dy is doubled, matching FiveSeven's
-    // placement of a 7-row glyph inside a 9-row line. Leave one row/column
-    // of padding around the core; the fill passes operate on that padding too.
-    for r in 0..7 {
-        for c in 0..5 {
-            if rows[r] & (1 << (4 - c)) == 0 {
+    // 1. Exact source magnification. Leave one row/column of padding around the
+    // core; the fill passes operate on that padding too.
+    let oy = 1 + dy as i32 * mag;
+    for r in 0..7i32 {
+        for c in 0..5i32 {
+            if rows[r as usize] & (1 << (4 - c)) == 0 {
                 continue;
             }
-            let x0 = 1 + 2 * c;
-            let y0 = 1 + 2 * dy as i32 + 2 * r as i32;
-            for sy in 0..2 {
-                for sx in 0..2 {
+            let x0 = 1 + c * mag;
+            let y0 = oy + r * mag;
+            for sy in 0..mag {
+                for sx in 0..mag {
                     let y = y0 + sy;
                     let x = x0 + sx;
-                    if (0..CELL_H).contains(&y) && (0..CELL_W).contains(&x) {
-                        base[y as usize][x as usize] = 3;
+                    if y >= 0 && x >= 0 && y < h && x < w {
+                        levels[y as usize][x as usize] = 3;
                     }
                 }
             }
         }
     }
 
-    // Three sequential additive passes. Each pass counts any non-empty
-    // (100/66/33) 4-neighbor, and writes its result simultaneously.
-    let mut levels = base;
-    levels = fill_pass(&levels, 1, 3);
-    levels = fill_pass(&levels, 1, 2);
-    levels = fill_pass(&levels, 0, 1);
+    // 2-4. Three sequential additive passes.
+    fill_pass(&mut levels, w, h, 1, 3);
+    fill_pass(&mut levels, w, h, 1, 2);
+    fill_pass(&mut levels, w, h, 0, 1);
 
-    // Pack 12 pixels x 2 bits into three bytes per row.
-    let mut packed = [0u8; GLYPH_BYTES];
-    for y in 0..CELL_H as usize {
-        for x in 0..CELL_W as usize {
-            packed[y * ROW_BYTES + x / 4] |= levels[y][x] << (6 - 2 * (x % 4));
+    // 5. Pack 2 bits per pixel.
+    let rb = row_bytes(step);
+    let mut packed = [0u8; MAX_BYTES];
+    for y in 0..h as usize {
+        for x in 0..w as usize {
+            packed[y * rb + x / 4] |= levels[y][x] << (6 - 2 * (x % 4));
         }
     }
 
-    let mut lsb = 12u8;
+    // 6. Proportional metrics.
+    let mut lsb = w as u8;
     let mut right = 0u8;
-    for x in 0..CELL_W as usize {
-        let used = (0..CELL_H as usize).any(|y| levels[y][x] != 0);
+    for x in 0..w as usize {
+        let used = (0..h as usize).any(|y| levels[y][x] != 0);
         if used {
-            if lsb == 12 {
+            if lsb == w as u8 {
                 lsb = x as u8;
             }
             right = x as u8;
         }
     }
-    let ink = if lsb == 12 { 0 } else { right - lsb + 1 };
+    let ink = if lsb == w as u8 { 0 } else { right - lsb + 1 };
+
     (packed, lsb, ink)
 }
 
-fn ensure(index: u16, rows: &[u8; 7], dy: u8) {
+fn ensure(index: u16, rows: &[u8; 7], dy: u8, step: usize) {
     let i = index as usize;
     if index == MISSING_INDEX || i >= COUNT {
         return;
     }
     unsafe {
-        if !(*CACHE.valid.get())[i] {
-            let (packed, lsb, ink) = generate(rows, dy);
-            (*CACHE.masks.get())[i] = packed;
-            (*CACHE.lsb.get())[i] = lsb;
-            (*CACHE.ink.get())[i] = ink;
-            (*CACHE.valid.get())[i] = true;
+        if !(*CACHE.valid.get())[i][step] {
+            let (packed, lsb, ink) = generate(rows, dy, step);
+            (*CACHE.masks.get())[i][step] = packed;
+            (*CACHE.lsb.get())[i][step] = lsb;
+            (*CACHE.ink.get())[i][step] = ink;
+            (*CACHE.valid.get())[i][step] = true;
         }
     }
 }
 
-/// Get (or lazily generate) the packed 12x19-line mask for a source glyph.
-pub fn glyph(index: u16, rows: &[u8; 7], dy: u8) -> &'static [u8; GLYPH_BYTES] {
-    if index == MISSING_INDEX || index as usize >= COUNT {
+/// Get (or lazily generate) the packed mask for a glyph at a ladder step.
+pub fn glyph(index: u16, rows: &[u8; 7], dy: u8, step: usize) -> &'static [u8; MAX_BYTES] {
+    if index == MISSING_INDEX || index as usize >= COUNT || step >= STEPS {
         return &EMPTY;
     }
-    ensure(index, rows, dy);
-    unsafe { &(*CACHE.masks.get())[index as usize] }
+    ensure(index, rows, dy, step);
+    unsafe { &(*CACHE.masks.get())[index as usize][step] }
 }
 
-/// Cached ink width of the smoothed mask, used for proportional spacing.
-pub fn ink_width(index: u16, rows: &[u8; 7], dy: u8) -> u8 {
-    if index == MISSING_INDEX || index as usize >= COUNT {
+/// Cached ink width of the mask at a step.
+pub fn ink_width(index: u16, rows: &[u8; 7], dy: u8, step: usize) -> u8 {
+    if index == MISSING_INDEX || index as usize >= COUNT || step >= STEPS {
         return 0;
     }
-    ensure(index, rows, dy);
-    unsafe { (*CACHE.ink.get())[index as usize] }
+    ensure(index, rows, dy, step);
+    unsafe { (*CACHE.ink.get())[index as usize][step] }
 }
 
-/// Cached left bearing of the smoothed mask.
-pub fn left_bearing(index: u16, rows: &[u8; 7], dy: u8) -> u8 {
-    if index == MISSING_INDEX || index as usize >= COUNT {
+/// Cached left bearing of the mask at a step.
+pub fn left_bearing(index: u16, rows: &[u8; 7], dy: u8, step: usize) -> u8 {
+    if index == MISSING_INDEX || index as usize >= COUNT || step >= STEPS {
         return 0;
     }
-    ensure(index, rows, dy);
-    unsafe { (*CACHE.lsb.get())[index as usize] }
+    ensure(index, rows, dy, step);
+    unsafe { (*CACHE.lsb.get())[index as usize][step] }
 }
 
 #[cfg(test)]
@@ -182,33 +223,52 @@ mod tests {
     use super::*;
 
     #[test]
-    fn x_is_filled_and_still_has_solid_core() {
+    fn ladder_cells_are_expected() {
+        assert_eq!((cell_w(0), cell_h(0)), (12, 19));
+        assert_eq!((cell_w(1), cell_h(1)), (17, 28));
+        assert_eq!((cell_w(2), cell_h(2)), (22, 37));
+        assert_eq!(row_bytes(0), 3);
+        assert_eq!(row_bytes(1), 5);
+        assert_eq!(row_bytes(2), 6);
+    }
+
+    #[test]
+    fn x_masks_keep_three_levels() {
         let g = glyph::lookup_fiveseven('X' as u32).unwrap();
-        let m = glyph(g.index, g.rows, g.dy);
-        let mut solid = 0;
-        let mut level2 = 0;
-        let mut level1 = 0;
-        for &b in m.iter() {
-            for shift in [6, 4, 2, 0] {
-                match (b >> shift) & 0x3 {
-                    3 => solid += 1,
-                    2 => level2 += 1,
-                    1 => level1 += 1,
-                    _ => {}
+        for step in 0..STEPS {
+            let m = glyph(g.index, g.rows, g.dy, step);
+            let w = cell_w(step);
+            let h = cell_h(step);
+            let (mut solid, mut mid, mut low) = (0, 0, 0);
+            for y in 0..h {
+                for x in 0..w {
+                    match unpack(m, step, x, y) {
+                        3 => solid += 1,
+                        2 => mid += 1,
+                        1 => low += 1,
+                        _ => {}
+                    }
                 }
             }
+            assert!(solid > 0, "step {} solid", step);
+            assert!(mid > 0, "step {} mid", step);
+            assert!(low > 0, "step {} low", step);
         }
-        assert!(solid > 0, "X must retain full-coverage pixels");
-        assert!(level2 > 0, "X must receive 66% fill pixels");
-        assert!(level1 > 0, "X must receive 33% fill pixels");
     }
 
     #[test]
     fn mask_cache_is_stable() {
         let g = glyph::lookup_fiveseven('g' as u32).unwrap();
-        let a = *glyph(g.index, g.rows, g.dy);
-        let b = *glyph(g.index, g.rows, g.dy);
+        let a = *glyph(g.index, g.rows, g.dy, 1);
+        let b = *glyph(g.index, g.rows, g.dy, 1);
         assert_eq!(a, b);
-        assert!(ink_width(g.index, g.rows, g.dy) > 0);
+        assert!(ink_width(g.index, g.rows, g.dy, 1) > 0);
+    }
+
+    #[test]
+    fn steps_match_magnification() {
+        assert_eq!(step_for_scale(1), 0);
+        assert_eq!(step_for_scale(2), 1);
+        assert_eq!(step_for_scale(3), 2);
     }
 }

@@ -96,20 +96,46 @@ pub fn effective_scale(scale: i32) -> i32 {
 }
 
 pub fn glyph_height(scale: i32) -> i32 {
-    metrics().cell_h * effective_scale(scale)
+    match glyph::family() {
+        FontFamily::FiveSeven => metrics().cell_h * effective_scale(scale),
+        FontFamily::TwelveSixteen => smooth::cell_h(smooth::step_for_scale(effective_scale(scale))),
+    }
 }
 
 pub fn line_height(scale: i32) -> i32 {
-    metrics().line_h * effective_scale(scale)
+    match glyph::family() {
+        FontFamily::FiveSeven => metrics().line_h * effective_scale(scale),
+        FontFamily::TwelveSixteen => smooth::cell_h(smooth::step_for_scale(effective_scale(scale))),
+    }
 }
 
 pub fn char_advance(scale: i32) -> i32 {
     let f = glyph::family();
-    (metrics_for(f).cell_w + 1) * effective_scale_for(f, scale)
+    match f {
+        FontFamily::FiveSeven => (metrics_for(f).cell_w + 1) * effective_scale_for(f, scale),
+        FontFamily::TwelveSixteen => {
+            smooth::cell_w(smooth::step_for_scale(effective_scale_for(f, scale))) + 1
+        }
+    }
 }
 
 pub fn inline_icon(scale: i32) -> i32 {
-    metrics().inline_icon * effective_scale(scale)
+    match glyph::family() {
+        FontFamily::FiveSeven => metrics().inline_icon * effective_scale(scale),
+        FontFamily::TwelveSixteen => smooth::cell_w(smooth::step_for_scale(effective_scale(scale))),
+    }
+}
+
+/// Native cell size (width, height) for a family at a native scale.
+pub fn native_cell(family: FontFamily, scale: i32) -> (i32, i32) {
+    let s = scale.max(1);
+    match family {
+        FontFamily::FiveSeven => (GLYPH_W * s, GLYPH_H * s),
+        FontFamily::TwelveSixteen => {
+            let step = smooth::step_for_scale(s);
+            (smooth::cell_w(step), smooth::cell_h(step))
+        }
+    }
 }
 
 /// Extensible descriptor for a character block / locale font sheet.
@@ -171,7 +197,13 @@ pub fn text_width_for(family: FontFamily, s: &str, scale: i32) -> i32 {
     if cells <= 0 {
         0
     } else {
-        cells * (metrics_for(family).cell_w + 1) * eff - eff
+        match family {
+            FontFamily::FiveSeven => cells * (metrics_for(family).cell_w + 1) * eff - eff,
+            FontFamily::TwelveSixteen => {
+                let step = smooth::step_for_scale(eff);
+                cells * (smooth::cell_w(step) + 1) - 1
+            }
+        }
     }
 }
 
@@ -189,17 +221,34 @@ fn prop_advance_units(family: FontFamily, g: &Glyph) -> i32 {
         Glyph::Text(t) if t.ink_w == 0 => blank_advance(family),
         Glyph::Text(t) => match family {
             FontFamily::FiveSeven => t.ink_w as i32 + 1,
-            FontFamily::TwelveSixteen => smooth::ink_width(t.index, t.rows, t.dy) as i32 + 1,
+            FontFamily::TwelveSixteen => smooth::ink_width(t.index, t.rows, t.dy, 0) as i32 + 1,
         },
         Glyph::Icon(_) => metrics_for(family).inline_icon + 1,
         Glyph::Missing => metrics_for(family).cell_w + 1,
     }
 }
 
+/// Proportional advance in pixels at the requested scale.
+fn prop_advance_px(family: FontFamily, g: &Glyph, scale: i32) -> i32 {
+    let eff = effective_scale_for(family, scale);
+    match family {
+        FontFamily::FiveSeven => prop_advance_units(family, g) * eff,
+        FontFamily::TwelveSixteen => {
+            let step = smooth::step_for_scale(eff);
+            match g {
+                Glyph::Text(t) if t.ink_w == 0 => blank_advance(family),
+                Glyph::Text(t) => smooth::ink_width(t.index, t.rows, t.dy, step) as i32 + 1,
+                Glyph::Icon(_) => smooth::cell_w(step) + 1,
+                Glyph::Missing => smooth::cell_w(step) + 1,
+            }
+        }
+    }
+}
+
 /// Proportional advance of a single character at `scale`.
 pub fn char_advance_prop(ch: char, scale: i32) -> i32 {
     let f = glyph::family();
-    prop_advance_units(f, &glyph::resolve(ch as u32)) * effective_scale_for(f, scale)
+    prop_advance_px(f, &glyph::resolve(ch as u32), scale)
 }
 
 /// Proportional string width in pixels (no trailing gap).
@@ -209,14 +258,17 @@ pub fn text_width_prop(s: &str, scale: i32) -> i32 {
 }
 
 pub fn text_width_prop_for(family: FontFamily, s: &str, scale: i32) -> i32 {
-    let units: i32 = s
+    let sum: i32 = s
         .chars()
-        .map(|c| prop_advance_units(family, &glyph::resolve_for(family, c as u32)))
+        .map(|c| prop_advance_px(family, &glyph::resolve_for(family, c as u32), scale))
         .sum();
-    if units <= 0 {
+    if sum <= 0 {
         0
     } else {
-        units * effective_scale_for(family, scale) - effective_scale_for(family, scale)
+        match family {
+            FontFamily::FiveSeven => sum - effective_scale_for(family, scale),
+            FontFamily::TwelveSixteen => sum - 1,
+        }
     }
 }
 
@@ -280,7 +332,13 @@ pub fn text_width_native(family: FontFamily, s: &str, scale: i32) -> i32 {
     if cells <= 0 {
         0
     } else {
-        cells * (metrics_for(family).cell_w + 1) * scale - scale
+        match family {
+            FontFamily::FiveSeven => cells * (metrics_for(family).cell_w + 1) * scale - scale,
+            FontFamily::TwelveSixteen => {
+                let step = smooth::step_for_scale(scale);
+                cells * (smooth::cell_w(step) + 1) - 1
+            }
+        }
     }
 }
 
@@ -405,7 +463,10 @@ fn draw_str_prop_styled_impl(
         let g = glyph::resolve_for(family, ch as u32);
         match g {
             Glyph::Icon(i) => {
-                let sz = metrics_for(family).inline_icon * scale;
+                let sz = match family {
+                    FontFamily::FiveSeven => metrics_for(family).inline_icon * scale,
+                    FontFamily::TwelveSixteen => smooth::cell_w(smooth::step_for_scale(scale)),
+                };
                 glyph::draw_icon_index(fb, x, y, i, sz, color);
             }
             Glyph::Text(t) => {
@@ -425,7 +486,7 @@ fn draw_str_prop_styled_impl(
                 );
             }
         }
-        x += prop_advance_units(family, &g) * scale;
+        x += prop_advance_px(family, &g, scale);
     }
 }
 
@@ -539,32 +600,27 @@ fn draw_text_glyph(
             }
         }
         FontFamily::TwelveSixteen => {
-            let mask = smooth::glyph(t.index, t.rows, t.dy);
+            let step = smooth::step_for_scale(scale);
+            let w = smooth::cell_w(step);
+            let h = smooth::cell_h(step);
+            let mask = smooth::glyph(t.index, t.rows, t.dy, step);
             let trim = if proportional {
-                smooth::left_bearing(t.index, t.rows, t.dy) as i32
+                smooth::left_bearing(t.index, t.rows, t.dy, step) as i32
             } else {
                 0
             };
-            for row in 0..smooth::CELL_H {
+            let bold_extra = i32::from(style == FontStyle::Bold);
+            for row in 0..h {
                 let shear_dx = match style {
-                    FontStyle::Italic => ((15 - row) * scale) / 8,
+                    FontStyle::Italic => ((h - row) * 2) / 16,
                     _ => 0,
                 };
-                for col in 0..smooth::CELL_W {
-                    let level = (mask[(row as usize) * smooth::ROW_BYTES + (col as usize) / 4]
-                        >> (6 - 2 * ((col as usize) % 4)))
-                        & 0x3;
+                for col in 0..w {
+                    let level = smooth::unpack(mask, step, col, row);
                     if level != 0 {
-                        let px = x + (col - trim) * scale + shear_dx;
-                        let py = y + row * scale;
-                        fb.blend(
-                            px,
-                            py,
-                            dot_size + bold_extra,
-                            dot_size,
-                            color,
-                            level as u32 * 85,
-                        );
+                        let px = x + col - trim + shear_dx;
+                        let py = y + row;
+                        fb.blend(px, py, 1 + bold_extra, 1, color, level as u32 * 85);
                     }
                 }
             }
@@ -572,13 +628,27 @@ fn draw_text_glyph(
     }
 
     if style == FontStyle::Underline {
-        let w = if proportional {
-            prop_advance_units(family, &Glyph::Text(*t))
-        } else {
-            metrics.cell_w + 1
-        };
-        let ul_y = y + metrics.cell_h * scale + (scale / 2).max(1);
-        fb.fill(x, ul_y, w * scale, scale.max(1), color);
+        match family {
+            FontFamily::FiveSeven => {
+                let w = if proportional {
+                    prop_advance_units(family, &Glyph::Text(*t))
+                } else {
+                    metrics.cell_w + 1
+                };
+                let ul_y = y + metrics.cell_h * scale + (scale / 2).max(1);
+                fb.fill(x, ul_y, w * scale, scale.max(1), color);
+            }
+            FontFamily::TwelveSixteen => {
+                let step = smooth::step_for_scale(scale);
+                let w = if proportional {
+                    smooth::ink_width(t.index, t.rows, t.dy, step) as i32 + 1
+                } else {
+                    smooth::cell_w(step) + 1
+                };
+                let ul_y = y + smooth::cell_h(step) + 1;
+                fb.fill(x, ul_y, w, 1, color);
+            }
+        }
     }
 }
 
@@ -656,20 +726,22 @@ mod tests {
     #[test]
     fn smooth_mask_uses_2bit_fill_levels() {
         let g = glyph::lookup_fiveseven('A' as u32).unwrap();
-        let mask = smooth::glyph(g.index, g.rows, g.dy);
-        let mut solid = 0;
-        let mut mid = 0;
-        for &b in mask.iter() {
-            for shift in [6, 4, 2, 0] {
-                match (b >> shift) & 0x3 {
-                    3 => solid += 1,
-                    1 | 2 => mid += 1,
-                    _ => {}
+        for step in 0..smooth::STEPS {
+            let mask = smooth::glyph(g.index, g.rows, g.dy, step);
+            let mut solid = 0;
+            let mut mid = 0;
+            for y in 0..smooth::cell_h(step) {
+                for x in 0..smooth::cell_w(step) {
+                    match smooth::unpack(mask, step, x, y) {
+                        3 => solid += 1,
+                        1 | 2 => mid += 1,
+                        _ => {}
+                    }
                 }
             }
+            assert!(solid > 0, "step {}", step);
+            assert!(mid > 0, "step {}", step);
         }
-        assert!(solid > 0);
-        assert!(mid > 0);
     }
 
     #[test]

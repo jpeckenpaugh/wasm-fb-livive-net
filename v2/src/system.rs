@@ -828,12 +828,11 @@ fn draw_fonts(fb: &mut Framebuffer) {
             (4, "4x (20x28)"),
             (5, "5x (25x35)"),
         ],
-        FontFamily::TwelveSixteen => &[(1, "1x (12x16)"), (2, "2x (24x32)"), (3, "3x (36x48)")],
+        FontFamily::TwelveSixteen => &[(1, "1x (12x19)"), (2, "2x (17x28)"), (3, "3x (22x37)")],
     };
     let scale_gap = if compact { 8 } else { 14 };
-    let native_metrics = font::metrics_for(font::family());
     for &(sc, label) in scales {
-        let row_h = native_metrics.cell_h * sc;
+        let row_h = font::native_cell(font::family(), sc).1;
         if y_scale + row_h > fb.h - 80 && sc > 1 {
             break;
         }
