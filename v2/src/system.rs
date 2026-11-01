@@ -828,11 +828,25 @@ fn draw_fonts(fb: &mut Framebuffer) {
             (4, "4x (20x28)"),
             (5, "5x (25x35)"),
         ],
-        FontFamily::TwelveSixteen => &[(1, "1x (12x19)"), (2, "2x (17x28)"), (3, "3x (22x37)")],
+        FontFamily::TwelveSixteen => &[
+            (1, "1x (12x19)"),
+            (2, "2x (17x28)"),
+            (3, "3x (22x37)"),
+            (4, "4x (27x46)"),
+            (5, "5x (32x55)"),
+            (6, "6x (37x64)"),
+            (7, "7x (42x73)"),
+            (8, "8x (47x82)"),
+        ],
     };
     let scale_gap = if compact { 8 } else { 14 };
     for &(sc, label) in scales {
-        let row_h = font::native_cell(font::family(), sc).1;
+        let smooth_big = font::family() == FontFamily::TwelveSixteen && sc >= 4;
+        let row_h = if smooth_big {
+            crate::smooth::cell_h(sc as usize - 1)
+        } else {
+            font::native_cell(font::family(), sc).1
+        };
         if y_scale + row_h > fb.h - 80 && sc > 1 {
             break;
         }
@@ -844,15 +858,26 @@ fn draw_fonts(fb: &mut Framebuffer) {
             body_scale,
             label_col,
         );
-        draw_str_native(
-            fb,
-            font::family(),
-            x0 + val_off,
-            y_scale,
-            "Aa 0123",
-            sc,
-            val_col,
-        );
+        if smooth_big {
+            font::draw_str_smooth_step(
+                fb,
+                x0 + val_off,
+                y_scale,
+                "Aa 0123",
+                sc as usize - 1,
+                val_col,
+            );
+        } else {
+            draw_str_native(
+                fb,
+                font::family(),
+                x0 + val_off,
+                y_scale,
+                "Aa 0123",
+                sc,
+                val_col,
+            );
+        }
         y_scale += row_h + scale_gap;
     }
     fb.fill(x0, y_scale - 2, w, 1, rule_col);

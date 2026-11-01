@@ -22,12 +22,45 @@
 use crate::glyph;
 use core::cell::UnsafeCell;
 
-/// Number of ladder steps (2x, 3x, 4x magnification).
-pub const STEPS: usize = 3;
+/// Number of ladder steps: 1x .. 8x labels, magnification 2 .. 9.
+pub const STEPS: usize = 8;
+/// Steps 0..2 keep the original 2-bit masks; 3..7 are 8-bit.
+const LEGACY_STEPS: usize = 3;
 const MAX_W: usize = 22;
 const MAX_H: usize = 37;
 const MAX_RB: usize = 6;
 pub const MAX_BYTES: usize = MAX_H * MAX_RB; // 222
+
+/// Extended (4x..8x) masks are bytes, up to 47x82.
+const BIG_W: usize = 47;
+const BIG_H: usize = 82;
+const BIG_MAX: usize = BIG_W * BIG_H;
+const BIG_SLOTS: usize = 12;
+
+#[derive(Clone, Copy)]
+struct BigSlot {
+    data: [u8; BIG_MAX],
+    key: u32,
+    len: u32,
+    age: u32,
+}
+
+impl BigSlot {
+    const EMPTY: Self = BigSlot {
+        data: [0u8; BIG_MAX],
+        key: 0,
+        len: 0,
+        age: 0,
+    };
+}
+
+struct BigCache(UnsafeCell<[BigSlot; BIG_SLOTS]>);
+unsafe impl Sync for BigCache {}
+struct BigTick(UnsafeCell<u32>);
+unsafe impl Sync for BigTick {}
+
+static BIG: BigCache = BigCache(UnsafeCell::new([BigSlot::EMPTY; BIG_SLOTS]));
+static BIG_TICK: BigTick = BigTick(UnsafeCell::new(0));
 
 const COUNT: usize = glyph::FIVESEVEN_GLYPH_COUNT;
 const MISSING_INDEX: u16 = u16::MAX;
@@ -65,6 +98,14 @@ pub fn magnification(step: usize) -> i32 {
     step as i32 + 2
 }
 
+pub fn cell_w_ext(step: usize) -> i32 {
+    cell_w(step)
+}
+
+pub fn cell_h_ext(step: usize) -> i32 {
+    cell_h(step)
+}
+
 pub fn cell_w(step: usize) -> i32 {
     5 * magnification(step) + 2
 }
@@ -83,8 +124,13 @@ pub fn descent(step: usize) -> i32 {
 
 #[inline]
 pub fn unpack(mask: &[u8], step: usize, x: i32, y: i32) -> u8 {
-    let rb = row_bytes(step);
-    (mask[y as usize * rb + x as usize / 4] >> (6 - 2 * ((x as usize) % 4))) & 0x3
+    if step < LEGACY_STEPS {
+        let rb = row_bytes(step);
+        let v = (mask[y as usize * rb + x as usize / 4] >> (6 - 2 * ((x as usize) % 4))) & 0x3;
+        v * 85
+    } else {
+        mask[y as usize * cell_w(step) as usize + x as usize]
+    }
 }
 
 fn fill_pass(levels: &mut [[u8; MAX_W]; MAX_H], w: i32, h: i32, threshold: u8, value: u8) {
@@ -192,12 +238,16 @@ fn ensure(index: u16, rows: &[u8; 7], dy: u8, step: usize) {
 }
 
 /// Get (or lazily generate) the packed mask for a glyph at a ladder step.
-pub fn glyph(index: u16, rows: &[u8; 7], dy: u8, step: usize) -> &'static [u8; MAX_BYTES] {
+pub fn glyph(index: u16, rows: &[u8; 7], dy: u8, step: usize) -> &'static [u8] {
     if index == MISSING_INDEX || index as usize >= COUNT || step >= STEPS {
         return &EMPTY;
     }
-    ensure(index, rows, dy, step);
-    unsafe { &(*CACHE.masks.get())[index as usize][step] }
+    if step < LEGACY_STEPS {
+        ensure(index, rows, dy, step);
+        unsafe { &(*CACHE.masks.get())[index as usize][step] }
+    } else {
+        big_glyph(index, rows, dy, step)
+    }
 }
 
 /// Cached ink width of the mask at a step.
@@ -205,7 +255,11 @@ pub fn ink_width(index: u16, rows: &[u8; 7], dy: u8, step: usize) -> u8 {
     if index == MISSING_INDEX || index as usize >= COUNT || step >= STEPS {
         return 0;
     }
-    ensure(index, rows, dy, step);
+    if step < LEGACY_STEPS {
+        ensure(index, rows, dy, step);
+    } else {
+        let _ = big_glyph(index, rows, dy, step);
+    }
     unsafe { (*CACHE.ink.get())[index as usize][step] }
 }
 
@@ -214,8 +268,199 @@ pub fn left_bearing(index: u16, rows: &[u8; 7], dy: u8, step: usize) -> u8 {
     if index == MISSING_INDEX || index as usize >= COUNT || step >= STEPS {
         return 0;
     }
-    ensure(index, rows, dy, step);
+    if step < LEGACY_STEPS {
+        ensure(index, rows, dy, step);
+    } else {
+        let _ = big_glyph(index, rows, dy, step);
+    }
     unsafe { (*CACHE.lsb.get())[index as usize][step] }
+}
+
+fn ramp(step: usize) -> &'static [u8] {
+    match step {
+        3 => &[255, 191, 128, 64],
+        4 => &[255, 204, 153, 102, 51],
+        5 | 6 => &[255, 212, 170, 128, 85, 43],
+        _ => &[255, 219, 182, 146, 109, 73, 36],
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn fill_big(
+    levels: &mut [[u8; BIG_W]; BIG_H],
+    outside: &[[bool; BIG_W]; BIG_H],
+    w: i32,
+    h: i32,
+    threshold: u8,
+    value: u8,
+) {
+    let mut out = *levels;
+    for y in 0..h as usize {
+        for x in 0..w as usize {
+            if levels[y][x] != 0 || !outside[y][x] {
+                continue;
+            }
+            let mut n = 0u8;
+            if x > 0 && levels[y][x - 1] != 0 {
+                n += 1;
+            }
+            if x + 1 < w as usize && levels[y][x + 1] != 0 {
+                n += 1;
+            }
+            if y > 0 && levels[y - 1][x] != 0 {
+                n += 1;
+            }
+            if y + 1 < h as usize && levels[y + 1][x] != 0 {
+                n += 1;
+            }
+            if n > threshold {
+                out[y][x] = value;
+            }
+        }
+    }
+    *levels = out;
+}
+
+/// 8-bit generator for steps 3..7 (4x..8x). Rings are gated to cells reachable
+/// from the border so counters stay open.
+#[allow(clippy::needless_range_loop)]
+fn generate_big(rows: &[u8; 7], dy: u8, step: usize) -> ([u8; BIG_MAX], usize, u8, u8) {
+    let mag = magnification(step);
+    let w = cell_w(step);
+    let h = cell_h(step);
+    let mut levels = [[0u8; BIG_W]; BIG_H];
+
+    let oy = 1 + dy as i32 * mag;
+    for r in 0..7i32 {
+        for c in 0..5i32 {
+            if rows[r as usize] & (1 << (4 - c)) == 0 {
+                continue;
+            }
+            let x0 = 1 + c * mag;
+            let y0 = oy + r * mag;
+            for sy in 0..mag {
+                for sx in 0..mag {
+                    let y = y0 + sy;
+                    let x = x0 + sx;
+                    if y >= 0 && x >= 0 && y < h && x < w {
+                        levels[y as usize][x as usize] = 255;
+                    }
+                }
+            }
+        }
+    }
+
+    // Outside mask (border-connected empty cells).
+    let mut outside = [[false; BIG_W]; BIG_H];
+    let mut stack = [(0usize, 0usize); BIG_MAX];
+    let mut top = 0usize;
+    let mut push = |x: usize,
+                    y: usize,
+                    stack: &mut [(usize, usize); BIG_MAX],
+                    top: &mut usize,
+                    outside: &mut [[bool; BIG_W]; BIG_H]| {
+        if levels[y][x] == 0 && !outside[y][x] {
+            outside[y][x] = true;
+            stack[*top] = (x, y);
+            *top += 1;
+        }
+    };
+    for x in 0..w as usize {
+        push(x, 0, &mut stack, &mut top, &mut outside);
+        push(x, h as usize - 1, &mut stack, &mut top, &mut outside);
+    }
+    for y in 0..h as usize {
+        push(0, y, &mut stack, &mut top, &mut outside);
+        push(w as usize - 1, y, &mut stack, &mut top, &mut outside);
+    }
+    while top > 0 {
+        top -= 1;
+        let (x, y) = stack[top];
+        let nbrs = [
+            (x.wrapping_sub(1), y),
+            (x + 1, y),
+            (x, y.wrapping_sub(1)),
+            (x, y + 1),
+        ];
+        for (nx, ny) in nbrs {
+            if nx < w as usize && ny < h as usize && !outside[ny][nx] && levels[ny][nx] == 0 {
+                outside[ny][nx] = true;
+                stack[top] = (nx, ny);
+                top += 1;
+            }
+        }
+    }
+
+    let values = ramp(step);
+    fill_big(&mut levels, &outside, w, h, 1, values[0]);
+    fill_big(&mut levels, &outside, w, h, 1, values[1]);
+    for &v in &values[2..] {
+        fill_big(&mut levels, &outside, w, h, 0, v);
+    }
+
+    let mut mask = [0u8; BIG_MAX];
+    let len = (w * h) as usize;
+    for y in 0..h as usize {
+        for x in 0..w as usize {
+            mask[y * w as usize + x] = levels[y][x];
+        }
+    }
+
+    let mut lsb = w as u8;
+    let mut right = 0u8;
+    for x in 0..w as usize {
+        if (0..h as usize).any(|y| mask[y * w as usize + x] != 0) {
+            if lsb == w as u8 {
+                lsb = x as u8;
+            }
+            right = x as u8;
+        }
+    }
+    let ink = if lsb == w as u8 { 0 } else { right - lsb + 1 };
+    (mask, len, lsb, ink)
+}
+
+fn big_glyph(index: u16, rows: &[u8; 7], dy: u8, step: usize) -> &'static [u8] {
+    let key = ((index as u32) << 4) | (step as u32 + 1);
+    unsafe {
+        let tick = {
+            let t = &mut *BIG_TICK.0.get();
+            *t = t.wrapping_add(1);
+            *t
+        };
+        let slots = &mut *BIG.0.get();
+        let mut found: Option<usize> = None;
+        let mut victim = 0usize;
+        let mut oldest = u32::MAX;
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..BIG_SLOTS {
+            if slots[i].key == key {
+                found = Some(i);
+            }
+            if slots[i].age < oldest {
+                oldest = slots[i].age;
+                victim = i;
+            }
+        }
+        let idx = match found {
+            Some(i) => {
+                slots[i].age = tick;
+                i
+            }
+            None => {
+                let (mask, len, lsb, ink) = generate_big(rows, dy, step);
+                let slot = &mut slots[victim];
+                slot.key = key;
+                slot.len = len as u32;
+                slot.age = tick;
+                slot.data[..len].copy_from_slice(&mask[..len]);
+                (*CACHE.lsb.get())[index as usize][step] = lsb;
+                (*CACHE.ink.get())[index as usize][step] = ink;
+                victim
+            }
+        };
+        &slots[idx].data[..slots[idx].len as usize]
+    }
 }
 
 #[cfg(test)]
@@ -239,28 +484,26 @@ mod tests {
             let m = glyph(g.index, g.rows, g.dy, step);
             let w = cell_w(step);
             let h = cell_h(step);
-            let (mut solid, mut mid, mut low) = (0, 0, 0);
+            let (mut solid, mut mid) = (0, 0);
             for y in 0..h {
                 for x in 0..w {
                     match unpack(m, step, x, y) {
-                        3 => solid += 1,
-                        2 => mid += 1,
-                        1 => low += 1,
-                        _ => {}
+                        255 => solid += 1,
+                        0 => {}
+                        _ => mid += 1,
                     }
                 }
             }
             assert!(solid > 0, "step {} solid", step);
             assert!(mid > 0, "step {} mid", step);
-            assert!(low > 0, "step {} low", step);
         }
     }
 
     #[test]
     fn mask_cache_is_stable() {
         let g = glyph::lookup_fiveseven('g' as u32).unwrap();
-        let a = *glyph(g.index, g.rows, g.dy, 1);
-        let b = *glyph(g.index, g.rows, g.dy, 1);
+        let a = glyph(g.index, g.rows, g.dy, 1).to_vec();
+        let b = glyph(g.index, g.rows, g.dy, 1).to_vec();
         assert_eq!(a, b);
         assert!(ink_width(g.index, g.rows, g.dy, 1) > 0);
     }
@@ -270,5 +513,43 @@ mod tests {
         assert_eq!(step_for_scale(1), 0);
         assert_eq!(step_for_scale(2), 1);
         assert_eq!(step_for_scale(3), 2);
+        assert_eq!(magnification(3), 5);
+        assert_eq!(magnification(7), 9);
+        assert_eq!((cell_w(3), cell_h(3)), (27, 46));
+        assert_eq!((cell_w(7), cell_h(7)), (47, 82));
+    }
+
+    fn fnv(mask: &[u8]) -> u64 {
+        let mut h = 0xcbf2_9ce4_8422_2325u64;
+        for &b in mask.iter().take(222) {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        h
+    }
+
+    #[test]
+    fn legacy_masks_are_pinned() {
+        // Recorded from the approved 1x/2x/3x build. Any change here is a
+        // regression in the masks the user has already tuned by eye.
+        let pinned = [
+            ('A', 0, 8114468120287716712u64),
+            ('A', 1, 10191097592905013314),
+            ('A', 2, 3734492700330503937),
+            ('S', 0, 4610887887618203869),
+            ('S', 1, 555551942518664327),
+            ('S', 2, 12359185727515687505),
+            ('e', 0, 640295919539083458),
+            ('e', 1, 10347693170050180963),
+            ('e', 2, 2990073217798374973),
+            ('g', 0, 15416199664591670312),
+            ('g', 1, 4908155948678889052),
+            ('g', 2, 210272780627839880),
+        ];
+        for (ch, step, want) in pinned {
+            let g = glyph::lookup_fiveseven(ch as u32).unwrap();
+            let got = fnv(glyph(g.index, g.rows, g.dy, step));
+            assert_eq!(got, want, "mask drift for {} step {}", ch, step);
+        }
     }
 }

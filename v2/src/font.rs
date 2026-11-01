@@ -429,6 +429,37 @@ pub fn draw_str_prop_family(
     );
 }
 
+/// Draw a string with the smooth face at an explicit ladder step, 1:1.
+pub fn draw_str_smooth_step(
+    fb: &mut Framebuffer,
+    x: i32,
+    y: i32,
+    s: &str,
+    step: usize,
+    color: u32,
+) {
+    let color = theme::resolve(color);
+    let w = smooth::cell_w(step);
+    let h = smooth::cell_h(step);
+    let mut cx = x;
+    for ch in s.chars() {
+        if let Some(t) = glyph::lookup_fiveseven(ch as u32) {
+            let mask = smooth::glyph(t.index, t.rows, t.dy, step);
+            for row in 0..h {
+                for col in 0..w {
+                    let level = smooth::unpack(mask, step, col, row);
+                    if level != 0 {
+                        fb.blend(cx + col, y + row, 1, 1, color, level as u32);
+                    }
+                }
+            }
+            cx += w + 1;
+        } else {
+            cx += w + 1;
+        }
+    }
+}
+
 /// Proportional styled string: glyphs are drawn shifted left by their blank
 /// leading columns, then advance by ink width + 1 gap column.
 pub fn draw_str_prop_styled(
@@ -620,7 +651,7 @@ fn draw_text_glyph(
                     if level != 0 {
                         let px = x + col - trim + shear_dx;
                         let py = y + row;
-                        fb.blend(px, py, 1 + bold_extra, 1, color, level as u32 * 85);
+                        fb.blend(px, py, 1 + bold_extra, 1, color, level as u32);
                     }
                 }
             }
@@ -724,18 +755,17 @@ mod tests {
     }
 
     #[test]
-    fn smooth_mask_uses_2bit_fill_levels() {
+    fn smooth_mask_has_full_and_partial_coverage() {
         let g = glyph::lookup_fiveseven('A' as u32).unwrap();
         for step in 0..smooth::STEPS {
             let mask = smooth::glyph(g.index, g.rows, g.dy, step);
-            let mut solid = 0;
-            let mut mid = 0;
+            let (mut solid, mut mid) = (0, 0);
             for y in 0..smooth::cell_h(step) {
                 for x in 0..smooth::cell_w(step) {
                     match smooth::unpack(mask, step, x, y) {
-                        3 => solid += 1,
-                        1 | 2 => mid += 1,
-                        _ => {}
+                        255 => solid += 1,
+                        0 => {}
+                        _ => mid += 1,
                     }
                 }
             }
