@@ -28,6 +28,7 @@ pub const MAX_NAME_LEN: usize = 64;
 pub const MAX_TEXT_BYTES: usize = 768 * 1024;
 pub const MAX_CONTEXT_BYTES: usize = 4096;
 pub const WEB_META_BYTES: usize = 512;
+pub const OPEN_TARGET_BYTES: usize = 128;
 
 pub const CODE_CHUNK_LINES: usize = 30;
 
@@ -204,27 +205,38 @@ pub enum FilesFocus {
     FontInc,
     FontDec,
     Tts,
+    Open,
     Prev,
     Next,
 }
 
 impl FilesFocus {
-    pub const CONTROLS: [FilesFocus; 6] = [
+    pub const CONTROLS: [FilesFocus; 7] = [
         FilesFocus::Mode,
         FilesFocus::FontInc,
         FilesFocus::FontDec,
         FilesFocus::Tts,
+        FilesFocus::Open,
         FilesFocus::Prev,
         FilesFocus::Next,
     ];
 
-    pub fn next(self, paging: bool) -> Self {
+    pub fn next(self, paging: bool, open: bool) -> Self {
         match self {
             FilesFocus::Browser => FilesFocus::Mode,
             FilesFocus::Mode => FilesFocus::FontInc,
             FilesFocus::FontInc => FilesFocus::FontDec,
             FilesFocus::FontDec => FilesFocus::Tts,
             FilesFocus::Tts => {
+                if open {
+                    FilesFocus::Open
+                } else if paging {
+                    FilesFocus::Prev
+                } else {
+                    FilesFocus::Browser
+                }
+            }
+            FilesFocus::Open => {
                 if paging {
                     FilesFocus::Prev
                 } else {
@@ -236,11 +248,13 @@ impl FilesFocus {
         }
     }
 
-    pub fn prev(self, paging: bool) -> Self {
+    pub fn prev(self, paging: bool, open: bool) -> Self {
         match self {
             FilesFocus::Browser => {
                 if paging {
                     FilesFocus::Next
+                } else if open {
+                    FilesFocus::Open
                 } else {
                     FilesFocus::Tts
                 }
@@ -249,7 +263,14 @@ impl FilesFocus {
             FilesFocus::FontInc => FilesFocus::Mode,
             FilesFocus::FontDec => FilesFocus::FontInc,
             FilesFocus::Tts => FilesFocus::FontDec,
-            FilesFocus::Prev => FilesFocus::Tts,
+            FilesFocus::Open => FilesFocus::Tts,
+            FilesFocus::Prev => {
+                if open {
+                    FilesFocus::Open
+                } else {
+                    FilesFocus::Tts
+                }
+            }
             FilesFocus::Next => FilesFocus::Prev,
         }
     }
@@ -302,6 +323,9 @@ pub struct FilesApp {
     pub web_meta_len: usize,
     /// Guest asked the host to re-capture the site.
     pub web_refresh_requested: bool,
+    /// Symbolic `web/...` or `gh/...` target for the host to open externally.
+    pub open_target: [u8; OPEN_TARGET_BYTES],
+    pub open_target_len: usize,
     /// Per-mount staging error (`-1` if none).
     pub error_idx: i32,
     pub error_code: i32,
@@ -342,6 +366,8 @@ impl FilesApp {
             web_meta: [0; WEB_META_BYTES],
             web_meta_len: 0,
             web_refresh_requested: false,
+            open_target: [0; OPEN_TARGET_BYTES],
+            open_target_len: 0,
             error_idx: -1,
             error_code: 0,
         }
@@ -376,6 +402,8 @@ impl FilesApp {
         self.web_meta = [0; WEB_META_BYTES];
         self.web_meta_len = 0;
         self.web_refresh_requested = false;
+        self.open_target = [0; OPEN_TARGET_BYTES];
+        self.open_target_len = 0;
         self.error_idx = -1;
         self.error_code = 0;
     }
@@ -672,6 +700,86 @@ impl FilesApp {
             pos += 1;
         }
         core::str::from_utf8(&buf[..pos]).unwrap_or("https://")
+    }
+
+    pub fn can_open_selection(&self) -> bool {
+        if let Some(idx) = self.active_file_idx() {
+            let entry = &self.entries[idx];
+            if entry.is_web() || entry.is_gh() {
+                return true;
+            }
+        }
+        match self.level {
+            FolderLevel::WebSite | FolderLevel::GhRepo => true,
+            FolderLevel::WebRoot | FolderLevel::GhRoot => self.row_selected > 0,
+            _ => false,
+        }
+    }
+
+    fn set_open_target(&mut self, bytes: &[u8]) -> bool {
+        if bytes.is_empty() {
+            return false;
+        }
+        let len = bytes.len().min(OPEN_TARGET_BYTES);
+        self.open_target[..len].copy_from_slice(&bytes[..len]);
+        self.open_target_len = len;
+        true
+    }
+
+    /// Build the symbolic target for the current selection. The host validates
+    /// and resolves it; the guest never hands over an arbitrary URL.
+    pub fn request_open(&mut self) -> InputResult {
+        let mut buf = [0u8; OPEN_TARGET_BYTES];
+        let mut len = 0usize;
+        if let Some(idx) = self.active_file_idx() {
+            let entry = &self.entries[idx];
+            if entry.is_web() || entry.is_gh() {
+                let name = entry.name_str().as_bytes();
+                len = name.len().min(buf.len());
+                buf[..len].copy_from_slice(&name[..len]);
+            }
+        }
+        if len == 0 {
+            let prefix = |bytes: &[u8], buf: &mut [u8; OPEN_TARGET_BYTES], len: &mut usize| {
+                for &b in bytes {
+                    if *len < buf.len() {
+                        buf[*len] = b;
+                        *len += 1;
+                    }
+                }
+            };
+            match self.level {
+                FolderLevel::WebSite => {
+                    prefix(b"web/", &mut buf, &mut len);
+                    prefix(self.web_site_name().as_bytes(), &mut buf, &mut len);
+                }
+                FolderLevel::GhRepo => {
+                    prefix(b"gh/", &mut buf, &mut len);
+                    prefix(self.gh_repo_name().as_bytes(), &mut buf, &mut len);
+                }
+                FolderLevel::WebRoot if self.row_selected > 0 => {
+                    if let Some(site) = self.web_site_at(self.row_selected - 1) {
+                        prefix(b"web/", &mut buf, &mut len);
+                        prefix(site.as_bytes(), &mut buf, &mut len);
+                    }
+                }
+                FolderLevel::GhRoot if self.row_selected > 0 => {
+                    if let Some(repo) = self.gh_repo_at(self.row_selected - 1) {
+                        prefix(b"gh/", &mut buf, &mut len);
+                        prefix(repo.as_bytes(), &mut buf, &mut len);
+                    }
+                }
+                _ => {}
+            }
+        }
+        if len == 0 {
+            return InputResult::Noop;
+        }
+        if self.set_open_target(&buf[..len]) {
+            InputResult::Open
+        } else {
+            InputResult::Noop
+        }
     }
 
     pub fn complete_web_meta(&mut self, byte_len: usize) {
@@ -1277,6 +1385,7 @@ struct PreviewControls {
     ap: Rect,
     am: Rect,
     tts: Rect,
+    open: Option<Rect>,
     prev: Option<Rect>,
     next: Option<Rect>,
 }
@@ -1288,6 +1397,7 @@ impl PreviewControls {
             FilesFocus::FontInc => Some(self.ap),
             FilesFocus::FontDec => Some(self.am),
             FilesFocus::Tts => Some(self.tts),
+            FilesFocus::Open => self.open,
             FilesFocus::Prev => self.prev,
             FilesFocus::Next => self.next,
             FilesFocus::Browser => None,
@@ -1304,13 +1414,21 @@ fn show_paging(app: &FilesApp, is_image: bool) -> bool {
 struct ControlLabels {
     mode: &'static str,
     tts: &'static str,
+    open: &'static str,
     ap: &'static str,
     am: &'static str,
     prev: &'static str,
     next: &'static str,
 }
 
-fn control_labels(app: &FilesApp, compact: bool, narrow: bool) -> ControlLabels {
+fn control_labels(
+    app: &FilesApp,
+    compact: bool,
+    narrow: bool,
+    entry: &MountEntry,
+) -> ControlLabels {
+    let is_web = entry.is_web();
+    let is_gh = entry.is_gh();
     if compact {
         ControlLabels {
             mode: if app.context_mode {
@@ -1321,6 +1439,7 @@ fn control_labels(app: &FilesApp, compact: bool, narrow: bool) -> ControlLabels 
                 "Context"
             },
             tts: if app.tts_active { "Stop" } else { "TTS" },
+            open: if is_web || is_gh { "\u{2197}" } else { "" },
             ap: "A+",
             am: "A-",
             prev: "<",
@@ -1338,6 +1457,13 @@ fn control_labels(app: &FilesApp, compact: bool, narrow: bool) -> ControlLabels 
             } else {
                 "[\u{25b6} TTS ]"
             },
+            open: if is_web {
+                "[ \u{2197} Live ]"
+            } else if is_gh {
+                "[ \u{2197} GitHub ]"
+            } else {
+                ""
+            },
             ap: "[ A+ ]",
             am: "[ A- ]",
             prev: "[\u{25b2} Prev]",
@@ -1346,9 +1472,9 @@ fn control_labels(app: &FilesApp, compact: bool, narrow: bool) -> ControlLabels 
     }
 }
 
-fn preview_controls(app: &FilesApp, g: &FilesGeom, is_image: bool) -> PreviewControls {
+fn preview_controls(app: &FilesApp, g: &FilesGeom, entry: &MountEntry) -> PreviewControls {
     let compact = g.right_w < 620;
-    let labels = control_labels(app, compact, g.right_w < 420);
+    let labels = control_labels(app, compact, g.right_w < 420, entry);
     let mode_w = text_width(labels.mode, 2) + 12;
     let mode_x = g.right_x + g.right_w - mode_w - 12;
 
@@ -1360,10 +1486,20 @@ fn preview_controls(app: &FilesApp, g: &FilesGeom, is_image: bool) -> PreviewCon
     let tts_w = text_width(labels.tts, 2) + 10;
     let tts_x = am_x - tts_w - 8;
 
-    let (prev, next) = if show_paging(app, is_image) {
+    let has_open = entry.is_web() || entry.is_gh();
+    let open_w = if has_open { text_width(labels.open, 2) + 10 } else { 0 };
+    let open_x = tts_x - open_w - if has_open { 8 } else { 0 };
+    let open = if has_open {
+        Some(Rect::new(open_x, 8, open_w, 24))
+    } else {
+        None
+    };
+    let paging_right = open.map(|r| r.x).unwrap_or(tts_x);
+
+    let (prev, next) = if show_paging(app, entry.is_image()) {
         let next_w = text_width(labels.next, 2) + 8;
         let prev_w = text_width(labels.prev, 2) + 8;
-        let next_x = tts_x - next_w - 8;
+        let next_x = paging_right - next_w - 8;
         let prev_x = next_x - prev_w - 4;
         (
             Some(Rect::new(prev_x, 8, prev_w, 24)),
@@ -1378,6 +1514,7 @@ fn preview_controls(app: &FilesApp, g: &FilesGeom, is_image: bool) -> PreviewCon
         ap: Rect::new(ap_x, 8, ap_w, 24),
         am: Rect::new(am_x, 8, am_w, 24),
         tts: Rect::new(tts_x, 8, tts_w, 24),
+        open,
         prev,
         next,
     }
@@ -1392,10 +1529,13 @@ fn draw_preview_control_bar(
 ) {
     ui::toolbar(fb, Rect::new(g.right_x, 0, g.right_w, 40));
 
-    let c = preview_controls(app, g, entry.is_image());
+    let c = preview_controls(app, g, entry);
     let compact = g.right_w < 620;
-    let labels = control_labels(app, compact, g.right_w < 420);
+    let labels = control_labels(app, compact, g.right_w < 420, entry);
     let mut controls_left = c.mode.x.min(c.ap.x).min(c.am.x).min(c.tts.x);
+    if let Some(open) = c.open {
+        controls_left = controls_left.min(open.x);
+    }
     if let Some(prev) = c.prev {
         controls_left = controls_left.min(prev.x);
     }
@@ -1421,6 +1561,9 @@ fn draw_preview_control_bar(
         },
         1,
     );
+    if let Some(open) = c.open {
+        ui::button(fb, open, labels.open, ui::Tone::Accent, 1);
+    }
 
     if let (Some(prev), Some(next)) = (c.prev, c.next) {
         let total_lines = count_total_lines(&staged_text[..app.staged_text_len]);
@@ -1926,8 +2069,14 @@ pub fn click_window(
     // Right panel: shared control-bar geometry.
     if cx >= g.right_x && cy < 40 {
         if let Some(sel_idx) = app.active_file_idx() {
-            let c = preview_controls(app, &g, app.entries[sel_idx].is_image());
+            let c = preview_controls(app, &g, &app.entries[sel_idx]);
 
+            if let Some(open) = c.open {
+                if open.contains(cx, cy) {
+                    app.focus = FilesFocus::Open;
+                    return activate_control(app, FilesFocus::Open);
+                }
+            }
             if c.mode.contains(cx, cy) {
                 app.focus = FilesFocus::Mode;
                 return activate_control(app, FilesFocus::Mode);
@@ -1981,6 +2130,7 @@ fn activate_control(app: &mut FilesApp, focus: FilesFocus) -> InputResult {
             app.tts_active = !app.tts_active;
             InputResult::Tts
         }
+        FilesFocus::Open => app.request_open(),
         FilesFocus::Prev => {
             app.code_scroll = app.code_scroll.saturating_sub(CODE_CHUNK_LINES);
             InputResult::Changed
@@ -1999,13 +2149,14 @@ pub fn key_window(app: &mut FilesApp, key: Key, mods: Mods) -> InputResult {
         .active_file_idx()
         .map(|idx| show_paging(app, app.entries[idx].is_image()))
         .unwrap_or(false);
+    let has_open = app.can_open_selection();
 
     // Focus traversal and app-level toggles work from any pane.
     if key == Key::Tab {
         let next = if mods.shift() {
-            app.focus.prev(paging)
+            app.focus.prev(paging, has_open)
         } else {
-            app.focus.next(paging)
+            app.focus.next(paging, has_open)
         };
         if next != app.focus {
             app.focus = next;
@@ -2020,6 +2171,12 @@ pub fn key_window(app: &mut FilesApp, key: Key, mods: Mods) -> InputResult {
     if key == Key::Refresh && app.web_configured() {
         app.web_refresh_requested = true;
         return InputResult::Changed;
+    }
+    if key == Key::Open {
+        if app.can_open_selection() {
+            return app.request_open();
+        }
+        return InputResult::Noop;
     }
 
     // Global-ish preview keys remain available while a control is focused.
@@ -2067,11 +2224,11 @@ pub fn key_window(app: &mut FilesApp, key: Key, mods: Mods) -> InputResult {
     if app.focus != FilesFocus::Browser {
         return match key {
             Key::Left => {
-                app.focus = app.focus.prev(paging);
+                app.focus = app.focus.prev(paging, has_open);
                 InputResult::Changed
             }
             Key::Right | Key::Tab => {
-                app.focus = app.focus.next(paging);
+                app.focus = app.focus.next(paging, has_open);
                 InputResult::Changed
             }
             Key::Enter | Key::Space => activate_control(app, app.focus),
@@ -2203,7 +2360,7 @@ pub fn pointer_move(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_
         }
     } else if cx >= g.right_x && cy < 40 {
         if let Some(sel_idx) = app.active_file_idx() {
-            let c = preview_controls(app, &g, app.entries[sel_idx].is_image());
+            let c = preview_controls(app, &g, &app.entries[sel_idx]);
             for focus in FilesFocus::CONTROLS {
                 if let Some(r) = c.rect_for(focus) {
                     if r.contains(cx, cy) {
@@ -2301,6 +2458,36 @@ mod web_tests {
         assert!(app.go_parent());
         assert_eq!(app.level, FolderLevel::WebRoot);
         assert_eq!(app.row_selected, 1);
+    }
+
+    #[test]
+    fn open_targets_cover_web_and_gh_selections() {
+        let mut app = app_with_web();
+        assert!(app.open_web_site_at(0));
+        app.row_selected = 1;
+        assert!(app.can_open_selection());
+        assert_eq!(app.request_open(), InputResult::Open);
+        assert_eq!(&app.open_target[..app.open_target_len], b"web/livive.net/index.html");
+
+        assert!(app.open_gh_repo_at(0));
+        app.row_selected = 1;
+        assert!(app.can_open_selection());
+        assert_eq!(app.request_open(), InputResult::Open);
+        assert_eq!(
+            &app.open_target[..app.open_target_len],
+            b"gh/jpeckenpaugh/mines-sm/lib.rs"
+        );
+
+        app.row_selected = 0;
+        assert_eq!(app.request_open(), InputResult::Open);
+        assert_eq!(
+            &app.open_target[..app.open_target_len],
+            b"gh/jpeckenpaugh/mines-sm"
+        );
+
+        app.level = FolderLevel::HomeWallpapers;
+        assert!(!app.can_open_selection());
+        assert_eq!(app.request_open(), InputResult::Noop);
     }
 
     #[test]

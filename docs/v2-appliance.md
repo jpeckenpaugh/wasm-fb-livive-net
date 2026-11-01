@@ -27,7 +27,7 @@ Browser Host (web/v2/host.js)
 
 ### 1.1 Pure `#![no_std]` on `wasm32-unknown-unknown`
 - Zero external runtime dependencies, zero standard library (`no_std`), and panic = abort.
-- Compiles down to **~150 KiB** of Wasm bytecode (151,906 B locally; 153,940 B in the pinned Docker build).
+- Compiles down to **~150 KiB** of Wasm bytecode (154,225 B locally; 156,187 B in the pinned Docker build).
 - Linear memory is dynamically grown via `memory_grow` above `__heap_base` in `app_init(width, height)` to support dynamic resolutions ranging from mobile (`360x800`) to 1080p (`1920x1080`).
 
 ### 1.2 Upstream Host Decoding vs. Zero Static Bloat
@@ -65,4 +65,4 @@ Browser Host (web/v2/host.js)
 | **System** | `system.rs` | System overview, hardware/build attestation, performance telemetry, a Fonts page with a 1x-8x selectable specimen and style ladder, icon galleries, the Theme page, and test patterns. |
 | **Calculator** | `calc.rs` | Interactive desk calculator with integer/decimal entry, thousands grouping, and keyboard entry. |
 | **Minesweeper** | `mines.rs`, `mine_sm.rs` | High-performance 8×8 bitboard engine (`u64` bitmasks for mines, flags, reveals) with SplitMix64 PRNG, RL observation tensor exports (`[f32; 64]`), and Classic/Shielded strike rules. |
-| **Files & Preview** | `files.rs`, `code.rs` | Two-panel explorer (left folder navigation, right live preview) supporting wallpapers, general code samples, nested GitHub repo mounts (`gh://<owner>/<repo>/`), captured web snapshots (`web://<site>/`, four configured sites), syntax highlighting, context metadata, and TTS. |
+| **Files & Preview** | `files.rs`, `code.rs` | Two-panel explorer (left folder navigation, right live preview) supporting wallpapers, general code samples, nested GitHub repo mounts (`gh://<owner>/<repo>/`), captured web snapshots (`web://<site>/`, four configured sites), syntax highlighting, context metadata, TTS, and host-mediated **Open in Browser** live tabs for `web://` and `gh://`. |

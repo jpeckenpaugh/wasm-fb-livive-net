@@ -195,6 +195,7 @@ pub enum Command {
     FilesWeb,
     FilesWebRefresh,
     FilesToggleContext,
+    FilesOpenExternal,
     FilesSetWallpaper,
     MinesNewSeed,
     MinesReplay,
@@ -298,6 +299,10 @@ const MENU_FILES: &[MenuItem] = &[
     MenuItem {
         label: "Toggle Context",
         command: Command::FilesToggleContext,
+    },
+    MenuItem {
+        label: "Open in Browser",
+        command: Command::FilesOpenExternal,
     },
     MenuItem {
         label: "Set as Wallpaper",
@@ -1000,6 +1005,14 @@ impl WmState {
                 self.files.context_mode = !self.files.context_mode;
                 InputResult::Changed
             }
+            Command::FilesOpenExternal => {
+                let result = self.files.request_open();
+                if result == InputResult::Noop {
+                    InputResult::Changed
+                } else {
+                    result
+                }
+            }
             Command::FilesSetWallpaper => {
                 if let Some(sel) = self.files.active_file_idx() {
                     if self.files.entries[sel].is_image() {
@@ -1422,7 +1435,7 @@ mod tests {
             Command::FilesToggleContext
         );
         assert_eq!(
-            files.menu_items(MenuId::App)[6].command,
+            files.menu_items(MenuId::App)[7].command,
             Command::CloseWindow
         );
         assert_eq!(

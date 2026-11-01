@@ -49,6 +49,7 @@ pub enum Key {
     Dock = 60,
     MenuBar = 61,
     Refresh = 62,
+    Open = 63,
 }
 
 impl Key {
@@ -94,6 +95,7 @@ impl Key {
             60 => Some(Key::Dock),
             61 => Some(Key::MenuBar),
             62 => Some(Key::Refresh),
+            63 => Some(Key::Open),
             _ => None,
         }
     }
@@ -170,6 +172,7 @@ pub enum InputResult {
     Snapshot = 2,
     Tts = 3,
     Handled = 4,
+    Open = 5,
 }
 
 impl InputResult {
@@ -177,7 +180,10 @@ impl InputResult {
     pub const fn is_changed(self) -> bool {
         matches!(
             self,
-            InputResult::Changed | InputResult::Snapshot | InputResult::Tts
+            InputResult::Changed
+                | InputResult::Snapshot
+                | InputResult::Tts
+                | InputResult::Open
         )
     }
 
@@ -228,6 +234,7 @@ mod tests {
         assert_eq!(Key::Dock as i32, 60);
         assert_eq!(Key::MenuBar as i32, 61);
         assert_eq!(Key::Refresh as i32, 62);
+        assert_eq!(Key::Open as i32, 63);
         assert_eq!(Key::from_code(99), None);
     }
 
@@ -238,7 +245,9 @@ mod tests {
         assert_eq!(InputResult::Snapshot.to_i32(), 2);
         assert_eq!(InputResult::Tts.to_i32(), 3);
         assert_eq!(InputResult::Handled.to_i32(), 4);
+        assert_eq!(InputResult::Open.to_i32(), 5);
         assert!(!InputResult::Noop.is_changed());
+        assert!(InputResult::Open.is_changed());
         assert!(InputResult::Tts.is_changed());
         assert!(!InputResult::Handled.is_changed());
         assert!(InputResult::Handled.is_consumed());

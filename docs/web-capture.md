@@ -36,6 +36,12 @@ Files
 highlighter. The visual page is `page.png`; pin it with `Enter` or
 `Files → Set as Wallpaper` to see it full-screen on the Desktop.
 
+Select any web artifact and use **`[ ↗ Live ]`**, `Files → Open in Browser`,
+or `O` to open the live site in a new browser tab. The live tab uses the
+browser's normal profile, not the incognito capture context. The same button
+appears as **`[ ↗ GitHub ]`** inside `gh://` and opens the repo or file on
+GitHub.
+
 ## Run it locally
 
 The core appliance is static. The capture service is optional.

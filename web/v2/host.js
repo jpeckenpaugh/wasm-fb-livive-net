@@ -60,6 +60,13 @@ const DEFAULT_MOUNTS = [
   { name: 'gh/jpeckenpaugh/gm-livive-net/tests/run_tests.gd', url: '../gh/gm-livive-net/tests/run_tests.gd', bytes: 2367, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
 ];
 
+const GH_REPOS = new Set(
+  DEFAULT_MOUNTS
+    .map((item) => item.name)
+    .filter((name) => name.startsWith('gh/'))
+    .map((name) => name.split('/').slice(1, 3).join('/')),
+);
+
 /* Host-level decoded RGBA8888, UTF-8 text, and parsed .context.xml caches shared across guests */
 const decodedRgbaCache = new Map();
 const fetchedTextCache = new Map();
@@ -388,6 +395,68 @@ async function refreshWebForGuest(guest) {
   setStatus(`${guest.name} · refreshed ${ready}/${sites.length} web sites`, true);
 }
 
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function resolveOpenTarget(guest, target) {
+  if (!target) return null;
+  if (target.startsWith('web/')) {
+    const siteId = target.slice(4).split('/')[0];
+    if (!siteId) return null;
+    const site =
+      guest.webSites?.find((candidate) => candidate.id === siteId) ||
+      guest.webConfig?.sites?.find((candidate) => candidate.id === siteId);
+    if (!site) return null;
+    const snapshot = guest.webSnapshots?.get(siteId);
+    return safeExternalUrl(site.url || snapshot?.manifest?.result?.finalUrl);
+  }
+  if (target.startsWith('gh/')) {
+    const parts = target.slice(3).split('/').filter(Boolean);
+    if (parts.length < 2) return null;
+    const [owner, repo, ...path] = parts;
+    if (!GH_REPOS.has(`${owner}/${repo}`)) return null;
+    if (path.some((part) => part === '.' || part === '..')) return null;
+    const base = `https://github.com/${owner}/${repo}`;
+    if (!path.length) return base;
+    return `${base}/blob/HEAD/${path.map(encodeURIComponent).join('/')}`;
+  }
+  return null;
+}
+
+/* Must run synchronously inside the click/keydown gesture, before any await. */
+function openExternal(guest) {
+  if (!guest?.exports?.app_open_target_ptr || !guest.exports.app_open_target_len) return;
+  const len = guest.exports.app_open_target_len();
+  if (!len) {
+    setStatus(`${guest.name} · nothing to open`);
+    return;
+  }
+  const ptr = guest.exports.app_open_target_ptr();
+  const target = new TextDecoder().decode(
+    new Uint8Array(guest.exports.memory.buffer, ptr, len),
+  );
+  const url = resolveOpenTarget(guest, target);
+  if (!url) {
+    setStatus(`${guest.name} · cannot open ${target}`);
+    return;
+  }
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  setStatus(`${guest.name} · opened ${url} in a new tab`, true);
+}
+
 function serviceWebControl(guest) {
   if (!guest?.exports?.app_web_take_refresh) return;
   if (guest.exports.app_web_take_refresh() !== 0) {
@@ -418,6 +487,7 @@ const KEY_CODES = {
   k: 39, K: 39,
   j: 38, J: 38,
   i: 40, I: 40,
+  o: 63, O: 63,
   Home: 41,
   End: 42,
   c: 43, C: 43,
@@ -1181,7 +1251,9 @@ async function createGuest(opts = {}) {
       const t1 = performance.now();
       if (rc !== 0) {
         blitToCanvas(t0, t1);
-        if (rc === 2) {
+        if (rc === 5) {
+          openExternal(vm);
+        } else if (rc === 2) {
           captureSnapshot(vm, true);
         } else if (rc === 3) {
           handleTtsToggle(vm);
@@ -1286,9 +1358,11 @@ async function createGuest(opts = {}) {
       // 0 = ignored: let the browser keep its default (Tab, browser shortcuts).
       if (rc === 0) return;
       event.preventDefault();
-      if (rc === 1 || rc === 2 || rc === 3) {
+      if (rc === 1 || rc === 2 || rc === 3 || rc === 5) {
         blitToCanvas(t0, t1);
-        if (rc === 2) {
+        if (rc === 5) {
+          openExternal(vm);
+        } else if (rc === 2) {
           captureSnapshot(vm, true);
         } else if (rc === 3) {
           handleTtsToggle(vm);

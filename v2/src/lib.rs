@@ -444,6 +444,17 @@ pub extern "C" fn app_web_commit_meta(byte_len: usize) {
     });
 }
 
+/// Symbolic `web/...` or `gh/...` target for the host to open externally.
+#[no_mangle]
+pub extern "C" fn app_open_target_ptr() -> *mut u8 {
+    unsafe { (*GUEST.wm.get()).files.open_target.as_mut_ptr() }
+}
+
+#[no_mangle]
+pub extern "C" fn app_open_target_len() -> usize {
+    unsafe { (*GUEST.wm.get()).files.open_target_len }
+}
+
 /// Returns 1 once when the guest requested a web re-capture, then clears.
 #[no_mangle]
 pub extern "C" fn app_web_take_refresh() -> i32 {
@@ -699,7 +710,7 @@ mod tests {
         let files_menu_x = wm::MENU_X0 + 20;
         assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
         assert_eq!(
-            app_click(files_menu_x, TITLE_H + 16 + 5 * wm::MENU_ITEM_H),
+            app_click(files_menu_x, TITLE_H + 16 + 6 * wm::MENU_ITEM_H),
             CLICK_CHANGED
         );
         assert_eq!(app_selected(), AppSlot::Desktop as i32);

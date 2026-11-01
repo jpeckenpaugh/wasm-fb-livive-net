@@ -35,7 +35,8 @@ outline/fill (`theme::TEXT_SOFT` / `SURFACE_HOVER`).
 | `F10` / `Alt+M` | Focus the Home header |
 | `F9` / `Alt+D` | Open the App Home drawer |
 | `Ctrl`/`Cmd` + `1..4` | Launch System / Calc / Files / Mines |
-| `F5` | Refresh the configured `web://` snapshot (Files) |
+| `F5` | Refresh all configured `web://` sites (Files) |
+| `O` | Open the selected site/repo/file in a new browser tab (Files) |
 | `Esc` | Close one layer; from the client, focus Home without opening it |
 | `Tab` / `Shift+Tab` | Traverse focusable controls in the active client |
 | `Enter` / `Space` | Activate the focused control |
@@ -83,13 +84,14 @@ the App Home drawer.
 | `Left` / `Backspace` | Go to the parent folder |
 | `Right` | Focus the right-pane controls |
 | `Enter` / `Space` | Open a folder / pin a wallpaper / activate a control |
-| `Tab` / `Shift+Tab` | Cycle `Browser -> Mode -> A+ -> A- -> TTS -> Prev -> Next` |
+| `Tab` / `Shift+Tab` | Cycle `Browser -> Mode -> A+ -> A- -> TTS -> Open -> Prev -> Next`; `Open` appears for `web://` and `gh://` items |
 | `Left` / `Right` (control focused) | Previous / next control |
 | `I` | Toggle the Raw / Context preview |
 | `PageUp` / `PageDown` (or `[` / `]`) | Page the code preview |
 | `{` / `}` (or `<` / `>`) | Horizontal code scroll |
 | `J` / `K` | Vertical code scroll (also moves context scroll) |
-| `F5` | Re-capture the configured `web://` site |
+| `F5` | Re-capture all configured `web://` sites |
+| `O` | Open the selected `web://` site or `gh://` repo/file in a new tab |
 | `I` | Toggle Raw / Context for a web artifact |
 
 With the browser focused, `Up`/`Down` move rows; `Right` enters the control
