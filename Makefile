@@ -41,11 +41,18 @@ NATIVE_ASSETS := $(OBJ)/native/$(GEN)/assets_gen.o \
                  $(OBJ)/native/$(GEN)/about_gen.o \
                  $(OBJ)/native/$(GEN)/demo_gen.o
 
-.PHONY: all v2 test-v2 assets test clean debug release serve
+.PHONY: all v2 v2-folded test-v2 assets test clean debug release serve
 
 all: $(WASM_OUT) $(V2_WASM_OUT)
 
 v2: $(V2_WASM_OUT)
+
+v2-folded:
+	cargo build --manifest-path v2/Cargo.toml --target wasm32-unknown-unknown --release --features folded-glyphs
+	@mkdir -p $(BUILD)/v2 web/v2/build
+	@cp v2/target/wasm32-unknown-unknown/release/appliance.wasm $(BUILD)/v2/appliance-folded.wasm
+	@cp $(BUILD)/v2/appliance-folded.wasm web/v2/build/appliance-folded.wasm
+	@ls -l $(BUILD)/v2/appliance-folded.wasm | awk '{printf "v2 folded wasm: %d bytes\n", $$5}'
 
 $(V2_WASM_OUT): $(wildcard v2/Cargo.toml v2/build.rs v2/src/*.rs v2/glyphs/*/*.txt)
 	@mkdir -p $(dir $@)

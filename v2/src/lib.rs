@@ -6,6 +6,8 @@ pub mod fb;
 pub mod files;
 pub mod fmt;
 pub mod font;
+#[cfg(feature = "folded-glyphs")]
+pub mod folded;
 pub mod glyph;
 pub mod icon;
 pub mod input;

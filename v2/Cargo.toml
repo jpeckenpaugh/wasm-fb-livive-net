@@ -9,6 +9,9 @@ license = "MIT"
 name = "appliance"
 crate-type = ["cdylib", "rlib"]
 
+[features]
+folded-glyphs = []
+
 [profile.release]
 opt-level = "s"
 lto = true

@@ -103,8 +103,8 @@ pub fn resolve_for(_font: Font, cp: u32) -> Glyph {
     Glyph::Missing
 }
 
-pub fn lookup_fiveseven(cp: u32) -> Option<TextGlyph> {
-    // Binary search over contiguous codepoint runs.
+/// Binary-search the contiguous codepoint runs; returns the glyph index.
+fn index_for(cp: u32) -> Option<usize> {
     let (mut lo, mut hi) = (0usize, FIVESEVEN_RANGES.len());
     while lo < hi {
         let mid = (lo + hi) / 2;
@@ -114,19 +114,54 @@ pub fn lookup_fiveseven(cp: u32) -> Option<TextGlyph> {
         } else if cp > last {
             lo = mid + 1;
         } else {
-            let idx = base as usize + (cp - first) as usize;
-            let (rows, dy) = unpack_glyph(&FIVESEVEN_PACKED[idx]);
-            let (lsb, ink_w) = derive_metrics(&rows);
-            return Some(TextGlyph {
-                rows,
-                dy,
-                lsb,
-                ink_w,
-                index: idx as u16,
-            });
+            return Some(base as usize + (cp - first) as usize);
         }
     }
     None
+}
+
+#[cfg(not(feature = "folded-glyphs"))]
+pub fn lookup_fiveseven(cp: u32) -> Option<TextGlyph> {
+    let idx = index_for(cp)?;
+    let (rows, dy) = unpack_glyph(&FIVESEVEN_PACKED[idx]);
+    let (lsb, ink_w) = derive_metrics(&rows);
+    Some(TextGlyph {
+        rows,
+        dy,
+        lsb,
+        ink_w,
+        index: idx as u16,
+    })
+}
+
+#[cfg(feature = "folded-glyphs")]
+pub fn lookup_fiveseven(cp: u32) -> Option<TextGlyph> {
+    let idx = index_for(cp)?;
+    crate::folded::ensure_init();
+    let rows = crate::folded::rows(idx);
+    let dy = crate::folded::dy(idx);
+    let (lsb, ink_w) = derive_metrics(&rows);
+    Some(TextGlyph {
+        rows,
+        dy,
+        lsb,
+        ink_w,
+        index: idx as u16,
+    })
+}
+
+/// Packed-table decode, kept as the oracle for the folded decoder's tests.
+#[cfg(test)]
+pub fn packed_glyph(idx: usize) -> TextGlyph {
+    let (rows, dy) = unpack_glyph(&FIVESEVEN_PACKED[idx]);
+    let (lsb, ink_w) = derive_metrics(&rows);
+    TextGlyph {
+        rows,
+        dy,
+        lsb,
+        ink_w,
+        index: idx as u16,
+    }
 }
 
 /// Decode one packed glyph: 35 row bits (5 per row, LSB-first) plus 2 `dy` bits.

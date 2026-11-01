@@ -520,3 +520,280 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod fold_tests {
+    use super::*;
+    use crate::glyph;
+
+    fn rev5(v: u8) -> u8 {
+        ((v & 1) << 4) | ((v & 2) << 2) | (v & 4) | ((v & 8) >> 2) | ((v & 16) >> 4)
+    }
+
+    fn lr_rows(rows: &[u8; 7]) -> [u8; 7] {
+        rows.map(rev5)
+    }
+
+    fn tb_rows(rows: &[u8; 7]) -> [u8; 7] {
+        let mut r = *rows;
+        r.reverse();
+        r
+    }
+
+    fn both(rows: &[u8; 7]) -> [u8; 7] {
+        tb_rows(&lr_rows(rows))
+    }
+
+    fn levels(rows: &[u8; 7], dy: u8, step: usize) -> Vec<u8> {
+        let m = generate(rows, dy, step);
+        let w = mask_w(step);
+        let h = mask_h(step);
+        let mut v = Vec::with_capacity((w * h) as usize);
+        for y in 0..h {
+            for x in 0..w {
+                v.push(unpack(&m, step, x, y));
+            }
+        }
+        v
+    }
+
+    fn fold_lr(v: &[u8], step: usize) -> Vec<u8> {
+        let w = mask_w(step);
+        let h = mask_h(step);
+        let mut o = vec![0u8; (w * h) as usize];
+        for y in 0..h {
+            for x in 0..w {
+                o[(y * w + x) as usize] = v[(y * w + (w - 1 - x)) as usize];
+            }
+        }
+        o
+    }
+
+    /// Reverse the 7s-row glyph cell (plus its ring), leaving the line frame.
+    fn fold_tb(v: &[u8], step: usize, dy: u8) -> Vec<u8> {
+        let w = mask_w(step);
+        let s = scale_for_step(step);
+        let start = dy as i32 * s;
+        let end = start + 7 * s + 2;
+        let mut o = v.to_vec();
+        for y in start..end {
+            let src = end - 1 - (y - start);
+            for x in 0..w {
+                o[(y * w + x) as usize] = v[(src * w + x) as usize];
+            }
+        }
+        o
+    }
+
+    fn glyphs() -> Vec<(u32, [u8; 7], u8)> {
+        let mut v = Vec::new();
+        for cp in 0x20..=0x26FFu32 {
+            if let Some(g) = glyph::lookup_fiveseven(cp) {
+                v.push((cp, g.rows, g.dy));
+            }
+        }
+        v
+    }
+
+    #[test]
+    fn geometric_folds_commute_with_upscale() {
+        let gs = glyphs();
+        let mut checks = 0;
+        for (cp, rows, dy) in &gs {
+            for step in 0..2 {
+                let base = levels(rows, *dy, step);
+                assert_eq!(
+                    levels(&lr_rows(rows), *dy, step),
+                    fold_lr(&base, step),
+                    "LR U+{:04X} step {}",
+                    cp,
+                    step
+                );
+                assert_eq!(
+                    levels(&tb_rows(rows), *dy, step),
+                    fold_tb(&base, step, *dy),
+                    "TB U+{:04X} step {}",
+                    cp,
+                    step
+                );
+                assert_eq!(
+                    levels(&both(rows), *dy, step),
+                    fold_tb(&fold_lr(&base, step), step, *dy),
+                    "180 U+{:04X} step {}",
+                    cp,
+                    step
+                );
+                checks += 3;
+            }
+        }
+        println!("fold equivariance: {} checks over {} glyphs", checks, gs.len());
+    }
+
+    /// Rotate the 5x5 core at rows 1..5 clockwise, keeping a 7-row canvas.
+    fn rot5(rows: &[u8; 7]) -> [u8; 7] {
+        let mut out = *rows;
+        for r in 1..6 {
+            out[r] = 0;
+        }
+        for r in 0..5 {
+            for c in 0..5 {
+                let bit = (rows[1 + (4 - c)] >> (4 - r)) & 1;
+                if bit != 0 {
+                    out[1 + r] |= 1 << (4 - c);
+                }
+            }
+        }
+        out
+    }
+
+    fn square(v: &[u8], step: usize) -> Vec<u8> {
+        let w = mask_w(step);
+        let s = scale_for_step(step);
+        let mut o = Vec::new();
+        for y in s..6 * s + 2 {
+            for x in 0..5 * s + 2 {
+                o.push(v[(y * w + x) as usize]);
+            }
+        }
+        o
+    }
+
+    fn rot90_square(sq: &[u8], n: i32) -> Vec<u8> {
+        let mut o = vec![0u8; (n * n) as usize];
+        for y in 0..n {
+            for x in 0..n {
+                o[(y * n + x) as usize] = sq[((n - 1 - x) * n + y) as usize];
+            }
+        }
+        o
+    }
+
+    fn clean(rows: &[u8; 7]) -> [u8; 7] {
+        let mut r = *rows;
+        r[0] = 0;
+        r[6] = 0;
+        r
+    }
+
+    #[test]
+    fn quarter_turns_report() {
+        let gs = glyphs();
+        let mut clean_pass = 0;
+        let mut clean_mismatch = 0;
+        let mut d4 = 0;
+        let mut d4_ok = 0;
+        let mut line_d4 = 0;
+        let mut line_d4_ok = 0;
+        for (cp, rows, _) in &gs {
+            for step in 0..2 {
+                let s = scale_for_step(step);
+                let n = 5 * s + 2;
+                // Square cell in isolation: blank the rows outside the 5x5 core.
+                let c = clean(rows);
+                let base = square(&levels(&c, 0, step), step);
+                let rot = square(&levels(&rot5(&c), 0, step), step);
+                if rot == rot90_square(&base, n) {
+                    clean_pass += 1;
+                } else {
+                    clean_mismatch += 1;
+                }
+                if rot5(&c) == c {
+                    d4 += 1;
+                    let ok = base == rot90_square(&base, n);
+                    if ok {
+                        d4_ok += 1;
+                    }
+                    if cp == &0x58 {
+                        println!("X step {} clean square 4-fold: {}", step, ok);
+                    }
+                }
+                // Same check in the full 7-row line frame.
+                if rot5(&c) == c {
+                    let lb = square(&levels(rows, 0, step), step);
+                    line_d4 += 1;
+                    if lb == rot90_square(&lb, n) {
+                        line_d4_ok += 1;
+                    }
+                    if cp == &0x58 {
+                        println!(
+                            "X step {} line-frame 4-fold: {}",
+                            step,
+                            lb == rot90_square(&lb, n)
+                        );
+                    }
+                }
+            }
+        }
+        println!(
+            "90deg clean square: {} pass, {} mismatch; D4 clean {}/{}, D4 line-frame {}/{}",
+            clean_pass, clean_mismatch, d4_ok, d4, line_d4_ok, line_d4
+        );
+    }
+
+    /// Naive isolated-quadrant upscale vs the full mask's top-left quadrant.
+    #[test]
+    fn isolated_quadrant_seam_report() {
+        let gs = glyphs();
+        let mut diffs = 0;
+        let mut total = 0;
+        for (cp, rows, _) in &gs {
+            let core = rows;
+            let q = [0u8, core[1], core[2], 0, 0]; // 3x3 at rows 1..3, cols 1..3 later
+            let _ = q;
+            for step in 0..2 {
+                let s = scale_for_step(step);
+                let n3 = 3 * s + 2;
+                let n5 = 5 * s + 2;
+                // Full mask's top-left quadrant (rows s..4s+2, cols 0..3s+2).
+                let full = levels(rows, 0, step);
+                let w = mask_w(step);
+                let mut fq = Vec::new();
+                for y in s..4 * s + 2 {
+                    for x in 0..3 * s + 2 {
+                        fq.push(full[(y * w + x) as usize]);
+                    }
+                }
+                // Independently upscale the 3x3 quadrant embedded at rows 1..3,
+                // cols 1..3 with blank margins.
+                let mut emb = [0u8; 7];
+                for r in 0..3 {
+                    let src = rows[1 + r];
+                    let mut bits = 0u8;
+                    for c in 0..3 {
+                        if src & (1 << (4 - c)) != 0 {
+                            bits |= 1 << (3 - c);
+                        }
+                    }
+                    emb[1 + r] = bits << 1; // cols 1..3
+                }
+                let qm = levels(&emb, 0, step);
+                let wq = mask_w(step);
+                let mut iq = Vec::new();
+                for y in s..4 * s + 2 {
+                    for x in s..4 * s + 2 {
+                        iq.push(qm[(y * wq + x) as usize]);
+                    }
+                }
+                let d = fq.iter().zip(iq.iter()).filter(|(a, b)| a != b).count();
+                if d != 0 {
+                    diffs += d;
+                    if cp == &0x58 && step == 0 {
+                        println!(
+                            "X 2x quadrant: {} of {} cells differ (naive isolated upscale)",
+                            d,
+                            n3 * n3
+                        );
+                    }
+                }
+                total += (n3 * n3) as usize;
+                let _ = n5;
+            }
+        }
+        println!(
+            "naive quadrant seam: {} of {} cells differ across {} glyphs",
+            diffs,
+            total,
+            gs.len()
+        );
+    }
+}

@@ -54,6 +54,7 @@ fn main() {
     for path in &[
         "Cargo.toml",
         "src/lib.rs",
+        "src/folded.rs",
         "src/fb.rs",
         "src/font.rs",
         "src/wm.rs",
@@ -76,6 +77,9 @@ fn main() {
         if let Ok(bytes) = std::fs::read(path) {
             combined.extend_from_slice(bytes.as_slice());
         }
+    }
+    if let Ok(bytes) = std::fs::read("glyphs/fiveseven.fold") {
+        combined.extend_from_slice(bytes.as_slice());
     }
     let src_hash = format!("{:016x}", fnv1a_64(&combined));
 
@@ -237,6 +241,9 @@ fn generate_glyph_tables() -> Vec<String> {
     // Packed glyph, 5 bytes: rows 0..6 are 5 bits each (LSB-first, bit 5r),
     // `dy` is bits 35..36, and the top 3 bits are unused. Left bearing and ink
     // width are derived from the rows at runtime.
+    if std::env::var_os("CARGO_FEATURE_FOLDED_GLYPHS").is_some() {
+        writeln!(o, "#[cfg(test)]").unwrap();
+    }
     writeln!(
         o,
         "pub static FIVESEVEN_PACKED: [[u8; 5]; {}] = [",
