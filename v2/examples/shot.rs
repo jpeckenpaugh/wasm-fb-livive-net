@@ -117,8 +117,10 @@ fn main() {
     font::set_render_mode(RenderMode::Smooth);
     font::draw_str(&mut fb, 8, 80, "Aa 0123  \u{E000} \u{2190} [|] gpqy", 2, 0xFFFFFFFF);
     font::draw_str(&mut fb, 8, 112, "\u{00A1}\u{00BF}\u{00C0}\u{00C1}\u{00C2}\u{00C3}\u{00C4}\u{00C5}\u{00C6}\u{00C7}\u{00C8}\u{00C9}\u{00CA}\u{00CB}", 2, 0xFFFFFFFF);
-    font::draw_str_mode(&mut fb, RenderMode::Native, 8, 160, "Aa 0123 gpqy", 4, 0xFFFFFFFF);
-    font::draw_str_mode(&mut fb, RenderMode::Smooth, 300, 160, "Aa 0123 gpqy", 4, 0xFFFFFFFF);
+    font::draw_str_mode(&mut fb, RenderMode::Native, 8, 160, "S Aa 0123", 4, 0xFFFFFFFF);
+    font::draw_str_mode(&mut fb, RenderMode::Smooth, 300, 160, "S Aa 0123", 4, 0xFFFFFFFF);
+    font::draw_str_mode(&mut fb, RenderMode::Native, 560, 160, "S", 7, 0xFFFFFFFF);
+    font::draw_str_mode(&mut fb, RenderMode::Smooth, 600, 160, "S", 7, 0xFFFFFFFF);
     font::draw_str_mode(&mut fb, RenderMode::Native, 640, 150, "Aa 0123", 8, 0xFFFFFFFF);
     font::draw_str_mode(&mut fb, RenderMode::Smooth, 940, 150, "Aa 0123", 8, 0xFFFFFFFF);
     write_ppm("rendered/v2-sample.ppm", 1280, 240);

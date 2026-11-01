@@ -82,6 +82,12 @@ Left bearing and ink width are derived from the rows at lookup time
 532 x 5 = 2,660 bytes versus 4,256 for the previous 7-byte rows plus metric
 byte. `FIVESEVEN_RANGES` remains the 67-run binary-search index.
 
+## Smooth upscaling
+
+The `2x`–`8x` averaging ladder (magnify, 1px ring, sequential 4-neighbour
+averaging passes) is documented in [v2-smooth.md](v2-smooth.md). The older fixed-level path
+remains only as a fallback above 8x described above.
+
 ## Codepoint resolution
 
 1. **FiveSeven** sheets (`glyphs/fiveseven/*.txt`), binary search over contiguous ranges.

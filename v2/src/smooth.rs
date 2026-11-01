@@ -34,6 +34,479 @@
 use crate::glyph;
 use core::cell::UnsafeCell;
 
+// --- averaging paths (2x and 3x) ------------------------------------------
+//
+// 2x: 12x20 frame, 1px ring, passes 1, 2/3, 1/3.
+// 3x: 19x31 frame, 2px ring, passes 1, 3/4, 1/2, 1/4.
+// Each pass fills an empty cell that has more than `threshold` non-zero
+// 4-neighbours with average(neighbours) * num / den. Later passes see the
+// values written by earlier passes.
+
+pub const AVG_W: usize = 12;
+pub const AVG_H: usize = 20;
+pub const AVG_LEN: usize = AVG_W * AVG_H;
+pub const AVG3_W: usize = 17;
+pub const AVG3_H: usize = 29;
+pub const AVG3_LEN: usize = AVG3_W * AVG3_H;
+pub const AVG4_W: usize = 22;
+pub const AVG4_H: usize = 38;
+pub const AVG4_LEN: usize = AVG4_W * AVG4_H;
+pub const AVG5_W: usize = 27;
+pub const AVG5_H: usize = 47;
+pub const AVG5_LEN: usize = AVG5_W * AVG5_H;
+pub const AVG6_W: usize = 32;
+pub const AVG6_H: usize = 56;
+pub const AVG6_LEN: usize = AVG6_W * AVG6_H;
+pub const AVG7_W: usize = 37;
+pub const AVG7_H: usize = 65;
+pub const AVG7_LEN: usize = AVG7_W * AVG7_H;
+pub const AVG8_W: usize = 42;
+pub const AVG8_H: usize = 74;
+pub const AVG8_LEN: usize = AVG8_W * AVG8_H;
+
+const AVG_MAX_W: usize = 42;
+const AVG_MAX_H: usize = 74;
+
+fn avg_pass(
+    levels: &mut [[u8; AVG_MAX_W]; AVG_MAX_H],
+    w: usize,
+    h: usize,
+    threshold: u8,
+    num: u32,
+    den: u32,
+) {
+    let mut out = *levels;
+    for y in 0..h {
+        for x in 0..w {
+            if levels[y][x] != 0 {
+                continue;
+            }
+            let mut sum = 0u32;
+            let mut n = 0u32;
+            if y > 0 && levels[y - 1][x] != 0 {
+                sum += levels[y - 1][x] as u32;
+                n += 1;
+            }
+            if y + 1 < h && levels[y + 1][x] != 0 {
+                sum += levels[y + 1][x] as u32;
+                n += 1;
+            }
+            if x > 0 && levels[y][x - 1] != 0 {
+                sum += levels[y][x - 1] as u32;
+                n += 1;
+            }
+            if x + 1 < w && levels[y][x + 1] != 0 {
+                sum += levels[y][x + 1] as u32;
+                n += 1;
+            }
+            if n > threshold as u32 {
+                out[y][x] = ((sum * num + (n * den) / 2) / (n * den)) as u8;
+            }
+        }
+    }
+    *levels = out;
+}
+
+fn seed_avg(
+    rows: &[u8; 7],
+    dy: u8,
+    mag: i32,
+    ring: i32,
+    levels: &mut [[u8; AVG_MAX_W]; AVG_MAX_H],
+) {
+    let oy = ring + dy as i32 * mag;
+    for r in 0..7i32 {
+        for c in 0..5i32 {
+            if rows[r as usize] & (1 << (4 - c)) == 0 {
+                continue;
+            }
+            let x0 = ring + c * mag;
+            let y0 = oy + r * mag;
+            for sy in 0..mag {
+                for sx in 0..mag {
+                    let y = (y0 + sy) as usize;
+                    let x = (x0 + sx) as usize;
+                    if y < AVG_MAX_H && x < AVG_MAX_W {
+                        levels[y][x] = 255;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn generate_avg2(rows: &[u8; 7], dy: u8) -> [u8; AVG_LEN] {
+    let mut levels = [[0u8; AVG_MAX_W]; AVG_MAX_H];
+    seed_avg(rows, dy, 2, 1, &mut levels);
+    avg_pass(&mut levels, AVG_W, AVG_H, 1, 1, 1);
+    avg_pass(&mut levels, AVG_W, AVG_H, 1, 2, 3);
+    avg_pass(&mut levels, AVG_W, AVG_H, 0, 1, 3);
+    let mut flat = [0u8; AVG_LEN];
+    for y in 0..AVG_H {
+        for x in 0..AVG_W {
+            flat[y * AVG_W + x] = levels[y][x];
+        }
+    }
+    flat
+}
+
+fn generate_avg3(rows: &[u8; 7], dy: u8) -> [u8; AVG3_LEN] {
+    let mut levels = [[0u8; AVG_MAX_W]; AVG_MAX_H];
+    seed_avg(rows, dy, 3, 1, &mut levels);
+    avg_pass(&mut levels, AVG3_W, AVG3_H, 1, 1, 1);
+    avg_pass(&mut levels, AVG3_W, AVG3_H, 1, 3, 4);
+    avg_pass(&mut levels, AVG3_W, AVG3_H, 1, 1, 2);
+    avg_pass(&mut levels, AVG3_W, AVG3_H, 0, 1, 4);
+    let mut flat = [0u8; AVG3_LEN];
+    for y in 0..AVG3_H {
+        for x in 0..AVG3_W {
+            flat[y * AVG3_W + x] = levels[y][x];
+        }
+    }
+    flat
+}
+
+fn generate_avg4(rows: &[u8; 7], dy: u8) -> [u8; AVG4_LEN] {
+    let mut levels = [[0u8; AVG_MAX_W]; AVG_MAX_H];
+    seed_avg(rows, dy, 4, 1, &mut levels);
+    avg_pass(&mut levels, AVG4_W, AVG4_H, 1, 1, 1);
+    avg_pass(&mut levels, AVG4_W, AVG4_H, 1, 4, 5);
+    avg_pass(&mut levels, AVG4_W, AVG4_H, 1, 3, 5);
+    avg_pass(&mut levels, AVG4_W, AVG4_H, 1, 2, 5);
+    avg_pass(&mut levels, AVG4_W, AVG4_H, 0, 1, 5);
+    let mut flat = [0u8; AVG4_LEN];
+    for y in 0..AVG4_H {
+        for x in 0..AVG4_W {
+            flat[y * AVG4_W + x] = levels[y][x];
+        }
+    }
+    flat
+}
+
+fn generate_avg5(rows: &[u8; 7], dy: u8) -> [u8; AVG5_LEN] {
+    let mut levels = [[0u8; AVG_MAX_W]; AVG_MAX_H];
+    seed_avg(rows, dy, 5, 1, &mut levels);
+    avg_pass(&mut levels, AVG5_W, AVG5_H, 1, 1, 1);
+    avg_pass(&mut levels, AVG5_W, AVG5_H, 1, 5, 6);
+    avg_pass(&mut levels, AVG5_W, AVG5_H, 1, 2, 3);
+    avg_pass(&mut levels, AVG5_W, AVG5_H, 1, 1, 2);
+    avg_pass(&mut levels, AVG5_W, AVG5_H, 1, 1, 3);
+    avg_pass(&mut levels, AVG5_W, AVG5_H, 0, 1, 6);
+    let mut flat = [0u8; AVG5_LEN];
+    for y in 0..AVG5_H {
+        for x in 0..AVG5_W {
+            flat[y * AVG5_W + x] = levels[y][x];
+        }
+    }
+    flat
+}
+
+fn generate_avg6(rows: &[u8; 7], dy: u8) -> [u8; AVG6_LEN] {
+    let mut levels = [[0u8; AVG_MAX_W]; AVG_MAX_H];
+    seed_avg(rows, dy, 6, 1, &mut levels);
+    avg_pass(&mut levels, AVG6_W, AVG6_H, 1, 1, 1);
+    avg_pass(&mut levels, AVG6_W, AVG6_H, 1, 6, 7);
+    avg_pass(&mut levels, AVG6_W, AVG6_H, 1, 5, 7);
+    avg_pass(&mut levels, AVG6_W, AVG6_H, 1, 4, 7);
+    avg_pass(&mut levels, AVG6_W, AVG6_H, 1, 3, 7);
+    avg_pass(&mut levels, AVG6_W, AVG6_H, 1, 2, 7);
+    avg_pass(&mut levels, AVG6_W, AVG6_H, 0, 1, 7);
+    let mut flat = [0u8; AVG6_LEN];
+    for y in 0..AVG6_H {
+        for x in 0..AVG6_W {
+            flat[y * AVG6_W + x] = levels[y][x];
+        }
+    }
+    flat
+}
+
+fn generate_avg7(rows: &[u8; 7], dy: u8) -> [u8; AVG7_LEN] {
+    let mut levels = [[0u8; AVG_MAX_W]; AVG_MAX_H];
+    seed_avg(rows, dy, 7, 1, &mut levels);
+    avg_pass(&mut levels, AVG7_W, AVG7_H, 1, 1, 1);
+    avg_pass(&mut levels, AVG7_W, AVG7_H, 1, 7, 8);
+    avg_pass(&mut levels, AVG7_W, AVG7_H, 1, 3, 4);
+    avg_pass(&mut levels, AVG7_W, AVG7_H, 1, 5, 8);
+    avg_pass(&mut levels, AVG7_W, AVG7_H, 1, 1, 2);
+    avg_pass(&mut levels, AVG7_W, AVG7_H, 1, 3, 8);
+    avg_pass(&mut levels, AVG7_W, AVG7_H, 1, 1, 4);
+    avg_pass(&mut levels, AVG7_W, AVG7_H, 0, 1, 8);
+    let mut flat = [0u8; AVG7_LEN];
+    for y in 0..AVG7_H {
+        for x in 0..AVG7_W {
+            flat[y * AVG7_W + x] = levels[y][x];
+        }
+    }
+    flat
+}
+
+fn generate_avg8(rows: &[u8; 7], dy: u8) -> [u8; AVG8_LEN] {
+    let mut levels = [[0u8; AVG_MAX_W]; AVG_MAX_H];
+    seed_avg(rows, dy, 8, 1, &mut levels);
+    avg_pass(&mut levels, AVG8_W, AVG8_H, 1, 1, 1);
+    avg_pass(&mut levels, AVG8_W, AVG8_H, 1, 8, 9);
+    avg_pass(&mut levels, AVG8_W, AVG8_H, 1, 7, 9);
+    avg_pass(&mut levels, AVG8_W, AVG8_H, 1, 2, 3);
+    avg_pass(&mut levels, AVG8_W, AVG8_H, 1, 5, 9);
+    avg_pass(&mut levels, AVG8_W, AVG8_H, 1, 4, 9);
+    avg_pass(&mut levels, AVG8_W, AVG8_H, 1, 1, 3);
+    avg_pass(&mut levels, AVG8_W, AVG8_H, 1, 2, 9);
+    avg_pass(&mut levels, AVG8_W, AVG8_H, 0, 1, 9);
+    let mut flat = [0u8; AVG8_LEN];
+    for y in 0..AVG8_H {
+        for x in 0..AVG8_W {
+            flat[y * AVG8_W + x] = levels[y][x];
+        }
+    }
+    flat
+}
+
+struct AvgCache {
+    masks: UnsafeCell<[[u8; AVG_LEN]; COUNT]>,
+    valid: UnsafeCell<[bool; COUNT]>,
+}
+
+unsafe impl Sync for AvgCache {}
+
+static AVG: AvgCache = AvgCache {
+    masks: UnsafeCell::new([[0u8; AVG_LEN]; COUNT]),
+    valid: UnsafeCell::new([false; COUNT]),
+};
+
+struct Avg3Cache {
+    masks: UnsafeCell<[[u8; AVG3_LEN]; COUNT]>,
+    valid: UnsafeCell<[bool; COUNT]>,
+}
+
+unsafe impl Sync for Avg3Cache {}
+
+static AVG3: Avg3Cache = Avg3Cache {
+    masks: UnsafeCell::new([[0u8; AVG3_LEN]; COUNT]),
+    valid: UnsafeCell::new([false; COUNT]),
+};
+
+struct Avg4Cache {
+    masks: UnsafeCell<[[u8; AVG4_LEN]; COUNT]>,
+    valid: UnsafeCell<[bool; COUNT]>,
+}
+
+unsafe impl Sync for Avg4Cache {}
+
+static AVG4: Avg4Cache = Avg4Cache {
+    masks: UnsafeCell::new([[0u8; AVG4_LEN]; COUNT]),
+    valid: UnsafeCell::new([false; COUNT]),
+};
+
+struct Avg5Cache {
+    masks: UnsafeCell<[[u8; AVG5_LEN]; COUNT]>,
+    valid: UnsafeCell<[bool; COUNT]>,
+}
+
+unsafe impl Sync for Avg5Cache {}
+
+static AVG5: Avg5Cache = Avg5Cache {
+    masks: UnsafeCell::new([[0u8; AVG5_LEN]; COUNT]),
+    valid: UnsafeCell::new([false; COUNT]),
+};
+
+struct Avg6Cache {
+    masks: UnsafeCell<[[u8; AVG6_LEN]; COUNT]>,
+    valid: UnsafeCell<[bool; COUNT]>,
+}
+
+unsafe impl Sync for Avg6Cache {}
+
+static AVG6: Avg6Cache = Avg6Cache {
+    masks: UnsafeCell::new([[0u8; AVG6_LEN]; COUNT]),
+    valid: UnsafeCell::new([false; COUNT]),
+};
+
+struct Avg7Cache {
+    masks: UnsafeCell<[[u8; AVG7_LEN]; COUNT]>,
+    valid: UnsafeCell<[bool; COUNT]>,
+}
+
+unsafe impl Sync for Avg7Cache {}
+
+static AVG7: Avg7Cache = Avg7Cache {
+    masks: UnsafeCell::new([[0u8; AVG7_LEN]; COUNT]),
+    valid: UnsafeCell::new([false; COUNT]),
+};
+
+struct Avg8Cache {
+    masks: UnsafeCell<[[u8; AVG8_LEN]; COUNT]>,
+    valid: UnsafeCell<[bool; COUNT]>,
+}
+
+unsafe impl Sync for Avg8Cache {}
+
+static AVG8: Avg8Cache = Avg8Cache {
+    masks: UnsafeCell::new([[0u8; AVG8_LEN]; COUNT]),
+    valid: UnsafeCell::new([false; COUNT]),
+};
+
+static EMPTY_AVG: [u8; AVG_LEN] = [0u8; AVG_LEN];
+static EMPTY_AVG3: [u8; AVG3_LEN] = [0u8; AVG3_LEN];
+static EMPTY_AVG4: [u8; AVG4_LEN] = [0u8; AVG4_LEN];
+static EMPTY_AVG5: [u8; AVG5_LEN] = [0u8; AVG5_LEN];
+static EMPTY_AVG6: [u8; AVG6_LEN] = [0u8; AVG6_LEN];
+static EMPTY_AVG7: [u8; AVG7_LEN] = [0u8; AVG7_LEN];
+static EMPTY_AVG8: [u8; AVG8_LEN] = [0u8; AVG8_LEN];
+
+fn ensure_avg2(index: u16, rows: &[u8; 7], dy: u8) {
+    let i = index as usize;
+    if index == MISSING_INDEX || i >= COUNT {
+        return;
+    }
+    unsafe {
+        if !(*AVG.valid.get())[i] {
+            (*AVG.masks.get())[i] = generate_avg2(rows, dy);
+            (*AVG.valid.get())[i] = true;
+        }
+    }
+}
+
+fn ensure_avg3(index: u16, rows: &[u8; 7], dy: u8) {
+    let i = index as usize;
+    if index == MISSING_INDEX || i >= COUNT {
+        return;
+    }
+    unsafe {
+        if !(*AVG3.valid.get())[i] {
+            (*AVG3.masks.get())[i] = generate_avg3(rows, dy);
+            (*AVG3.valid.get())[i] = true;
+        }
+    }
+}
+
+fn ensure_avg4(index: u16, rows: &[u8; 7], dy: u8) {
+    let i = index as usize;
+    if index == MISSING_INDEX || i >= COUNT {
+        return;
+    }
+    unsafe {
+        if !(*AVG4.valid.get())[i] {
+            (*AVG4.masks.get())[i] = generate_avg4(rows, dy);
+            (*AVG4.valid.get())[i] = true;
+        }
+    }
+}
+
+fn ensure_avg5(index: u16, rows: &[u8; 7], dy: u8) {
+    let i = index as usize;
+    if index == MISSING_INDEX || i >= COUNT {
+        return;
+    }
+    unsafe {
+        if !(*AVG5.valid.get())[i] {
+            (*AVG5.masks.get())[i] = generate_avg5(rows, dy);
+            (*AVG5.valid.get())[i] = true;
+        }
+    }
+}
+
+fn ensure_avg6(index: u16, rows: &[u8; 7], dy: u8) {
+    let i = index as usize;
+    if index == MISSING_INDEX || i >= COUNT {
+        return;
+    }
+    unsafe {
+        if !(*AVG6.valid.get())[i] {
+            (*AVG6.masks.get())[i] = generate_avg6(rows, dy);
+            (*AVG6.valid.get())[i] = true;
+        }
+    }
+}
+
+fn ensure_avg7(index: u16, rows: &[u8; 7], dy: u8) {
+    let i = index as usize;
+    if index == MISSING_INDEX || i >= COUNT {
+        return;
+    }
+    unsafe {
+        if !(*AVG7.valid.get())[i] {
+            (*AVG7.masks.get())[i] = generate_avg7(rows, dy);
+            (*AVG7.valid.get())[i] = true;
+        }
+    }
+}
+
+fn ensure_avg8(index: u16, rows: &[u8; 7], dy: u8) {
+    let i = index as usize;
+    if index == MISSING_INDEX || i >= COUNT {
+        return;
+    }
+    unsafe {
+        if !(*AVG8.valid.get())[i] {
+            (*AVG8.masks.get())[i] = generate_avg8(rows, dy);
+            (*AVG8.valid.get())[i] = true;
+        }
+    }
+}
+
+/// 8-bit 2x mask for the averaging renderer, cached per glyph.
+pub fn glyph_avg2(_font: u8, index: u16, rows: &[u8; 7], dy: u8) -> &'static [u8; AVG_LEN] {
+    if index == MISSING_INDEX || index as usize >= COUNT {
+        return &EMPTY_AVG;
+    }
+    ensure_avg2(index, rows, dy);
+    unsafe { &(*AVG.masks.get())[index as usize] }
+}
+
+/// 8-bit 3x mask for the averaging renderer, cached per glyph.
+pub fn glyph_avg3(_font: u8, index: u16, rows: &[u8; 7], dy: u8) -> &'static [u8; AVG3_LEN] {
+    if index == MISSING_INDEX || index as usize >= COUNT {
+        return &EMPTY_AVG3;
+    }
+    ensure_avg3(index, rows, dy);
+    unsafe { &(*AVG3.masks.get())[index as usize] }
+}
+
+/// 8-bit 4x mask for the averaging renderer, cached per glyph.
+pub fn glyph_avg4(_font: u8, index: u16, rows: &[u8; 7], dy: u8) -> &'static [u8; AVG4_LEN] {
+    if index == MISSING_INDEX || index as usize >= COUNT {
+        return &EMPTY_AVG4;
+    }
+    ensure_avg4(index, rows, dy);
+    unsafe { &(*AVG4.masks.get())[index as usize] }
+}
+
+/// 8-bit 5x mask for the averaging renderer, cached per glyph.
+pub fn glyph_avg5(_font: u8, index: u16, rows: &[u8; 7], dy: u8) -> &'static [u8; AVG5_LEN] {
+    if index == MISSING_INDEX || index as usize >= COUNT {
+        return &EMPTY_AVG5;
+    }
+    ensure_avg5(index, rows, dy);
+    unsafe { &(*AVG5.masks.get())[index as usize] }
+}
+
+/// 8-bit 6x mask for the averaging renderer, cached per glyph.
+pub fn glyph_avg6(_font: u8, index: u16, rows: &[u8; 7], dy: u8) -> &'static [u8; AVG6_LEN] {
+    if index == MISSING_INDEX || index as usize >= COUNT {
+        return &EMPTY_AVG6;
+    }
+    ensure_avg6(index, rows, dy);
+    unsafe { &(*AVG6.masks.get())[index as usize] }
+}
+
+/// 8-bit 7x mask for the averaging renderer, cached per glyph.
+pub fn glyph_avg7(_font: u8, index: u16, rows: &[u8; 7], dy: u8) -> &'static [u8; AVG7_LEN] {
+    if index == MISSING_INDEX || index as usize >= COUNT {
+        return &EMPTY_AVG7;
+    }
+    ensure_avg7(index, rows, dy);
+    unsafe { &(*AVG7.masks.get())[index as usize] }
+}
+
+/// 8-bit 8x mask for the averaging renderer, cached per glyph.
+pub fn glyph_avg8(_font: u8, index: u16, rows: &[u8; 7], dy: u8) -> &'static [u8; AVG8_LEN] {
+    if index == MISSING_INDEX || index as usize >= COUNT {
+        return &EMPTY_AVG8;
+    }
+    ensure_avg8(index, rows, dy);
+    unsafe { &(*AVG8.masks.get())[index as usize] }
+}
+
 /// Number of smooth steps: absolute scales 2..=8.
 pub const STEPS: usize = 7;
 /// Steps 0..2 (scale 2..4) keep the original 2-bit masks; 3..6 are 8-bit.
@@ -518,6 +991,76 @@ mod tests {
             let got = fnv_used(glyph(0, g.index, &g.rows, g.dy, step), step);
             assert_eq!(got, want, "mask drift for {} step {}", ch, step);
         }
+    }
+
+    #[test]
+    fn avg3_reference_s() {
+        let rows = [0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E];
+        let m = generate_avg3(&rows, 0);
+        assert_eq!(m[0], 0);
+        assert_eq!(m[AVG3_W * 1 + 3], 112);
+        assert_eq!(m[AVG3_W * 2 + 3], 191);
+        assert_eq!(fnv(&m), 11176960991489867612u64);
+    }
+
+    #[test]
+    fn avg4_reference_s() {
+        let rows = [0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E];
+        let m = generate_avg4(&rows, 0);
+        assert_eq!(m[0], 0);
+        assert_eq!(m[AVG4_W * 1 + 3], 13);
+        assert_eq!(m[AVG4_W * 2 + 3], 52);
+        assert_eq!(fnv(&m), 3211897364347968397u64);
+    }
+
+    #[test]
+    fn avg5_reference_s() {
+        let rows = [0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E];
+        let m = generate_avg5(&rows, 0);
+        assert_eq!(m[0], 0);
+        assert_eq!(m[AVG5_W + 5], 60);
+        assert_eq!(m[AVG5_W * 2 + 5], 103);
+        assert_eq!(fnv(&m), 15292096614725901540u64);
+    }
+
+    #[test]
+    fn avg6_reference_s() {
+        let rows = [0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E];
+        let m = generate_avg6(&rows, 0);
+        assert_eq!(m[0], 0);
+        assert_eq!(m[AVG6_W + 5], 5);
+        assert_eq!(m[AVG6_W * 2 + 5], 18);
+        assert_eq!(fnv(&m), 3899084773390586721u64);
+    }
+
+    #[test]
+    fn avg7_reference_s() {
+        let rows = [0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E];
+        let m = generate_avg7(&rows, 0);
+        assert_eq!(m[0], 0);
+        assert!(m.iter().any(|&v| v == 223));
+        assert_eq!(fnv(&m), 12697047180094134924u64);
+    }
+
+    #[test]
+    fn avg8_reference_s() {
+        let rows = [0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E];
+        let m = generate_avg8(&rows, 0);
+        assert_eq!(m[0], 0);
+        assert!(m.iter().any(|&v| v == 227));
+        assert_eq!(fnv(&m), 14602437259815236441u64);
+    }
+
+    #[test]
+    fn avg2_reference_s() {
+        let rows = [0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E];
+        let m = generate_avg2(&rows, 0);
+        assert_eq!(m[2], 57);
+        assert_eq!(m[14], 170);
+        assert_eq!(m[15], 255);
+        assert_eq!(m[40], 170);
+        assert_eq!(m[52], 57);
+        assert_eq!(fnv(&m), 16249398564372139549u64);
     }
 }
 

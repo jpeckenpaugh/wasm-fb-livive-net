@@ -157,9 +157,10 @@ fn scale_of(scale: i32) -> i32 {
     scale.max(1)
 }
 
-/// One pixel of bleed on every side of the ink. The smooth mask draws its
-/// antialiased ring into this space; native leaves it blank so both modes keep
-/// the same footprint. At 1x there is no ring (Native == Smooth), so no pad.
+/// Bleed on every side of the ink. The smooth mask draws its ring into this
+/// space; native leaves it blank so both modes keep the same footprint.
+/// 2x uses a 1px ring, 3x uses a 2px ring (four averaging passes), 4x+ keeps
+/// the 1px ring. At 1x there is no ring (Native == Smooth), so no pad.
 fn bleed(scale: i32) -> i32 {
     if scale_of(scale) >= 2 {
         1
@@ -178,7 +179,7 @@ pub fn glyph_height(scale: i32) -> i32 {
 pub fn line_height(scale: i32) -> i32 {
     let s = scale_of(scale);
     if s >= 2 {
-        9 * s + 2
+        9 * s + 2 * bleed(scale)
     } else {
         LINE_H
     }
@@ -188,7 +189,7 @@ pub fn line_height(scale: i32) -> i32 {
 pub fn char_advance(scale: i32) -> i32 {
     let s = scale_of(scale);
     if s >= 2 {
-        5 * s + 3
+        5 * s + 2 * bleed(scale) + 1
     } else {
         ADVANCE
     }
@@ -481,7 +482,65 @@ fn draw_text_glyph(
     let trim = if proportional { t.lsb as i32 * scale } else { 0 };
     let dy = t.dy as i32;
 
-    if mode == RenderMode::Smooth && scale >= 2 {
+    if mode == RenderMode::Smooth && (2..=8).contains(&scale) {
+        // Averaging ladder: 2x..6x, 1px ring. The mask is 8-bit.
+        let (w, h, mask): (i32, i32, &[u8]) = match scale {
+            2 => (
+                smooth::AVG_W as i32,
+                smooth::AVG_H as i32,
+                smooth::glyph_avg2(glyph::font() as u8, t.index, &t.rows, t.dy),
+            ),
+            3 => (
+                smooth::AVG3_W as i32,
+                smooth::AVG3_H as i32,
+                smooth::glyph_avg3(glyph::font() as u8, t.index, &t.rows, t.dy),
+            ),
+            4 => (
+                smooth::AVG4_W as i32,
+                smooth::AVG4_H as i32,
+                smooth::glyph_avg4(glyph::font() as u8, t.index, &t.rows, t.dy),
+            ),
+            5 => (
+                smooth::AVG5_W as i32,
+                smooth::AVG5_H as i32,
+                smooth::glyph_avg5(glyph::font() as u8, t.index, &t.rows, t.dy),
+            ),
+            6 => (
+                smooth::AVG6_W as i32,
+                smooth::AVG6_H as i32,
+                smooth::glyph_avg6(glyph::font() as u8, t.index, &t.rows, t.dy),
+            ),
+            7 => (
+                smooth::AVG7_W as i32,
+                smooth::AVG7_H as i32,
+                smooth::glyph_avg7(glyph::font() as u8, t.index, &t.rows, t.dy),
+            ),
+            _ => (
+                smooth::AVG8_W as i32,
+                smooth::AVG8_H as i32,
+                smooth::glyph_avg8(glyph::font() as u8, t.index, &t.rows, t.dy),
+            ),
+        };
+        let bold_extra = i32::from(style == FontStyle::Bold);
+        for row in 0..h {
+            let shear_dx = match style {
+                FontStyle::Italic => {
+                    let src_row = ((row - 1) / scale).clamp(0, 6);
+                    ((6 - src_row) * scale) / 3
+                }
+                _ => 0,
+            };
+            for col in 0..w {
+                let level = mask[(row * w + col) as usize];
+                if level == 0 {
+                    continue;
+                }
+                let px = x + col - 1 - trim + shear_dx;
+                let py = y + row;
+                fb.blend(px, py, 1 + bold_extra, 1, color, level as u32);
+            }
+        }
+    } else if mode == RenderMode::Smooth && scale > 8 {
         let step = smooth::step_for_scale(scale).unwrap_or(0);
         let w = smooth::mask_w(step);
         let h = smooth::mask_h(step);
@@ -638,9 +697,10 @@ mod tests {
         assert_eq!(char_advance(1), 6);
         for scale in 2..=8 {
             let s = scale;
-            assert_eq!(glyph_height(s), 7 * s + 2);
-            assert_eq!(line_height(s), 9 * s + 2);
-            assert_eq!(char_advance(s), 5 * s + 3);
+            let b = bleed(s);
+            assert_eq!(glyph_height(s), 7 * s + 2 * b);
+            assert_eq!(line_height(s), 9 * s + 2 * b);
+            assert_eq!(char_advance(s), 5 * s + 2 * b + 1);
             // The smooth core is exactly the native ink footprint.
             if let Some(step) = smooth::step_for_scale(s) {
                 assert_eq!(smooth::ink_w(step), 5 * s, "scale {}", s);
