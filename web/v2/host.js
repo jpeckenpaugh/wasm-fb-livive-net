@@ -223,6 +223,14 @@ const fmtDuration = (ms) => {
   return `${hh}:${mm}:${ss}`;
 };
 
+/* Render mode: 0 = Native, 1 = Smooth. `app_font_family` is the legacy name. */
+const guestRenderMode = (guest) => {
+  if (!guest || !guest.exports) return 0;
+  return guest.exports.app_render_mode
+    ? guest.exports.app_render_mode()
+    : guest.exports.app_font_family();
+};
+
 const selectionLabel = (guest) => {
   if (!guest || !guest.exports) return 'desktop';
   const sel = guest.exports.app_selected();
@@ -1009,7 +1017,8 @@ window.__appliance = {
     fbHashHex: fmtHex32(guest.fbHash),
     focus: guest.exports ? guest.exports.app_focus() : 0,
     theme: guest.exports ? guest.exports.app_theme() : 0,
-    fontFamily: guest.exports ? guest.exports.app_font_family() : 0,
+    renderMode: guestRenderMode(guest),
+    fontFamily: guestRenderMode(guest),
   })),
   click: (id, x, y) => {
     const guest = guests.find((candidate) => candidate.id === id) || guests[0];
@@ -1023,7 +1032,8 @@ window.__appliance = {
       view: selectionLabel(guest),
       focus: guest.exports.app_focus(),
       theme: guest.exports.app_theme(),
-      fontFamily: guest.exports.app_font_family(),
+      renderMode: guestRenderMode(guest),
+      fontFamily: guestRenderMode(guest),
       dockVisible: Boolean(guest.exports.app_dock_visible()),
       fbHash: guest.fbHash,
       fbHashHex: fmtHex32(guest.fbHash),

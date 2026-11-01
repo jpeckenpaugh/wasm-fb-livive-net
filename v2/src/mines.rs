@@ -188,13 +188,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     let text_col = t::TEXT_BODY;
 
     // --- 1. Draw the 8×8 Minesweeper Bitboard Grid ---
-    let glyph_sc = if g.cell >= 54 {
-        3
-    } else if g.cell >= 34 {
-        2
-    } else {
-        1
-    };
+    let glyph_sc = if g.cell >= 54 { 3 } else { 2 };
 
     for idx in 0..64u8 {
         let r = (idx / 8) as i32;
@@ -257,7 +251,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     // --- 2. Draw Telemetry & Controls ---
     let compact_info = g.info_w < 260 || fb.h < 500;
     let head_sc = if compact_info { 2 } else { 3 };
-    let row_sc = if compact_info { 1 } else { 2 };
+    let row_sc = 2;
 
     draw_str(fb, g.info_x, g.info_y, "Mines 8x8", head_sc, t::TEXT);
     let bar_col = if b.is_terminal {
@@ -282,7 +276,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     let flags_placed = b.flagged_mask.count_ones();
 
     let mut y = g.info_y + line_height(head_sc) + 14;
-    let step_y = if row_sc == 1 { 16 } else { 28 };
+    let step_y = if compact_info { 20 } else { 28 };
 
     let row = |y: i32| Rect::new(g.info_x, y, g.info_w, step_y);
     ui::kv_row(
@@ -449,7 +443,7 @@ pub fn draw_dock_tile(
     } else {
         "Seeded"
     };
-    draw_str_prop(fb, x + 48, y + 42, sub, 1, t::ACCENT);
+    draw_str_prop(fb, x + 48, y + 42, sub, 2, t::ACCENT);
 }
 
 fn count_color(cnt: u8) -> u32 {

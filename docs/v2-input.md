@@ -97,9 +97,22 @@ strip. With a control focused, `Left`/`Right` move along the strip and `Esc`,
 
 | Key | Action |
 |---|---|
-| `1..5` or `Left` / `Right` | Select About / Locale / Fonts / Icons / Theme |
+| `1..5` | Select About / Locale / Fonts / Icons / Theme |
 | `Tab` / `Shift+Tab` | Cycle the section tabs |
+| `Left` / `Right` | Section-dependent (Fonts: render mode; Theme: no-op) |
 | `Home` / `End` | First / last section |
+
+### Fonts page
+
+| Key | Action |
+|---|---|
+| `Left` / `Up` | Select Native rendering |
+| `Right` / `Down` | Select Smooth rendering |
+| `1..5` | Jump to a System section |
+| `Tab` | Cycle System sections |
+
+Render mode is global and never changes layout: `1x` is the 5x7 base in both
+modes, and the two modes occupy the same box at every scale.
 
 ### Theme page
 
@@ -108,9 +121,8 @@ strip. With a control focused, `Left`/`Right` move along the strip and `Esc`,
 | `Up` / `Down` | Move the theme cursor |
 | `Home` / `End` | First / last theme |
 | `Enter` / `Space` | Apply the selected theme |
-| `Left` / `Right` | Select Native / Smooth 12x16 rendering |
 | `1..5` | Jump to a System section |
-| Tab | Cycle System sections |
+| `Tab` | Cycle System sections |
 
 ## Casing
 
@@ -157,4 +169,5 @@ Files rows, Files controls, and System tabs all share this hover path.
 - `app_files_context_mode()` returns `0` for Raw and `1` for Context.
 - `app_dock_visible()` reports whether the App Home drawer is open.
 - `app_theme()` returns the active theme index (`0..9`).
-- `app_font_family()` returns `0` for Native 5x7 and `1` for Smooth 12x16.
+- `app_render_mode()` returns `0` for Native and `1` for Smooth (`app_font_family()` is a deprecated alias).
+- `app_font()` returns the active font index (`0` = FiveSeven).

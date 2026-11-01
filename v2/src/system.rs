@@ -4,16 +4,15 @@
 //! the app menu, the bottom tab bar, or keys `1`..`5`:
 //! - `0` (`About`): build & binary attestation
 //! - `1` (`Locale`): UTC clock, timezone offset, and language/encoding
-//! - `2` (`Fonts`): active family glyph repertoire, scale ladder, and styles
+//! - `2` (`Fonts`): render mode, glyph repertoire, scale ladder, and styles
 //! - `3` (`Icons`): `Icons32` gallery (32x32, 2-bit)
-//! - `4` (`Theme`): global font family and ten color themes
+//! - `4` (`Theme`): ten color themes
 
 use crate::fb::Framebuffer;
 use crate::fmt as f;
 use crate::font::{
-    self, char_advance, draw_str, draw_str_centered, draw_str_native, draw_str_prop,
-    draw_str_styled, glyph_height, line_height, text_width, text_width_prop, FontFamily, FontStyle,
-    FIVESEVEN_US_LATIN, TWELVESIXTEEN_US_LATIN,
+    self, char_advance, draw_str, draw_str_centered, draw_str_mode, draw_str_prop,
+    draw_str_styled, glyph_height, line_height, text_width, text_width_prop, FontStyle, RenderMode,
 };
 use crate::icon::{draw_icon, Icon};
 use crate::input::InputResult;
@@ -69,8 +68,7 @@ pub struct SystemApp {
     pub hover_tab: Option<usize>,
     pub theme_index: usize,
     pub theme_focus: usize,
-    pub font_family: FontFamily,
-    pub family_focus: usize,
+    pub render_focus: usize,
     pub theme_cursor_ready: bool,
     // UTC wall clock + timezone offset (minutes East of UTC, e.g. -240 for UTC-04:00)
     pub utc_year: u16,
@@ -91,8 +89,7 @@ impl SystemApp {
             hover_tab: None,
             theme_index: 0,
             theme_focus: 0,
-            font_family: FontFamily::TwelveSixteen,
-            family_focus: 1,
+            render_focus: 1,
             theme_cursor_ready: false,
             utc_year: 2026,
             utc_month: 10,
@@ -116,11 +113,6 @@ pub fn draw_window(fb: &mut Framebuffer, app: &mut SystemApp, session_w: i32, se
     if app.section == SystemSection::Theme && !app.theme_cursor_ready {
         app.theme_index = t::theme_index();
         app.theme_focus = app.theme_index;
-        app.font_family = font::family();
-        app.family_focus = match app.font_family {
-            FontFamily::FiveSeven => 0,
-            FontFamily::TwelveSixteen => 1,
-        };
         app.theme_cursor_ready = true;
     }
     {
@@ -128,7 +120,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &mut SystemApp, session_w: i32, se
         match app.section {
             SystemSection::About => draw_about(&mut content, app, session_w, session_h),
             SystemSection::Locale => draw_locale(&mut content, app),
-            SystemSection::Fonts => draw_fonts(&mut content),
+            SystemSection::Fonts => draw_fonts(&mut content, app),
             SystemSection::Icons => draw_icons(&mut content),
             SystemSection::Theme => draw_theme(&mut content, app),
         }
@@ -224,6 +216,9 @@ pub fn click_window(
     if app.section == SystemSection::Theme {
         return click_theme(app, cx, cy, client_w, client_h);
     }
+    if app.section == SystemSection::Fonts {
+        return click_fonts(app, cx, cy, client_w, client_h);
+    }
     InputResult::Noop
 }
 
@@ -267,8 +262,8 @@ fn draw_icons(fb: &mut Framebuffer) {
         }
         draw_icon(fb, cx + (cell_w - 32) / 2, cy, *icon, 32, ink);
         let lbl = icon.label();
-        let lw = text_width_prop(lbl, 1);
-        draw_str_prop(fb, cx + (cell_w - lw) / 2, cy + 36, lbl, 1, label_col);
+        let lw = text_width_prop(lbl, 2);
+        draw_str_prop(fb, cx + (cell_w - lw) / 2, cy + 36, lbl, 2, label_col);
     }
     let rows = (Icon::ALL.len() as i32 + cols - 1) / cols;
     y += rows * cell_h + 4;
@@ -327,9 +322,6 @@ fn layout_margins(fb_w: i32, fb_h: i32) -> (i32, i32, i32, i32, i32) {
 struct ThemeGeom {
     x0: i32,
     w: i32,
-    y_family: i32,
-    family_h: i32,
-    family_w: i32,
     y_list: i32,
     row_h: i32,
     row_gap: i32,
@@ -340,19 +332,13 @@ fn theme_geom(fb_w: i32, fb_h: i32) -> ThemeGeom {
     let m = Metrics::new(fb_w, fb_h);
     let head_h = glyph_height(m.head_scale());
     let label_h = glyph_height(m.body_scale());
-    let y_family = y0 + head_h + if m.is_compact() { 14 } else { 22 } + label_h + 4;
-    let family_h = m.pick(24, 26, 28);
-    let family_w = ((w - 8) / 2).max(80);
-    let y_list = y_family + family_h + if m.is_compact() { 12 } else { 22 } + label_h + 4;
+    let y_list = y0 + head_h + if m.is_compact() { 14 } else { 22 } + label_h + 4;
     let available = (fb_h - y_list - 8).max(10);
     let row_gap = 4;
-    let row_h = ((available - 9 * row_gap) / 10).clamp(20, 30);
+    let row_h = ((available - 9 * row_gap) / 10).clamp(20, 34);
     ThemeGeom {
         x0,
         w,
-        y_family,
-        family_h,
-        family_w,
         y_list,
         row_h,
         row_gap,
@@ -377,41 +363,6 @@ fn draw_theme(fb: &mut Framebuffer, app: &SystemApp) {
         2,
         accent,
     );
-
-    draw_str_prop(
-        fb,
-        g.x0,
-        g.y_family - glyph_height(body_scale) - 4,
-        "Rendering",
-        body_scale,
-        label,
-    );
-
-    let families = [FontFamily::FiveSeven, FontFamily::TwelveSixteen];
-    let labels = ["Native", "Smooth 12x16"];
-    for (idx, family) in families.iter().enumerate() {
-        let r = Rect::new(
-            g.x0 + idx as i32 * (g.family_w + 8),
-            g.y_family,
-            g.family_w,
-            g.family_h,
-        );
-        let selected = app.font_family == *family;
-        ui::button(
-            fb,
-            r,
-            labels[idx],
-            if selected {
-                ui::Tone::Accent
-            } else {
-                ui::Tone::Neutral
-            },
-            body_scale,
-        );
-        if app.focus_visible && app.family_focus == idx {
-            ui::focus_ring(fb, r);
-        }
-    }
 
     draw_str_prop(
         fb,
@@ -496,30 +447,18 @@ pub fn apply_theme(app: &mut SystemApp, idx: usize) -> InputResult {
     InputResult::Changed
 }
 
-pub fn apply_family(app: &mut SystemApp, family: FontFamily) -> InputResult {
-    app.font_family = family;
-    app.family_focus = match family {
-        FontFamily::FiveSeven => 0,
-        FontFamily::TwelveSixteen => 1,
-    };
-    font::set_family(family);
+pub fn apply_render_mode(app: &mut SystemApp, mode: RenderMode) -> InputResult {
+    if font::render_mode() == mode {
+        app.render_focus = mode as usize;
+        return InputResult::Handled;
+    }
+    app.render_focus = mode as usize;
+    font::set_render_mode(mode);
     InputResult::Changed
 }
 
 fn click_theme(app: &mut SystemApp, cx: i32, cy: i32, client_w: i32, client_h: i32) -> InputResult {
     let g = theme_geom(client_w, (client_h - SECTION_BAR_H).max(0));
-    let families = [FontFamily::FiveSeven, FontFamily::TwelveSixteen];
-    for (idx, family) in families.iter().enumerate() {
-        let r = Rect::new(
-            g.x0 + idx as i32 * (g.family_w + 8),
-            g.y_family,
-            g.family_w,
-            g.family_h,
-        );
-        if r.contains(cx, cy) {
-            return apply_family(app, *family);
-        }
-    }
     for idx in 0..t::THEME_COUNT {
         let r = Rect::new(
             g.x0,
@@ -668,31 +607,155 @@ fn draw_sample(fb: &mut Framebuffer, x: i32, y: i32, s: &str, scale: i32, max_w:
     draw_str(fb, x, y, ui::truncate_chars(s, max_chars), scale, color);
 }
 
-fn draw_compact_fonts(fb: &mut Framebuffer, sheet: &crate::font::FontSheet) {
-    let x0 = 16;
-    let m = Metrics::new(fb.w, fb.h);
-    let body = m.body_scale();
-    let head = m.head_scale();
-    let mut y = 16;
-    draw_str(fb, x0, y, sheet.id, head, t::TEXT);
-    y += line_height(head) + 2 * head;
-    fb.fill(x0, y, (fb.w - 2 * x0).max(80), 2, t::ACCENT);
-    y += 10;
+/// Geometry shared by the Fonts page drawing and hit testing.
+struct FontsGeom {
+    x0: i32,
+    w: i32,
+    val_off: i32,
+    y0: i32,
+    rule_y: i32,
+    y_toggle: i32,
+    toggle_h: i32,
+    toggle_w: i32,
+    body_scale: i32,
+    head_scale: i32,
+    compact: bool,
+}
 
-    draw_str_native(fb, font::family(), x0, y, "AaBbCc 0123", 1, t::TEXT_BODY);
-    y += font::metrics().cell_h + 12;
+fn fonts_geom(fb_w: i32, fb_h: i32) -> FontsGeom {
+    let (x0, w, val_off, y0, _) = layout_margins(fb_w, fb_h);
+    let m = Metrics::new(fb_w, fb_h);
+    let head_scale = m.head_scale();
+    let body_scale = m.body_scale();
+    let compact = m.is_compact();
+    let rule_y = y0 + line_height(head_scale) + 2 * head_scale;
+    let y_toggle =
+        rule_y + if compact { 8 } else { 12 } + glyph_height(body_scale) + 4;
+    FontsGeom {
+        x0,
+        w,
+        val_off,
+        y0,
+        rule_y,
+        y_toggle,
+        toggle_h: m.pick(24, 26, 28),
+        toggle_w: ((w - 8) / 2).max(80),
+        body_scale,
+        head_scale,
+        compact,
+    }
+}
 
-    for (sc, label) in [(1, "1x"), (2, "2x")] {
+fn render_toggle_rects(g: &FontsGeom) -> [Rect; 2] {
+    [
+        Rect::new(g.x0, g.y_toggle, g.toggle_w, g.toggle_h),
+        Rect::new(g.x0 + g.toggle_w + 8, g.y_toggle, g.toggle_w, g.toggle_h),
+    ]
+}
+
+/// `Rendering: [ Native | Smooth ]` — the mode is global to the guest.
+fn draw_render_toggle(fb: &mut Framebuffer, app: &SystemApp, g: &FontsGeom) {
+    draw_str_prop(
+        fb,
+        g.x0,
+        g.y_toggle - glyph_height(g.body_scale) - 4,
+        "Rendering",
+        g.body_scale,
+        t::TEXT_DIM,
+    );
+    let active = font::render_mode();
+    for (idx, mode) in RenderMode::ALL.iter().enumerate() {
+        let r = render_toggle_rects(g)[idx];
+        ui::button(
+            fb,
+            r,
+            mode.name(),
+            if active == *mode {
+                ui::Tone::Accent
+            } else {
+                ui::Tone::Neutral
+            },
+            g.body_scale,
+        );
+        if app.focus_visible && app.render_focus == idx {
+            ui::focus_ring(fb, r);
+        }
+    }
+}
+
+fn click_fonts(app: &mut SystemApp, cx: i32, cy: i32, client_w: i32, client_h: i32) -> InputResult {
+    let g = fonts_geom(client_w, (client_h - SECTION_BAR_H).max(0));
+    for (idx, mode) in RenderMode::ALL.iter().enumerate() {
+        if render_toggle_rects(&g)[idx].contains(cx, cy) {
+            return apply_render_mode(app, *mode);
+        }
+    }
+    InputResult::Noop
+}
+
+/// Absolute scale ladder. 1x is the 5x7 base in both modes; the smooth mask is
+/// only generated from 2x up.
+const FONTS_LADDER: [(&str, i32); 8] = [
+    ("1x (5x7)", 1),
+    ("2x (10x14)", 2),
+    ("3x (15x21)", 3),
+    ("4x (20x28)", 4),
+    ("5x (25x35)", 5),
+    ("6x (30x42)", 6),
+    ("7x (35x49)", 7),
+    ("8x (40x56)", 8),
+];
+
+fn draw_compact_fonts(fb: &mut Framebuffer, app: &SystemApp) {
+    let g = fonts_geom(fb.w, fb.h);
+    let x0 = g.x0;
+    let body = g.body_scale;
+    let head = g.head_scale;
+
+    draw_str(fb, x0, g.y0, font::spec(font::font()).id, head, t::TEXT);
+    fb.fill(
+        x0,
+        g.rule_y,
+        (fb.w - 2 * x0).max(80),
+        2,
+        t::ACCENT,
+    );
+
+    draw_render_toggle(fb, app, &g);
+
+    let mut y = g.y_toggle + g.toggle_h + 12;
+    draw_str_mode(
+        fb,
+        font::render_mode(),
+        x0,
+        y,
+        "AaBbCc 0123",
+        2,
+        t::TEXT_BODY,
+    );
+    y += glyph_height(2) + 12;
+
+    let sample_x = x0 + 136;
+    for &(label, sc) in FONTS_LADDER.iter().take(3) {
+        let row_h = line_height(sc).max(glyph_height(body));
         draw_str_prop(
             fb,
             x0,
-            y + (font::metrics().cell_h * sc - glyph_height(body)) / 2,
+            y + (row_h - glyph_height(body)) / 2,
             label,
             body,
             t::TEXT_DIM,
         );
-        draw_str_native(fb, font::family(), x0 + 40, y, "Aa 0123", sc, t::TEXT_BODY);
-        y += font::metrics().cell_h * sc + 8;
+        draw_str_mode(
+            fb,
+            font::render_mode(),
+            sample_x,
+            y + (row_h - glyph_height(sc)) / 2,
+            "Aa 0123",
+            sc,
+            t::TEXT_BODY,
+        );
+        y += row_h + 8;
     }
     y += 4;
     fb.fill(x0, y, (fb.w - 2 * x0).max(80), 1, t::BORDER_DARK);
@@ -707,35 +770,35 @@ fn draw_compact_fonts(fb: &mut Framebuffer, sheet: &crate::font::FontSheet) {
     ];
     let sample_x = x0 + text_width_prop("Underline", body) + 12;
     for (style, name) in styles {
+        if y + glyph_height(2) > fb.h {
+            break;
+        }
         draw_str_prop(fb, x0, y, name, body, t::TEXT_DIM);
-        draw_str_styled(fb, sample_x, y, "Aa 0123", 1, style, t::TEXT_BODY);
+        draw_str_styled(fb, sample_x, y, "Aa 0123", 2, style, t::TEXT_BODY);
         y += glyph_height(body) + 8;
     }
 }
 
-fn draw_fonts(fb: &mut Framebuffer) {
-    fb.clear(t::BG);
-    let sheet = match font::family() {
-        FontFamily::FiveSeven => &FIVESEVEN_US_LATIN,
-        FontFamily::TwelveSixteen => &TWELVESIXTEEN_US_LATIN,
-    };
+fn draw_fonts(fb: &mut Framebuffer, app: &SystemApp) {
+    let sheet = font::spec(font::font());
     if fb.w < 560 {
-        draw_compact_fonts(fb, sheet);
+        fb.clear(t::BG);
+        draw_compact_fonts(fb, app);
         return;
     }
 
-    let (x0, w, _, _, _) = layout_margins(fb.w, fb.h);
-    let m = Metrics::new(fb.w, fb.h);
-    let val_off = m.pick(92, 140, 220);
+    fb.clear(t::BG);
+    let g = fonts_geom(fb.w, fb.h);
+    let (x0, w, val_off) = (g.x0, g.w, g.val_off);
     let label_col = t::TEXT_DIM;
     let val_col = t::TEXT_BODY;
     let accent = t::ACCENT;
     let rule_col = t::BORDER_DARK;
-    let compact = m.is_compact();
-    let body_scale = m.body_scale();
-    let head_scale = m.head_scale();
+    let compact = g.compact;
+    let body_scale = g.body_scale;
+    let head_scale = g.head_scale;
+    let y0 = g.y0;
 
-    let y0 = if compact { 16 } else { 36 };
     draw_str(fb, x0, y0, sheet.id, head_scale, t::TEXT);
     if fb.w >= 640 {
         let sheet_x = x0 + text_width(sheet.id, head_scale) + 24;
@@ -743,16 +806,13 @@ fn draw_fonts(fb: &mut Framebuffer) {
             draw_str(fb, sheet_x, y0 + 7, sheet.range_label, 2, label_col);
         }
     }
-    fb.fill(
-        x0,
-        y0 + line_height(head_scale) + 2 * head_scale,
-        w,
-        2,
-        accent,
-    );
+    fb.fill(x0, g.rule_y, w, 2, accent);
 
-    // 1. Character Set
-    let y_cs = y0 + line_height(head_scale) + 2 * head_scale + (if compact { 10 } else { 18 });
+    // 1. Rendering mode (moved here from Theme).
+    draw_render_toggle(fb, app, &g);
+
+    // 2. Character set, sampled in the active mode.
+    let y_cs = g.y_toggle + g.toggle_h + (if compact { 10 } else { 16 });
     let cs_step = if compact { 16 } else { 22 };
     draw_str(fb, x0, y_cs, "Upper", body_scale, label_col);
     draw_sample(
@@ -818,36 +878,22 @@ fn draw_fonts(fb: &mut Framebuffer) {
     let div1_y = y_cs + cs_step * 5;
     fb.fill(x0, div1_y, w, 1, rule_col);
 
-    // 2. Native scale ladder for the active family.
-    let mut y_scale = div1_y + (if compact { 10 } else { 18 });
-    let scales: &[(i32, &str)] = match font::family() {
-        FontFamily::FiveSeven => &[
-            (1, "1x (5x7)"),
-            (2, "2x (10x14)"),
-            (3, "3x (15x21)"),
-            (4, "4x (20x28)"),
-            (5, "5x (25x35)"),
-        ],
-        FontFamily::TwelveSixteen => &[
-            (1, "1x (12x19)"),
-            (2, "2x (17x28)"),
-            (3, "3x (22x37)"),
-            (4, "4x (27x46)"),
-            (5, "5x (32x55)"),
-            (6, "6x (37x64)"),
-            (7, "7x (42x73)"),
-            (8, "8x (47x82)"),
-        ],
-    };
-    let scale_gap = if compact { 8 } else { 14 };
-    for &(sc, label) in scales {
-        let smooth_big = font::family() == FontFamily::TwelveSixteen && sc >= 4;
-        let row_h = if smooth_big {
-            crate::smooth::cell_h(sc as usize - 1)
-        } else {
-            font::native_cell(font::family(), sc).1
-        };
-        if y_scale + row_h > fb.h - 80 && sc > 1 {
+    // 3. Absolute scale ladder. Both modes are drawn at the same scale so the
+    // 1x row is visibly identical and the mode never changes the box.
+    let mut y_scale = div1_y + (if compact { 10 } else { 16 });
+    let col_gap = if compact { 96 } else { 128 };
+    let native_x = x0 + val_off;
+    let smooth_x = native_x + col_gap;
+    if y_scale + line_height(body_scale) < fb.h {
+        draw_str(fb, x0, y_scale, "Size", body_scale, label_col);
+        draw_str(fb, native_x, y_scale, "Native", body_scale, label_col);
+        draw_str(fb, smooth_x, y_scale, "Smooth", body_scale, label_col);
+        y_scale += line_height(body_scale) + 4;
+    }
+    let scale_gap = if compact { 6 } else { 10 };
+    for &(label, sc) in FONTS_LADDER.iter() {
+        let row_h = line_height(sc);
+        if y_scale + row_h > fb.h - 56 {
             break;
         }
         draw_str(
@@ -858,39 +904,15 @@ fn draw_fonts(fb: &mut Framebuffer) {
             body_scale,
             label_col,
         );
-        if smooth_big {
-            font::draw_str_smooth_step(
-                fb,
-                x0 + val_off,
-                y_scale,
-                "Aa 0123",
-                sc as usize - 1,
-                val_col,
-            );
-        } else {
-            draw_str_native(
-                fb,
-                font::family(),
-                x0 + val_off,
-                y_scale,
-                "Aa 0123",
-                sc,
-                val_col,
-            );
-        }
+        draw_str_mode(fb, RenderMode::Native, native_x, y_scale, "Aa", sc, val_col);
+        draw_str_mode(fb, RenderMode::Smooth, smooth_x, y_scale, "Aa", sc, val_col);
         y_scale += row_h + scale_gap;
     }
     fb.fill(x0, y_scale - 2, w, 1, rule_col);
 
-    // 3. Style Transforms (Regular, Bold, Italic, Matrix, Underline)
-    let y_style = y_scale + (if compact { 8 } else { 12 });
-    let style_sc = if font::family() == FontFamily::TwelveSixteen {
-        1
-    } else if compact {
-        2
-    } else {
-        3
-    };
+    // 4. Style transforms in the active mode.
+    let y_style = y_scale + (if compact { 6 } else { 10 });
+    let style_sc = if compact { 2 } else { 3 };
     let style_step = glyph_height(style_sc) + 12;
     let styles: [(FontStyle, &str); 5] = [
         (FontStyle::Regular, "Regular"),
@@ -921,7 +943,7 @@ fn draw_row(fb: &mut Framebuffer, x: i32, y: i32, w: i32, val_off: i32, key: &st
     if y + 20 > fb.h {
         return;
     }
-    let scale = if w < 420 { 1 } else { 2 };
+    let scale = 2;
     let char_w = char_advance(scale);
     let max_chars = ((w - val_off) / char_w).max(6) as usize;
     let v_clamped = ui::truncate_chars(val, max_chars);
@@ -967,5 +989,5 @@ pub fn draw_dock_tile(
     ui::dock_tile(fb, Rect::new(x, y, w, h), active);
     draw_icon(fb, x + 10, y + 24, Icon::System, 32, t::ACCENT);
     draw_str_prop(fb, x + 48, y + 18, "System", 2, t::TEXT);
-    draw_str_prop(fb, x + 48, y + 42, app.section.label(), 1, t::ACCENT);
+    draw_str_prop(fb, x + 48, y + 42, app.section.label(), 2, t::ACCENT);
 }

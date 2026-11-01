@@ -128,7 +128,7 @@ fn parse_fiveseven(path: &str, out: &mut Vec<TextGlyph>) {
                 dy = v
                     .parse()
                     .unwrap_or_else(|_| panic!("{}:{}: bad dy", path, ln + 1));
-                assert!(dy <= 3, "{}:{}: dy must be 0..=3", path, ln + 1);
+                assert!(dy <= 2, "{}:{}: dy must be 0..=2", path, ln + 1);
             }
         }
         let mut rows = [0u8; 7];

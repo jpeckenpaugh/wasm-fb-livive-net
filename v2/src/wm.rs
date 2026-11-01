@@ -18,10 +18,10 @@ use crate::calc::{self, CalcApp};
 use crate::fb::{rgb, Framebuffer};
 use crate::files::{self, FilesApp};
 use crate::fmt as f;
-use crate::font::{draw_str_prop, text_width_prop};
+use crate::font::{draw_str_prop, text_width_prop, RenderMode};
 use crate::icon::{draw_icon, Icon};
 use crate::input::{InputResult, Key, Mods};
-use crate::layout::{Metrics, Rect};
+use crate::layout::Rect;
 use crate::mines::{self, MinesApp};
 use crate::system::{self, SystemApp, SystemSection};
 use crate::theme as t;
@@ -342,8 +342,7 @@ pub struct WmLayout {
 
 impl WmLayout {
     pub fn new(width: i32) -> Self {
-        let m = Metrics::new(width, 720);
-        let menu_scale = if m.is_compact() { 1 } else { 2 };
+        let menu_scale = 2;
         let text_y = ((TITLE_H - crate::font::glyph_height(menu_scale)) / 2).max(0);
         Self {
             header_w: menu_header_w(width),
@@ -1263,6 +1262,15 @@ impl WmState {
                     InputResult::Handled
                 }
             }
+            Key::Left | Key::Right | Key::Up | Key::Down
+                if self.system.section == SystemSection::Fonts =>
+            {
+                let mode = match key {
+                    Key::Left | Key::Up => RenderMode::Native,
+                    _ => RenderMode::Smooth,
+                };
+                system::apply_render_mode(&mut self.system, mode)
+            }
             Key::Left | Key::Right | Key::Tab | Key::Up | Key::Down
                 if self.system.section == SystemSection::Theme =>
             {
@@ -1274,13 +1282,6 @@ impl WmState {
                         self.system.theme_focus = next as usize;
                         InputResult::Changed
                     }
-                    Key::Left => {
-                        system::apply_family(&mut self.system, crate::glyph::FontFamily::FiveSeven)
-                    }
-                    Key::Right => system::apply_family(
-                        &mut self.system,
-                        crate::glyph::FontFamily::TwelveSixteen,
-                    ),
                     Key::Tab => {
                         let cur = self.system.section as usize;
                         let next = if mods.shift() {
@@ -1440,7 +1441,7 @@ mod tests {
         assert_eq!(full.header_w, MENU_HEADER_W);
         assert_eq!(compact.header_w, 72);
         assert_eq!(full.menu_scale, 2);
-        assert_eq!(compact.menu_scale, 1);
+        assert_eq!(compact.menu_scale, 2);
         assert!(!full.right_compact);
         assert!(compact.right_compact);
 

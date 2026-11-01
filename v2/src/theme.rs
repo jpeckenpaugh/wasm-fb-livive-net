@@ -353,6 +353,7 @@ mod tests {
 
     #[test]
     fn themes_are_distinct_and_resolvable() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         assert_eq!(THEME_COUNT, THEME_NAMES.len());
         set_theme(0);
         assert_eq!(resolve(ACCENT), THEMES[0][index_of(ACCENT)]);
@@ -377,6 +378,7 @@ mod tests {
 
     #[test]
     fn preview_colors_ignore_active_theme() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let a = color(3, ACCENT);
         set_theme(0);
         assert_eq!(a, THEMES[3][index_of(ACCENT)]);

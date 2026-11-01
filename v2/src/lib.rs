@@ -49,6 +49,12 @@ struct GuestMemory {
 
 unsafe impl Sync for GuestMemory {}
 
+/// Serialises tests that touch the global guest, theme, or render-mode state.
+/// `cargo test` runs test functions on threads, and this appliance is
+/// single-threaded by design.
+#[cfg(test)]
+pub(crate) static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 static GUEST: GuestMemory = GuestMemory {
     #[cfg(not(target_arch = "wasm32"))]
     pixels: UnsafeCell::new(core::mem::MaybeUninit::uninit()),
@@ -287,8 +293,19 @@ pub extern "C" fn app_theme() -> i32 {
 }
 
 #[no_mangle]
+pub extern "C" fn app_render_mode() -> i32 {
+    crate::font::render_mode() as i32
+}
+
+/// Deprecated alias kept for older hosts/snapshots: `0` native, `1` smooth.
+#[no_mangle]
 pub extern "C" fn app_font_family() -> i32 {
-    crate::glyph::family() as i32
+    app_render_mode()
+}
+
+#[no_mangle]
+pub extern "C" fn app_font() -> i32 {
+    crate::glyph::font() as i32
 }
 
 #[no_mangle]
@@ -525,7 +542,7 @@ pub extern "C" fn app_destroy() {
 mod tests {
     use super::*;
     use crate::fb::rgb;
-    use crate::glyph::FontFamily;
+    use crate::font::RenderMode;
     use crate::wm::{
         dock_icon_y, CLICK_CHANGED, CLICK_NOOP, CLICK_SNAPSHOT, CLICK_TTS, DOCK_ICON_H,
         DOCK_ICON_W, DOCK_X, DOCK_Y, TITLE_H,
@@ -533,7 +550,8 @@ mod tests {
 
     #[test]
     fn step1_pipeline_system_calc_files_mount_and_test_pattern() {
-        crate::font::set_family(FontFamily::FiveSeven);
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        crate::font::set_render_mode(RenderMode::Smooth);
         app_set_session(1);
         app_set_date(2026, 10, 30, 5);
         app_set_time(6, 45, 0, 0);
@@ -658,7 +676,8 @@ mod tests {
 
     #[test]
     fn test_github_mount_and_context_staging_and_key_paging() {
-        crate::font::set_family(FontFamily::FiveSeven);
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        crate::font::set_render_mode(RenderMode::Smooth);
         app_set_session(1);
         assert_eq!(app_init(1280, 720), 1);
 
@@ -742,12 +761,12 @@ mod tests {
         assert_eq!(app_key(34), CLICK_CHANGED); // scroll chunk up
 
         // Test new font scaling and horizontal/vertical scroll keys
-        assert_eq!(app_key(20), CLICK_CHANGED); // font_scale + 1 -> 2
         assert_eq!(app_key(20), CLICK_CHANGED); // font_scale + 1 -> 3
-        assert_eq!(app_key(20), CLICK_CHANGED); // font_scale clamped at 3
+        assert_eq!(app_key(20), CLICK_CHANGED); // font_scale + 1 -> 4
+        assert_eq!(app_key(20), CLICK_CHANGED); // clamped at 4 (no visual change)
+        assert_eq!(app_key(21), CLICK_CHANGED); // font_scale - 1 -> 3
         assert_eq!(app_key(21), CLICK_CHANGED); // font_scale - 1 -> 2
-        assert_eq!(app_key(21), CLICK_CHANGED); // font_scale - 1 -> 1
-        assert_eq!(app_key(21), CLICK_CHANGED); // font_scale clamped at 1
+        assert_eq!(app_key(21), CLICK_CHANGED); // clamped at 2 (no visual change)
 
         assert_eq!(app_key(37), CLICK_CHANGED); // col_scroll + 8
         assert_eq!(app_key(36), CLICK_CHANGED); // col_scroll - 8
@@ -757,13 +776,9 @@ mod tests {
         // Test TTS button click and C export
         assert_eq!(app_tts_active(), 0);
         // Compute click on TTS button in Control bar:
-        // mode_w = text_width("[ RAW VIEW ]", 1) + 12 = 12 * 6 + 12 = 84
-        // mode_x = 1280 - 84 - 12 = 1184
-        // ap_w = 44, ap_x = 1184 - 44 - 8 = 1132
-        // am_w = 44, am_x = 1132 - 44 - 4 = 1084
-        // Click inside the TTS button (layout-dependent).
-        // y = TITLE_H + 16 = 48
-        let tts_click_x = 1040;
+        // Control labels are drawn at scale 2 (advance 12). The TTS button
+        // sits left of A+/A- at y = TITLE_H + 8..32 (layout-dependent).
+        let tts_click_x = 880;
         let tts_click_y = TITLE_H + 16;
         assert_eq!(app_click(tts_click_x, tts_click_y), CLICK_TTS);
         assert_eq!(app_tts_active(), 1);
@@ -781,7 +796,8 @@ mod tests {
 
     #[test]
     fn keyboard_focus_traversal_and_activation() {
-        crate::font::set_family(FontFamily::FiveSeven);
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        crate::font::set_render_mode(RenderMode::Smooth);
         app_set_session(1);
         assert_eq!(app_init(1280, 720), 1);
         assert_eq!(app_focus(), 0);
@@ -831,28 +847,47 @@ mod tests {
     }
 
     #[test]
-    fn theme_page_updates_global_font_and_palette() {
+    fn fonts_page_switches_render_mode() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        crate::font::set_render_mode(RenderMode::Smooth);
+        app_set_session(1);
+        assert_eq!(app_init(1280, 720), 1);
+        assert_eq!(app_key_mods(11, 2), CLICK_CHANGED); // Ctrl+1 -> System
+        assert_eq!(app_key(13), CLICK_CHANGED); // 3 -> Fonts
+        assert_eq!(app_active_page(), 2);
+        assert_eq!(app_render_mode(), 1);
+        assert_eq!(app_font_family(), 1); // deprecated alias
+
+        assert_eq!(app_key(1), CLICK_CHANGED); // Left -> Native
+        assert_eq!(app_render_mode(), 0);
+        assert_eq!(app_key(2), CLICK_CHANGED); // Right -> Smooth
+        assert_eq!(app_render_mode(), 1);
+
+        // Render mode never changes layout.
+        assert_eq!(crate::font::char_advance(2), 13);
+        assert_eq!(crate::font::line_height(2), 20);
+        assert_eq!(crate::font::glyph_height(2), 16);
+    }
+
+    #[test]
+    fn theme_page_applies_palette_only() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         app_set_session(1);
         assert_eq!(app_init(1280, 720), 1);
         assert_eq!(app_key_mods(11, 2), CLICK_CHANGED); // Ctrl+1 -> System
         assert_eq!(app_key(15), CLICK_CHANGED); // 5 -> Theme
         assert_eq!(app_active_page(), 4);
-        assert_eq!(app_key(51), CLICK_CHANGED); // next theme
-        assert_eq!(app_key(24), CLICK_CHANGED); // apply
+        assert_eq!(app_key(51), CLICK_CHANGED); // Down -> next theme
+        assert_eq!(app_key(24), CLICK_CHANGED); // Enter -> apply
         assert_eq!(app_theme(), 1);
-        assert_eq!(app_key(2), CLICK_CHANGED); // right -> TwelveSixteen
-        assert_eq!(app_font_family(), 1);
-        assert_eq!(app_key(1), CLICK_CHANGED); // left -> FiveSeven
-        assert_eq!(app_font_family(), 0);
         assert_eq!(app_key(41), CLICK_CHANGED); // Home -> first theme
         assert_eq!(app_key(24), CLICK_CHANGED); // apply
         assert_eq!(app_theme(), 0);
-        assert_eq!(app_key(13), CLICK_CHANGED); // 3 -> Fonts
-        assert_eq!(app_active_page(), 2);
     }
 
     #[test]
     fn pointer_hover_is_reported_once() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         assert_eq!(app_init(1280, 720), 1);
         assert_eq!(app_pointer_move(56, 16), CLICK_CHANGED); // first menu header
         assert_eq!(app_pointer_move(56, 16), CLICK_NOOP);

@@ -1,6 +1,6 @@
 # Appliance v2: Minimalist `no_std` Rust Wasm Window Manager & Appliance
 
-`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~109 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, a 5x7 bitmap source with native/smooth 12x16 rendering, ten color themes, and built-in system attestation.
+`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~109 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, a 5x7 bitmap font with Native/Smooth render modes, ten color themes, and built-in system attestation.
 
 ```
 Browser Host (web/v2/host.js)
@@ -47,7 +47,7 @@ Browser Host (web/v2/host.js)
 - `theme.rs`: runtime semantic palette with ten built-in themes; apps draw sentinel tokens resolved by the framebuffer.
 - `layout.rs`: shared `Rect`, `SizeClass` (`Compact` / `Medium` / `Full`), and metrics helpers.
 - `ui.rs`: panel, toolbar, button, dock-tile, separator, and key/value-row widgets.
-- `font.rs`: `FiveSeven` 5x7 source with `Native` and `Smooth 12x16` runtime render modes (Smooth is the default); the smooth mask is generated lazily and cached in guest memory.
+- `font.rs`: one font (`FiveSeven`, 5x7) with `Native` and `Smooth` render modes; scale is absolute (1x is the 5x7 base in both), and the smooth mask is generated lazily at the same physical size and cached in guest memory.
 - `fmt.rs`: the single allocation-free numeric / date / size / title formatter.
 - `input.rs`: `Key`, `Mods`, and `InputResult` (`0` noop, `1` changed, `2` snapshot, `3` TTS, `4` handled); the host only prevents browser defaults for consumed keys.
 - `wm.rs` menu labels map to `Command` values, and `WmLayout` is shared by drawing and hit testing.

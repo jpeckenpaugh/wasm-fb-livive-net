@@ -52,13 +52,10 @@ impl Metrics {
         }
     }
 
-    /// Standard body text scale for UI labels.
+    /// Standard body text scale for UI labels. Absolute: 2 is a 10x14 line,
+    /// which is the smallest size the appliance uses for prose.
     pub fn body_scale(self) -> i32 {
-        if self.w < 480 {
-            1
-        } else {
-            2
-        }
+        2
     }
 
     /// Standard section-heading text scale.
@@ -123,7 +120,7 @@ mod tests {
         assert_eq!(full.pick(1, 2, 3), 3);
         assert_eq!(compact.head_scale(), 2);
         assert_eq!(full.head_scale(), 3);
-        assert_eq!(Metrics::new(400, 800).body_scale(), 1);
+        assert_eq!(Metrics::new(400, 800).body_scale(), 2);
         assert_eq!(full.body_scale(), 2);
     }
 

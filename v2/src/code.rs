@@ -897,7 +897,7 @@ pub fn draw_code_preview(
     scale: i32,
     col_scroll: usize,
 ) {
-    let scale = scale.clamp(1, 3);
+    let scale = scale.clamp(2, 4);
     let char_adv = char_advance(scale);
     let line_h = line_height(scale) + 2 * scale;
     let pad_top = if Metrics::new(w, h).is_compact() {
@@ -906,7 +906,7 @@ pub fn draw_code_preview(
         20
     };
     let gutter_w = (4 * char_adv + 8).max(34);
-    let text_x = x + gutter_w + (if scale == 1 { 10 } else { 16 });
+    let text_x = x + gutter_w + (if scale <= 2 { 10 } else { 16 });
     let max_cols = ((w - gutter_w - 20).max(0) / char_adv) as usize;
     let visible_lines = ((h - 2 * pad_top).max(0) / line_h) as usize;
 

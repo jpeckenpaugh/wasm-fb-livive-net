@@ -14,8 +14,7 @@ use crate::code::{count_total_lines, draw_code_preview, is_image_filename, lang_
 use crate::fb::Framebuffer;
 use crate::fmt as f;
 use crate::font::{
-    self as font, char_advance, draw_str, draw_str_centered, draw_str_prop, glyph_height,
-    line_height, text_width, FontFamily,
+    char_advance, draw_str, draw_str_centered, draw_str_prop, glyph_height, line_height, text_width,
 };
 use crate::icon::{draw_icon, Icon};
 use crate::input::{InputResult, Key, Mods};
@@ -40,15 +39,12 @@ pub struct FilesGeom {
     pub row_start_y: i32,
     pub row_h: i32,
     pub row_scale: i32,
+    pub row_icon: i32,
 }
 
 pub fn files_geom(client_w: i32, client_h: i32) -> FilesGeom {
     let m = Metrics::new(client_w, client_h);
-    let ratio = if font::family() == FontFamily::TwelveSixteen && client_w < 700 {
-        48
-    } else {
-        33
-    };
+    let ratio = if client_w < 700 { 48 } else { 33 };
     let left_w = (client_w * ratio / 100).max(120);
     let div_x = left_w;
     let right_x = left_w + 2;
@@ -58,7 +54,8 @@ pub fn files_geom(client_w: i32, client_h: i32) -> FilesGeom {
     let head_y = m.pick(12, 16, 24);
     let row_start_y = m.pick(48, 60, 76);
     let row_h = m.pick(32, 38, 46);
-    let row_scale = if compact_w { 1 } else { 2 };
+    let row_scale = 2;
+    let row_icon = if compact_w { 12 } else { 16 };
 
     FilesGeom {
         left_w,
@@ -70,6 +67,7 @@ pub fn files_geom(client_w: i32, client_h: i32) -> FilesGeom {
         row_start_y,
         row_h,
         row_scale,
+        row_icon,
     }
 }
 
@@ -264,7 +262,7 @@ impl FilesApp {
             code_scroll: 0,
             code_col_scroll: 0,
             context_scroll: 0,
-            font_scale: 1,
+            font_scale: 2,
             tts_active: false,
             staged_context_idx: -1,
             staged_context_len: 0,
@@ -483,7 +481,7 @@ pub fn draw_window(
 
     let row_w = g.left_w - 2 * g.pad_x;
     let text_pad_y = (g.row_h - 4 - glyph_height(g.row_scale)) / 2;
-    let show_meta = g.left_w >= 260;
+    let show_meta = g.left_w >= 320;
 
     match app.level {
         FolderLevel::HomeRoot => {
@@ -508,7 +506,7 @@ pub fn draw_window(
                     fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_HOVER);
                 }
 
-                let isz = if g.row_scale == 1 { 12 } else { 16 };
+                let isz = g.row_icon;
                 draw_icon(
                     fb,
                     g.pad_x + 8,
@@ -562,7 +560,7 @@ pub fn draw_window(
                     fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_HOVER);
                 }
 
-                let isz = if g.row_scale == 1 { 12 } else { 16 };
+                let isz = g.row_icon;
                 if r == 0 {
                     draw_icon(
                         fb,
@@ -818,22 +816,22 @@ fn control_labels(app: &FilesApp, compact: bool, narrow: bool) -> ControlLabels 
 }
 
 fn preview_controls(app: &FilesApp, g: &FilesGeom, is_image: bool) -> PreviewControls {
-    let compact = g.right_w < 620 || font::family() == FontFamily::TwelveSixteen;
+    let compact = g.right_w < 620;
     let labels = control_labels(app, compact, g.right_w < 420);
-    let mode_w = text_width(labels.mode, 1) + 12;
+    let mode_w = text_width(labels.mode, 2) + 12;
     let mode_x = g.right_x + g.right_w - mode_w - 12;
 
-    let ap_w = text_width(labels.ap, 1) + 8;
-    let am_w = text_width(labels.am, 1) + 8;
+    let ap_w = text_width(labels.ap, 2) + 8;
+    let am_w = text_width(labels.am, 2) + 8;
     let ap_x = mode_x - ap_w - 8;
     let am_x = ap_x - am_w - 4;
 
-    let tts_w = text_width(labels.tts, 1) + 10;
+    let tts_w = text_width(labels.tts, 2) + 10;
     let tts_x = am_x - tts_w - 8;
 
     let (prev, next) = if show_paging(app, is_image) {
-        let next_w = text_width(labels.next, 1) + 8;
-        let prev_w = text_width(labels.prev, 1) + 8;
+        let next_w = text_width(labels.next, 2) + 8;
+        let prev_w = text_width(labels.prev, 2) + 8;
         let next_x = tts_x - next_w - 8;
         let prev_x = next_x - prev_w - 4;
         (
@@ -864,7 +862,7 @@ fn draw_preview_control_bar(
     ui::toolbar(fb, Rect::new(g.right_x, 0, g.right_w, 40));
 
     let c = preview_controls(app, g, entry.is_image());
-    let compact = g.right_w < 620 || font::family() == FontFamily::TwelveSixteen;
+    let compact = g.right_w < 620;
     let labels = control_labels(app, compact, g.right_w < 420);
     let mut controls_left = c.mode.x.min(c.ap.x).min(c.am.x).min(c.tts.x);
     if let Some(prev) = c.prev {
@@ -875,9 +873,9 @@ fn draw_preview_control_bar(
     }
     let mut title_buf = [0u8; 64];
     let title = fmt_file_title(&mut title_buf, app.level, entry.base_name());
-    let max_chars = (((controls_left - (g.right_x + 12) - 8) / char_advance(1)).max(3)) as usize;
+    let max_chars = (((controls_left - (g.right_x + 12) - 8) / char_advance(2)).max(3)) as usize;
     let title = ui::truncate_chars(title, max_chars);
-    draw_str(fb, g.right_x + 12, 14, title, 1, t::TEXT);
+    draw_str(fb, g.right_x + 12, 14, title, 2, t::TEXT);
     ui::button(fb, c.mode, labels.mode, ui::Tone::Accent, 1);
     ui::button(fb, c.ap, labels.ap, ui::Tone::Neutral, 1);
     ui::button(fb, c.am, labels.am, ui::Tone::Neutral, 1);
@@ -904,10 +902,10 @@ fn draw_preview_control_bar(
             end_line as u32,
             total_lines as u32,
         );
-        let rw = text_width(range_str, 1);
+        let rw = text_width(range_str, 2);
         let range_x = prev.x - rw - 8;
-        if range_x > g.right_x + text_width(title, 1) + 16 {
-            draw_str(fb, range_x, 14, range_str, 1, t::TEXT_DIM);
+        if range_x > g.right_x + text_width(title, 2) + 16 {
+            draw_str(fb, range_x, 14, range_str, 2, t::TEXT_DIM);
         }
         ui::button(fb, prev, labels.prev, ui::Tone::Neutral, 1);
         ui::button(fb, next, labels.next, ui::Tone::Neutral, 1);
@@ -994,7 +992,7 @@ fn draw_context_preview(
     let key_w = 90;
     for &key in &keys {
         if y >= 40 && y + 16 <= fb.h {
-            draw_str(fb, rx, y, context_label(key), 1, key_col);
+            draw_str(fb, rx, y, context_label(key), 2, key_col);
 
             let val =
                 find_context_field(context_data, key.as_bytes()).unwrap_or(if key == "SCOPE" {
@@ -1012,7 +1010,7 @@ fn draw_context_preview(
                 val
             };
 
-            draw_str(fb, rx + key_w, y, val_clamped, 1, text_col);
+            draw_str(fb, rx + key_w, y, val_clamped, 2, text_col);
         }
         y += 18;
     }
@@ -1023,11 +1021,11 @@ fn draw_context_preview(
     }
     y += 12;
 
-    let font_scale = app.font_scale.clamp(1, 3);
+    let font_scale = app.font_scale.clamp(2, 4);
 
     // TECHNICAL SUMMARY
     if y + 16 >= 40 && y < fb.h {
-        draw_str(fb, rx, y, "Technical Summary", 1, accent);
+        draw_str(fb, rx, y, "Technical Summary", 2, accent);
     }
     y += 16;
     let summary_val = find_context_field(context_data, b"SUMMARY")
@@ -1038,7 +1036,7 @@ fn draw_context_preview(
     // ARCHITECTURAL FIT
     if let Some(arch_val) = find_context_field(context_data, b"ARCHITECTURE") {
         if y + 16 >= 40 && y < fb.h {
-            draw_str(fb, rx, y, "Architectural Fit", 1, accent);
+            draw_str(fb, rx, y, "Architectural Fit", 2, accent);
         }
         y += 16;
         draw_word_wrapped_paragraph(fb, rx, y, content_w, arch_val, label_col, font_scale);
@@ -1154,7 +1152,7 @@ fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, fold
     };
 
     let head_sc = if g.right_w < 360 { 2 } else { 3 };
-    let body_sc = if g.right_w < 360 { 1 } else { 2 };
+    let body_sc = 2;
     let max_title = ((g.right_w - 2 * pad) / char_advance(head_sc)).max(4) as usize;
     let max_sub = ((g.right_w - 2 * pad) / char_advance(body_sc)).max(4) as usize;
     draw_str(
@@ -1310,11 +1308,11 @@ fn activate_control(app: &mut FilesApp, focus: FilesFocus) -> InputResult {
             InputResult::Changed
         }
         FilesFocus::FontInc => {
-            app.font_scale = (app.font_scale + 1).min(3);
+            app.font_scale = (app.font_scale + 1).min(4);
             InputResult::Changed
         }
         FilesFocus::FontDec => {
-            app.font_scale = (app.font_scale - 1).max(1);
+            app.font_scale = (app.font_scale - 1).max(2);
             InputResult::Changed
         }
         FilesFocus::Tts => {
@@ -1361,11 +1359,11 @@ pub fn key_window(app: &mut FilesApp, key: Key, mods: Mods) -> InputResult {
     // Global-ish preview keys remain available while a control is focused.
     match key {
         Key::Plus => {
-            app.font_scale = (app.font_scale + 1).min(3);
+            app.font_scale = (app.font_scale + 1).min(4);
             return InputResult::Changed;
         }
         Key::Minus => {
-            app.font_scale = (app.font_scale - 1).max(1);
+            app.font_scale = (app.font_scale - 1).max(2);
             return InputResult::Changed;
         }
         Key::PageUp => {
@@ -1563,5 +1561,5 @@ pub fn draw_dock_tile(
 
     let mut sub_buf = [b' '; 16];
     let sub_str = f::mount_count(&mut sub_buf, app.count as u32);
-    draw_str_prop(fb, x + 48, y + 42, sub_str, 1, t::ACCENT);
+    draw_str_prop(fb, x + 48, y + 42, sub_str, 2, t::ACCENT);
 }

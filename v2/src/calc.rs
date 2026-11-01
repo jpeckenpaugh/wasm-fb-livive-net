@@ -417,7 +417,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
     let g = calc_geom(fb.w, fb.h);
 
     // 2. Readout line (pending operator on left, value right-aligned, 2px underline)
-    let op_scale = if g.disp_h < 64 { 3 } else { 4 };
+    let op_scale = 3;
     if app.pending != 0 && !app.error {
         let op_buf = [app.pending];
         let op_str = core::str::from_utf8(&op_buf).unwrap_or("");
@@ -433,13 +433,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CalcApp) {
 
     let mut disp_buf = [0u8; 24];
     let disp_str = app.format_display(&mut disp_buf);
-    let scale = if g.grid_w < 360 || g.disp_h < 64 {
-        4
-    } else if g.grid_w < 520 {
-        5
-    } else {
-        6
-    };
+    let scale = 4;
     let tw = text_width(disp_str, scale);
     draw_str(
         fb,
@@ -482,7 +476,7 @@ pub fn draw_dock_tile(
 
     let mut disp_buf = [0u8; 24];
     let disp_str = app.format_display(&mut disp_buf);
-    let max_chars = (((w - 48) / char_advance(1)).max(1) as usize).min(12);
+    let max_chars = (((w - 48) / char_advance(2)).max(1) as usize).min(12);
     let clamped = crate::ui::truncate_chars(disp_str, max_chars);
     draw_str(fb, x + 48, y + 42, clamped, 1, t::ACCENT);
 }

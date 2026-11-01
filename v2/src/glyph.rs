@@ -19,37 +19,38 @@ use core::sync::atomic::{AtomicU8, Ordering};
 
 include!(concat!(env!("OUT_DIR"), "/glyph_tables.rs"));
 
-/// Available bitmap families. Add a variant here when another family ships.
+/// Available bitmap fonts (typefaces / glyph sources). Add a variant here when
+/// another font ships, then register it with `font::FONT_REGISTRY`.
+///
+/// A font is the glyph data; how it is rasterized is `font::RenderMode`.
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub enum FontFamily {
-    FiveSeven = 0,
+pub enum Font {
     #[default]
-    TwelveSixteen = 1,
+    FiveSeven = 0,
 }
 
-impl FontFamily {
-    pub const ALL: [FontFamily; 2] = [FontFamily::FiveSeven, FontFamily::TwelveSixteen];
+impl Font {
+    pub const ALL: [Font; 1] = [Font::FiveSeven];
 
     pub const fn name(self) -> &'static str {
         match self {
-            FontFamily::FiveSeven => "FiveSeven",
-            FontFamily::TwelveSixteen => "TwelveSixteen",
+            Font::FiveSeven => "FiveSeven",
         }
     }
 }
 
-static FAMILY: AtomicU8 = AtomicU8::new(FontFamily::TwelveSixteen as u8);
+static FONT: AtomicU8 = AtomicU8::new(Font::FiveSeven as u8);
 
-pub fn family() -> FontFamily {
-    match FAMILY.load(Ordering::Relaxed) {
-        1 => FontFamily::TwelveSixteen,
-        _ => FontFamily::FiveSeven,
+pub fn font() -> Font {
+    match FONT.load(Ordering::Relaxed) {
+        1 => Font::FiveSeven,
+        _ => Font::FiveSeven,
     }
 }
 
-pub fn set_family(family: FontFamily) -> bool {
-    FAMILY.store(family as u8, Ordering::Relaxed);
+pub fn set_font(font: Font) -> bool {
+    FONT.store(font as u8, Ordering::Relaxed);
     true
 }
 
@@ -60,8 +61,8 @@ pub const ICON_SIZE: i32 = 32;
 /// Missing-glyph box (5x7).
 pub const MISSING_ROWS: [u8; 7] = [0x1F, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1F];
 
-/// A 5x7 source glyph plus its metrics. The smoothed 12x16 face is derived
-/// from these rows at render time.
+/// A 5x7 source glyph plus its metrics. The smooth render mode derives its
+/// masks from these rows at render time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TextGlyph {
     pub rows: &'static [u8; 7],
@@ -83,14 +84,16 @@ pub enum Glyph {
     Missing,
 }
 
-/// Resolve a Unicode scalar value using the active font family.
+/// Resolve a Unicode scalar value using the active font.
 pub fn resolve(cp: u32) -> Glyph {
-    resolve_for(family(), cp)
+    resolve_for(font(), cp)
 }
 
-/// Resolve a Unicode scalar value for a specific family. Both current families
-/// use the same FiveSeven source; TwelveSixteen is a render mode over it.
-pub fn resolve_for(_family: FontFamily, cp: u32) -> Glyph {
+/// Resolve a Unicode scalar value for a specific font.
+///
+/// Today every font shares the FiveSeven sheets, so this dispatches to the same
+/// table. It stays as the extension point for a second font with its own data.
+pub fn resolve_for(_font: Font, cp: u32) -> Glyph {
     if let Some(t) = lookup_fiveseven(cp) {
         return Glyph::Text(t);
     }
