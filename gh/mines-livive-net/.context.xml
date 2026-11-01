@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<context-index scope="gh://jpeckenpaugh/mines-livive-net" ref="main" generator="deepseek-v4.1-flash">
+  <file name="README.md" runtime="Markdown" role="Project overview">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Playable browser demo and RL policy notes for mines.livive.net.</summary>
+  </file>
+  <file name="index.html" runtime="HTML" role="Playable policy demo shell">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Loads the Mines engine, policy runtime, and UI for the browser demo.</summary>
+  </file>
+  <file name="app.js" runtime="JavaScript" role="Application shell">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Boots the demo, wires UI events, and runs the policy loop.</summary>
+  </file>
+  <file name="engine.js" runtime="JavaScript" role="Mines game engine">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Browser-side 8x8 board state machine used by the demo.</summary>
+  </file>
+  <file name="policy.js" runtime="JavaScript" role="ONNX policy runtime">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Loads model manifests and runs policy inference in the browser.</summary>
+  </file>
+  <file name="featurize.js" runtime="JavaScript" role="Observation featurizer">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Converts board state into the policy observation tensor.</summary>
+  </file>
+  <file name="contract.js" runtime="JavaScript" role="Policy contract">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Shared action/observation contract between engine and policy.</summary>
+  </file>
+  <file name="train.py" runtime="Python" role="Training loop">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Trains the policy checkpoints exported for the browser demo.</summary>
+  </file>
+  <file name="eval.py" runtime="Python" role="Evaluation harness">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Evaluates policy checkpoints against the Mines engine.</summary>
+  </file>
+  <file name="manifest.json" runtime="JSON" role="Model manifest">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Lists policy checkpoints and metadata consumed by the browser runtime.</summary>
+  </file>
+  <file name="checkpoints.md" runtime="Markdown" role="Checkpoint log">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Records policy milestones and evaluation notes.</summary>
+  </file>
+</context-index>

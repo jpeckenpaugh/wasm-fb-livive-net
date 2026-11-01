@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<context-index scope="gh://jpeckenpaugh/gm-livive-net" ref="main" generator="deepseek-v4.1-flash">
+  <file name="README.md" runtime="Markdown" role="Project overview">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Godot 3D minesweeper prototype for gm.livive.net.</summary>
+  </file>
+  <file name="ARCHITECTURE.md" runtime="Markdown" role="Architecture notes">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Describes the 3D planet, excavation, and claim-net systems.</summary>
+  </file>
+  <file name="claim_net.gd" runtime="GDScript" role="Claim network">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Tracks territory claims across the dodecahedral planet.</summary>
+  </file>
+  <file name="dodecahedron_planet.gd" runtime="GDScript" role="Planet geometry">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Builds the dodecahedral mine planet and face topology.</summary>
+  </file>
+  <file name="minesweeper_3d.gd" runtime="GDScript" role="3D minesweeper controller">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Coordinates board generation, reveal, flag, and win state.</summary>
+  </file>
+  <file name="minesweeper_tile_3d.gd" runtime="GDScript" role="3D tile">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Renders and animates a single minesweeper face tile.</summary>
+  </file>
+  <file name="player.gd" runtime="GDScript" role="Player controller">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Handles movement, camera, and interaction with tiles.</summary>
+  </file>
+  <file name="face_camera_controller.gd" runtime="GDScript" role="Face camera">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Orients the camera to the selected planet face.</summary>
+  </file>
+  <file name="project.godot" runtime="Godot project" role="Project configuration">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Godot project settings, input map, and main scene.</summary>
+  </file>
+  <file name="run_tests.gd" runtime="GDScript" role="Test runner">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>See repository README</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Headless test entrypoint for the 3D minesweeper systems.</summary>
+  </file>
+</context-index>

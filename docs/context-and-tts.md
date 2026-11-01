@@ -6,20 +6,24 @@ This document details the architectural design and implementation of on-demand c
 
 ## 1. On-Demand GitHub Repository Mounts (`gh://`)
 
-The `Files` application structures storage into two main domains:
+The `Files` application structures storage into three domains:
 1. **`Home (~/)`**:
    - `~/wallpapers`: 5 wallpaper images (`assets/*.png`), staged as decoded RGBA8888 pixels.
    - `~/samples`: 8 general web/application source files (`demo/*`).
 2. **`GitHub (gh://)`**:
-   - `gh://mines-sm`: Task-scoped upstream code files (`lib.rs`, `Cargo.toml`, `README.md`) located in `gh/mines-sm/`.
+   - `gh://jpeckenpaugh/mines-sm`: `lib.rs`, `Cargo.toml`, `README.md` from `gh/mines-sm/`.
+   - `gh://jpeckenpaugh/mines-livive-net`: browser demo, engine, policy, and training files from `gh/mines-livive-net/`.
+   - `gh://jpeckenpaugh/gm-livive-net`: Godot 3D minesweeper files from `gh/gm-livive-net/`.
+3. **`Web (web://)`**:
+   - Captured snapshots of `livive.net`, `mines.livive.net`, `mines-sm.livive.net`, and `gm.livive.net`, including raw source, rendered DOM, screenshot, text, headers, console, and network manifests.
 
-No repository files are baked into `appliance.wasm`. When a file is selected, the JS hypervisor fetches the UTF-8 text and stages it into `app_mount_text_ptr()` in Wasm linear memory.
+No repository files are baked into `appliance.wasm`. When a file is selected, the JS hypervisor fetches the UTF-8 text and stages it into `app_mount_text_ptr()` in Wasm linear memory. Web artifacts are staged the same way, or as RGBA8888 screenshots.
 
 ---
 
 ## 2. Enriched Context Sidecars (`.context.xml`)
 
-Each directory (`assets/`, `demo/`, `gh/mines-sm/`) maintains a hidden `.context.xml` sidecar file containing pre-computed grounding metadata:
+Each directory (`assets/`, `demo/`, and each `gh/<repo>/`) maintains a hidden `.context.xml` sidecar file containing pre-computed grounding metadata:
 
 ### 2.1 Schema
 ```xml
@@ -64,7 +68,7 @@ The Right 2/3 Preview control bar (`y: 0..40`) provides interactive viewport adj
 ## 4. Text-To-Speech (TTS) Hypervisor Bridge
 
 Inside the `Files` control bar, users can click **`[ ▶ TTS ]`**:
-1. The guest marks `tts_active = true`, renders the button as `[ ⏹ STOP ]` in emerald green, and returns `InputResult::Tts` (`rc = 3`, `CLICK_TTS`) from `app_click`.
+1. The guest marks `tts_active = true`, renders the button as `[ ⏹ STOP ]` in emerald green, and returns `InputResult::Tts` (`rc = 3`, `CLICK_TTS`) from `app_click`. For `web://` artifacts, the host reads the captured `text.txt` first, so narration reads the page rather than the raw HTML source.
 2. The JS hypervisor catches `rc = 3`, reads the active context metadata (`ROLE`, `SUMMARY`, `ARCHITECTURE`) from Wasm linear memory, and synthesizes speech using the browser's native **Web Speech API (`window.speechSynthesis`)**.
 3. Clicking `[ ■ STOP ]` immediately calls `window.speechSynthesis.cancel()`.
 4. When the utterance finishes, `utterance.onend` calls `guest.exports.app_tts_set_active(0)` to reset the button state.

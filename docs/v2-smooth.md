@@ -210,8 +210,9 @@ The masks are 8-bit, so the draw path blends the level directly (no
 435 KB (4x), 675 KB (5x), 953 KB (6x), 1.22 MB (7x), and 1.58 MB (8x) of
 zero-initialised BSS; none of that is in the wasm file. The wasm memory
 minimum is 6.19 MiB and the guest grows its framebuffer/staging area from
-there. The current release wasm is 128,591 B, including the redesigned Fonts
-page.
+there. The current release wasm is 151,906 B locally (153,940 B in the pinned
+Docker build), including the redesigned Fonts
+page and the optional `web://` mount ABI.
 
 ## Fonts screen
 

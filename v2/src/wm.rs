@@ -192,6 +192,8 @@ pub enum Command {
     CalcClear,
     FilesHome,
     FilesGithub,
+    FilesWeb,
+    FilesWebRefresh,
     FilesToggleContext,
     FilesSetWallpaper,
     MinesNewSeed,
@@ -284,6 +286,14 @@ const MENU_FILES: &[MenuItem] = &[
     MenuItem {
         label: "GitHub (gh://)",
         command: Command::FilesGithub,
+    },
+    MenuItem {
+        label: "Web (web://)",
+        command: Command::FilesWeb,
+    },
+    MenuItem {
+        label: "Refresh Web",
+        command: Command::FilesWebRefresh,
     },
     MenuItem {
         label: "Toggle Context",
@@ -975,7 +985,15 @@ impl WmState {
                 InputResult::Changed
             }
             Command::FilesGithub => {
-                self.files.open_subfolder(files::FolderLevel::GithubRepo);
+                self.files.open_subfolder(files::FolderLevel::GhRoot);
+                InputResult::Changed
+            }
+            Command::FilesWeb => {
+                self.files.open_subfolder(files::FolderLevel::WebSite);
+                InputResult::Changed
+            }
+            Command::FilesWebRefresh => {
+                self.files.web_refresh_requested = true;
                 InputResult::Changed
             }
             Command::FilesToggleContext => {
@@ -1400,11 +1418,11 @@ mod tests {
         let mut files = WmState::new();
         files.active_app = AppSlot::Files;
         assert_eq!(
-            files.menu_items(MenuId::App)[2].command,
+            files.menu_items(MenuId::App)[4].command,
             Command::FilesToggleContext
         );
         assert_eq!(
-            files.menu_items(MenuId::App)[4].command,
+            files.menu_items(MenuId::App)[6].command,
             Command::CloseWindow
         );
         assert_eq!(

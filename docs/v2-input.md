@@ -35,6 +35,7 @@ outline/fill (`theme::TEXT_SOFT` / `SURFACE_HOVER`).
 | `F10` / `Alt+M` | Focus the Home header |
 | `F9` / `Alt+D` | Open the App Home drawer |
 | `Ctrl`/`Cmd` + `1..4` | Launch System / Calc / Files / Mines |
+| `F5` | Refresh the configured `web://` snapshot (Files) |
 | `Esc` | Close one layer; from the client, focus Home without opening it |
 | `Tab` / `Shift+Tab` | Traverse focusable controls in the active client |
 | `Enter` / `Space` | Activate the focused control |
@@ -88,6 +89,8 @@ the App Home drawer.
 | `PageUp` / `PageDown` (or `[` / `]`) | Page the code preview |
 | `{` / `}` (or `<` / `>`) | Horizontal code scroll |
 | `J` / `K` | Vertical code scroll (also moves context scroll) |
+| `F5` | Re-capture the configured `web://` site |
+| `I` | Toggle Raw / Context for a web artifact |
 
 With the browser focused, `Up`/`Down` move rows; `Right` enters the control
 strip. With a control focused, `Left`/`Right` move along the strip and `Esc`,

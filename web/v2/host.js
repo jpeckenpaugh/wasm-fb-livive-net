@@ -34,9 +34,30 @@ const DEFAULT_MOUNTS = [
   { name: 'samples/script.py',         url: '../demo/script.py',        bytes: 935,    kind: 'code' },
   { name: 'samples/style.css',         url: '../demo/style.css',        bytes: 655,    kind: 'code' },
   { name: 'samples/types.ts',          url: '../demo/types.ts',         bytes: 700,    kind: 'code' },
-  { name: 'github/lib.rs',             url: '../gh/mines-sm/lib.rs',        bytes: 12638, kind: 'code' },
-  { name: 'github/Cargo.toml',         url: '../gh/mines-sm/Cargo.toml',    bytes: 229,   kind: 'code' },
-  { name: 'github/README.md',          url: '../gh/mines-sm/README.md',     bytes: 2599,  kind: 'code' },
+  { name: 'gh/jpeckenpaugh/mines-sm/lib.rs', url: '../gh/mines-sm/lib.rs', bytes: 12638, kind: 'code', contextUrl: '../gh/mines-sm/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-sm/Cargo.toml', url: '../gh/mines-sm/Cargo.toml', bytes: 229, kind: 'code', contextUrl: '../gh/mines-sm/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-sm/README.md', url: '../gh/mines-sm/README.md', bytes: 2599, kind: 'code', contextUrl: '../gh/mines-sm/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/README.md', url: '../gh/mines-livive-net/README.md', bytes: 2394, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/index.html', url: '../gh/mines-livive-net/index.html', bytes: 12877, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/src/app.js', url: '../gh/mines-livive-net/src/app.js', bytes: 35616, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/src/contract.js', url: '../gh/mines-livive-net/src/contract.js', bytes: 2346, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/src/engine.js', url: '../gh/mines-livive-net/src/engine.js', bytes: 7728, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/src/featurize.js', url: '../gh/mines-livive-net/src/featurize.js', bytes: 2622, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/src/policy.js', url: '../gh/mines-livive-net/src/policy.js', bytes: 5657, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/tools/train.py', url: '../gh/mines-livive-net/tools/train.py', bytes: 14560, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/tools/eval.py', url: '../gh/mines-livive-net/tools/eval.py', bytes: 11962, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/models/manifest.json', url: '../gh/mines-livive-net/models/manifest.json', bytes: 9300, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/mines-livive-net/docs/checkpoints.md', url: '../gh/mines-livive-net/docs/checkpoints.md', bytes: 10602, kind: 'code', contextUrl: '../gh/mines-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/README.md', url: '../gh/gm-livive-net/README.md', bytes: 10784, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/docs/ARCHITECTURE.md', url: '../gh/gm-livive-net/docs/ARCHITECTURE.md', bytes: 17121, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/claim_net.gd', url: '../gh/gm-livive-net/claim_net.gd', bytes: 15018, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/dodecahedron_planet.gd', url: '../gh/gm-livive-net/dodecahedron_planet.gd', bytes: 9764, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/face_camera_controller.gd', url: '../gh/gm-livive-net/face_camera_controller.gd', bytes: 2360, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/minesweeper_3d.gd', url: '../gh/gm-livive-net/minesweeper_3d.gd', bytes: 17425, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/minesweeper_tile_3d.gd', url: '../gh/gm-livive-net/minesweeper_tile_3d.gd', bytes: 5950, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/player.gd', url: '../gh/gm-livive-net/player.gd', bytes: 5666, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/project.godot', url: '../gh/gm-livive-net/project.godot', bytes: 3617, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/gm-livive-net/tests/run_tests.gd', url: '../gh/gm-livive-net/tests/run_tests.gd', bytes: 2367, kind: 'code', contextUrl: '../gh/gm-livive-net/.context.xml' },
 ];
 
 /* Host-level decoded RGBA8888, UTF-8 text, and parsed .context.xml caches shared across guests */
@@ -44,6 +65,335 @@ const decodedRgbaCache = new Map();
 const fetchedTextCache = new Map();
 const contextXmlCache = new Map();
 const textEncoder = new TextEncoder();
+const WEB_TEXT_CAP = 768 * 1024;
+
+/* Optional `web://` capture configuration and cache. */
+let webConfigPromise = null;
+const webCaptureCache = new Map();
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function loadWebConfig() {
+  if (!webConfigPromise) {
+    webConfigPromise = fetch(new URL('./sites.json', import.meta.url), { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null);
+  }
+  return webConfigPromise;
+}
+
+function oneLine(value) {
+  return String(value == null ? '' : value).replace(/[\r\n]+/g, ' ').trim();
+}
+
+function webMetaText(state, detail, sites = []) {
+  const lines = [
+    `STATE=${state}`,
+    `SITES=${sites.length}`,
+    `DETAIL=${oneLine(detail)}`,
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+function writeWebMeta(guest, text) {
+  if (!guest?.exports?.app_web_meta_ptr || !guest.exports.app_web_commit_meta) return;
+  const bytes = textEncoder.encode(text).subarray(0, 512);
+  const ptr = guest.exports.app_web_meta_ptr();
+  new Uint8Array(guest.exports.memory.buffer).set(bytes, ptr);
+  guest.exports.app_web_commit_meta(bytes.byteLength);
+  if (guest.blitToCanvas) {
+    const t = performance.now();
+    guest.blitToCanvas(t, t);
+  }
+}
+
+async function decodeBlobToRgba(blob) {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return {
+    width: canvas.width,
+    height: canvas.height,
+    rgba: ctx.getImageData(0, 0, canvas.width, canvas.height).data,
+  };
+}
+
+async function captureSite(site, width, height, opts = {}) {
+  const cfg = await loadWebConfig();
+  if (!cfg || !cfg.captureEndpoint) throw new Error('capture service is not configured');
+  const viewport = { width, height: Math.max(1, height - TITLE_H), dpr: 1 };
+  const key = `${site.id}@${viewport.width}x${viewport.height}`;
+  const maxAge = (site.maxAgeMinutes || 15) * 60_000;
+  const hit = webCaptureCache.get(key);
+  if (!opts.force && hit?.snapshot && Date.now() - hit.at < maxAge) return hit.snapshot;
+  if (hit?.promise) return hit.promise;
+
+  const promise = (async () => {
+    const res = await fetch(cfg.captureEndpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url: site.url,
+        site: { id: site.id, label: site.label || site.id },
+        viewport,
+        options: {
+          colorScheme: 'dark',
+          reducedMotion: true,
+          locale: navigator.language || 'en-US',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        },
+      }),
+    });
+    if (!res.ok) throw new Error(`capture request failed: HTTP ${res.status}`);
+    const job = await res.json();
+    if (!job.statusUrl) throw new Error('capture service did not return a status URL');
+    const statusUrl = new URL(job.statusUrl, cfg.captureEndpoint).href;
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const statusRes = await fetch(statusUrl, { cache: 'no-store' });
+      const status = await statusRes.json();
+      if (status.state === 'error') throw new Error(status.error || 'capture failed');
+      if (status.state === 'ready') {
+        const snapshot = {
+          manifest: status.manifest || {},
+          context: status.context || '',
+          artifacts: status.artifacts || {},
+          at: Date.now(),
+        };
+        const textMeta = snapshot.artifacts['text.txt'];
+        if (textMeta?.url) {
+          try {
+            const textRes = await fetch(textMeta.url);
+            if (textRes.ok) snapshot.text = (await textRes.text()).slice(0, 12000);
+          } catch {
+            /* TTS is optional. */
+          }
+        }
+        webCaptureCache.set(key, { snapshot, at: Date.now() });
+        return snapshot;
+      }
+      await sleep(300);
+    }
+    throw new Error('capture timed out');
+  })();
+
+  webCaptureCache.set(key, { promise, at: 0 });
+  try {
+    return await promise;
+  } catch (error) {
+    webCaptureCache.delete(key);
+    throw error;
+  }
+}
+
+function mountWebArtifacts(guest, site, snapshot) {
+  const { exports } = guest;
+  if (!exports || !exports.app_mount_add) return;
+  guest.webMounts = guest.webMounts || new Map();
+  const order = [
+    'index.html',
+    'rendered.html',
+    'page.png',
+    'text.txt',
+    'headers.txt',
+    'console.txt',
+    'network.json',
+    'capture.json',
+  ];
+  for (const path of order) {
+    const meta = snapshot.artifacts[path];
+    if (!meta) continue;
+    const mountKey = `${site.id}/${path}`;
+    const existing = guest.webMounts.get(mountKey);
+    if (existing != null) {
+      exports.app_mount_update_size(existing, meta.bytes || 0);
+      const item = guest.mounts[existing];
+      if (item) {
+        item.bytes = meta.bytes || 0;
+        item.url = meta.url;
+        item.context = snapshot.context;
+        item.snapshot = snapshot;
+      }
+      continue;
+    }
+    const name = `web/${site.id}/${path}`;
+    const encoded = textEncoder.encode(name).subarray(0, 64);
+    const namePtr = exports.app_mount_name_buf();
+    new Uint8Array(exports.memory.buffer).set(encoded, namePtr);
+    const idx = exports.app_mount_add(encoded.length, meta.bytes || 0);
+    if (idx < 0) continue;
+    guest.webMounts.set(mountKey, idx);
+    guest.mounts.push({
+      name,
+      source: 'web',
+      siteId: site.id,
+      artifact: path,
+      bytes: meta.bytes || 0,
+      kind: path.endsWith('.png') ? 'image' : 'code',
+      url: meta.url,
+      context: snapshot.context,
+      snapshot,
+    });
+  }
+}
+
+async function stageWebArtifact(guest, idx, item) {
+  const { exports } = guest;
+  if (!exports) return;
+  const truncated = item.kind === 'image' ? false : (item.bytes || 0) > WEB_TEXT_CAP;
+  const contextText = `${item.context || ''}\nARTIFACT=${item.artifact} (${item.bytes || 0} B)\nBYTES=${item.bytes || 0}\nTRUNCATED=${truncated}\n`;
+  const contextBytes = textEncoder.encode(contextText).subarray(0, 4096);
+  const contextPtr = exports.app_mount_context_ptr();
+  new Uint8Array(exports.memory.buffer).set(contextBytes, contextPtr);
+  exports.app_mount_commit_context(idx, contextBytes.byteLength);
+
+  const res = await fetch(item.url);
+  if (!res.ok) throw new Error(`artifact ${item.artifact}: HTTP ${res.status}`);
+
+  if (item.kind === 'image') {
+    const decoded = await decodeBlobToRgba(await res.blob());
+    const maxBytes = guest.width * guest.height * 4;
+    if (decoded.rgba.byteLength > maxBytes) throw new Error('screenshot exceeds staging buffer');
+    const stagingPtr = exports.app_mount_staging_ptr();
+    new Uint8Array(exports.memory.buffer).set(decoded.rgba, stagingPtr);
+    const t0 = performance.now();
+    exports.app_mount_commit_rgba(idx, decoded.width, decoded.height);
+    const t1 = performance.now();
+    guest.blitToCanvas(t0, t1);
+  } else {
+    const bytes = new Uint8Array(await res.arrayBuffer()).subarray(0, WEB_TEXT_CAP);
+    const textPtr = exports.app_mount_text_ptr();
+    new Uint8Array(exports.memory.buffer).set(bytes, textPtr);
+    const t0 = performance.now();
+    exports.app_mount_commit_text(idx, bytes.byteLength);
+    const t1 = performance.now();
+    guest.blitToCanvas(t0, t1);
+  }
+}
+
+async function initWebForGuest(guest) {
+  try {
+    const cfg = await loadWebConfig();
+    if (!cfg || !cfg.captureEndpoint || !Array.isArray(cfg.sites) || !cfg.sites.length) return;
+    if (guest.disposed || !guest.exports) return;
+    guest.webConfig = cfg;
+    const sites = (guest.webSiteId
+      ? cfg.sites.filter((candidate) => candidate.id === guest.webSiteId)
+      : cfg.sites
+    ).slice(0, 12);
+    if (!sites.length) return;
+    guest.webSites = sites;
+    guest.webSnapshots = new Map();
+    writeWebMeta(guest, webMetaText('capturing', `Capturing ${sites.length} web sites...`, sites));
+    const results = await Promise.all(
+      sites.map(async (site) => {
+        try {
+          return { site, snapshot: await captureSite(site, guest.width, guest.height) };
+        } catch (error) {
+          console.error(`web capture failed for ${site.id}:`, error);
+          return { site, error };
+        }
+      }),
+    );
+    let ready = 0;
+    let failed = 0;
+    for (const { site, snapshot, error } of results) {
+      if (guest.disposed || !guest.exports) return;
+      if (snapshot) {
+        guest.webSnapshots.set(site.id, snapshot);
+        mountWebArtifacts(guest, site, snapshot);
+        ready += 1;
+      } else {
+        failed += 1;
+      }
+      writeWebMeta(
+        guest,
+        webMetaText(
+          'capturing',
+          `${ready}/${sites.length} web sites ready${error ? ` · ${site.id} failed` : ''}`,
+          sites,
+        ),
+      );
+    }
+    if (guest.render) guest.render();
+    const state = failed === 0 ? 'ready' : ready > 0 ? 'partial' : 'error';
+    writeWebMeta(
+      guest,
+      webMetaText(state, `${ready}/${sites.length} web sites captured`, sites),
+    );
+    if (guest.render) guest.render();
+    if (guest.exports.app_mount_pending_idx && guest.exports.app_mount_pending_idx() >= 0) {
+      servicePendingMountFetch(guest).catch((error) => console.error(error));
+    }
+    setStatus(`${guest.name} · captured ${ready}/${sites.length} web sites`, true);
+  } catch (error) {
+    console.error(error);
+    if (!guest.disposed && guest.exports) {
+      writeWebMeta(guest, webMetaText('error', error.message || error, guest.webSites || []));
+    }
+    setStatus(`${guest.name} · web capture failed: ${error.message || error}`);
+  }
+}
+
+async function refreshWebForGuest(guest) {
+  const sites = guest.webSites?.length ? guest.webSites : guest.webConfig?.sites || [];
+  if (!sites.length) {
+    await initWebForGuest(guest);
+    return;
+  }
+  writeWebMeta(guest, webMetaText('capturing', `Refreshing ${sites.length} web sites...`, sites));
+  const results = await Promise.all(
+    sites.map(async (site) => {
+      try {
+        return {
+          site,
+          snapshot: await captureSite(site, guest.width, guest.height, { force: true }),
+        };
+      } catch (error) {
+        console.error(`web refresh failed for ${site.id}:`, error);
+        return { site, error };
+      }
+    }),
+  );
+  let ready = 0;
+  let failed = 0;
+  for (const { site, snapshot } of results) {
+    if (guest.disposed || !guest.exports) return;
+    if (snapshot) {
+      guest.webSnapshots.set(site.id, snapshot);
+      mountWebArtifacts(guest, site, snapshot);
+      ready += 1;
+    } else {
+      failed += 1;
+    }
+    writeWebMeta(
+      guest,
+      webMetaText('capturing', `${ready}/${sites.length} web sites refreshed`, sites),
+    );
+  }
+  const state = failed === 0 ? 'ready' : ready > 0 ? 'partial' : guest.webSnapshots.size ? 'stale' : 'error';
+  writeWebMeta(guest, webMetaText(state, `${ready}/${sites.length} web sites refreshed`, sites));
+  const selected = guest.exports.app_active_page ? guest.exports.app_active_page() : -1;
+  if (selected >= 0 && guest.mounts[selected]?.source === 'web') {
+    await stageWebArtifact(guest, selected, guest.mounts[selected]);
+  } else if (guest.render) {
+    guest.render();
+  }
+  if (guest.exports.app_mount_pending_idx && guest.exports.app_mount_pending_idx() >= 0) {
+    servicePendingMountFetch(guest).catch((error) => console.error(error));
+  }
+  setStatus(`${guest.name} · refreshed ${ready}/${sites.length} web sites`, true);
+}
+
+function serviceWebControl(guest) {
+  if (!guest?.exports?.app_web_take_refresh) return;
+  if (guest.exports.app_web_take_refresh() !== 0) {
+    refreshWebForGuest(guest).catch((error) => console.error(error));
+  }
+}
 
 /* Flat key namespace mirrored by `v2/src/input.rs::Key`. Keep both in sync. */
 const KEY_CODES = {
@@ -75,6 +425,7 @@ const KEY_CODES = {
   ArrowDown: 51,
   F9: 60,
   F10: 61,
+  F5: 62,
 };
 
 /* Modifier bits mirrored by `v2/src/input.rs::Mods`. */
@@ -148,7 +499,9 @@ function handleTtsToggle(guest) {
   const ctxPtr = guest.exports.app_mount_context_ptr ? guest.exports.app_mount_context_ptr() : 0;
   let textToSpeak = '';
 
-  if (ctxPtr) {
+  if (item.source === 'web' && item.snapshot?.text) {
+    textToSpeak = `Web snapshot of ${item.siteId}. ${item.snapshot.text.slice(0, 8000)}`;
+  } else if (ctxPtr) {
     const mem = new Uint8Array(guest.exports.memory.buffer);
     const slice = mem.subarray(ctxPtr, ctxPtr + 4096);
     const zeroIdx = slice.indexOf(0);
@@ -335,6 +688,9 @@ function mountCatalogIntoGuest(guest, mounts = DEFAULT_MOUNTS) {
   if (!exports || !exports.app_mount_clear) return;
   exports.app_mount_clear();
   guest.mounts = mounts.slice();
+  guest.webMounts = new Map();
+  guest.webSnapshots = new Map();
+  guest.webSites = [];
 
   const namePtr = exports.app_mount_name_buf();
   for (const item of guest.mounts) {
@@ -349,7 +705,7 @@ async function fetchContextForMount(item) {
   try {
     const lastSlash = item.url.lastIndexOf('/');
     const dirUrl = lastSlash !== -1 ? item.url.slice(0, lastSlash) : '.';
-    const contextUrlStr = `${dirUrl}/.context.xml`;
+    const contextUrlStr = item.contextUrl || `${dirUrl}/.context.xml`;
     const fileName = item.name.slice(item.name.lastIndexOf('/') + 1);
 
     let doc = contextXmlCache.get(contextUrlStr);
@@ -420,6 +776,12 @@ async function servicePendingMountFetch(guest) {
   const item = guest.mounts[idx];
   const isImage = item.kind === 'image' || /\.(png|jpe?g)$/i.test(item.name);
   try {
+    if (item.source === 'web') {
+      setStatus(`${guest.name} · staging web://${item.siteId}/${item.artifact}…`, true);
+      await stageWebArtifact(guest, idx, item);
+      setStatus(`${guest.name} · staged web://${item.siteId}/${item.artifact}`, true);
+      return;
+    }
     if (isImage) {
       setStatus(`${guest.name} · decoding ~/${item.name} → RGBA8888…`, true);
       const clientH = Math.max(1, guest.height - TITLE_H);
@@ -475,7 +837,12 @@ async function servicePendingMountFetch(guest) {
     }
   } catch (error) {
     console.error(error);
-    setStatus(`${guest.name} · failed to stage ${item.name}`);
+    if (guest.exports?.app_mount_commit_error) {
+      guest.exports.app_mount_commit_error(idx, 1);
+      const t = performance.now();
+      guest.blitToCanvas(t, t);
+    }
+    setStatus(`${guest.name} · failed to stage ${item.name}: ${error.message || error}`);
   }
 }
 
@@ -821,6 +1188,7 @@ async function createGuest(opts = {}) {
         } else {
           setStatus(`${vm.name} · ${selectionLabel(vm)} · ${fmtHex32(vm.fbHash)}`, true);
         }
+        serviceWebControl(vm);
         servicePendingMountFetch(vm);
       }
       return rc;
@@ -930,6 +1298,7 @@ async function createGuest(opts = {}) {
             true,
           );
         }
+        serviceWebControl(vm);
         servicePendingMountFetch(vm);
       }
     });
@@ -946,6 +1315,7 @@ async function createGuest(opts = {}) {
       true,
     );
     pumpClock();
+    initWebForGuest(vm).catch((error) => console.error(error));
     return vm;
   } catch (error) {
     console.error(error);

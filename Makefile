@@ -41,7 +41,7 @@ NATIVE_ASSETS := $(OBJ)/native/$(GEN)/assets_gen.o \
                  $(OBJ)/native/$(GEN)/about_gen.o \
                  $(OBJ)/native/$(GEN)/demo_gen.o
 
-.PHONY: all v2 v2-folded test-v2 assets test clean debug release serve
+.PHONY: all v2 v2-folded test-v2 assets test clean debug release serve serve-web web-capture
 
 all: $(WASM_OUT) $(V2_WASM_OUT)
 
@@ -58,11 +58,11 @@ $(V2_WASM_OUT): $(wildcard v2/Cargo.toml v2/build.rs v2/src/*.rs v2/glyphs/*/*.t
 	@mkdir -p $(dir $@)
 	cargo build --manifest-path v2/Cargo.toml --target wasm32-unknown-unknown --release
 	cp v2/target/wasm32-unknown-unknown/release/appliance.wasm $@
-	@mkdir -p web/v2/build web/assets web/demo web/gh/mines-sm
+	@mkdir -p web/v2/build web/assets web/demo web/gh
 	@cp $@ web/v2/build/appliance.wasm
 	@cp assets/*.png assets/.context.xml web/assets/
 	@cp demo/* demo/.context.xml web/demo/
-	@cp -R gh/mines-sm/. web/gh/mines-sm/
+	@cp -R gh/mines-sm gh/mines-livive-net gh/gm-livive-net web/gh/
 	@ls -l $@ | awk '{printf "v2 wasm: %d bytes\n", $$5}'
 
 test-v2:
@@ -178,6 +178,12 @@ debug:
 	  WASM_LDFLAGS="$(WASM_LDFLAGS) -O0 -g -sASSERTIONS=1" all
 
 release: all
+
+serve-web:
+	python3 -m http.server 8081 --directory web
+
+web-capture:
+	cd services/web-capture && npm install && npm start
 
 serve:
 	docker compose up --build serve

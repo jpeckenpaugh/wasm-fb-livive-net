@@ -403,6 +403,59 @@ pub extern "C" fn app_mount_add(name_len: usize, byte_size: u32) -> i32 {
 }
 
 #[no_mangle]
+pub extern "C" fn app_mount_update_size(idx: i32, byte_size: u32) -> i32 {
+    with_state(|wm, fb, st, txt, ctx| {
+        if idx < 0 || idx as usize >= wm.files.count {
+            return -1;
+        }
+        wm.files.entries[idx as usize].byte_size = byte_size;
+        if wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+        0
+    })
+}
+
+/// Host-side staging failure for a mount. The Files preview renders an error
+/// card instead of waiting forever on "Loading preview...".
+#[no_mangle]
+pub extern "C" fn app_mount_commit_error(idx: i32, code: i32) {
+    with_state(|wm, fb, st, txt, ctx| {
+        wm.files.complete_error(idx, code);
+        if wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+    });
+}
+
+/// `KEY=VALUE\n` capture metadata for `web://` (512 bytes).
+#[no_mangle]
+pub extern "C" fn app_web_meta_ptr() -> *mut u8 {
+    unsafe { (*GUEST.wm.get()).files.web_meta.as_mut_ptr() }
+}
+
+#[no_mangle]
+pub extern "C" fn app_web_commit_meta(byte_len: usize) {
+    with_state(|wm, fb, st, txt, ctx| {
+        wm.files.complete_web_meta(byte_len);
+        if wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+    });
+}
+
+/// Returns 1 once when the guest requested a web re-capture, then clears.
+#[no_mangle]
+pub extern "C" fn app_web_take_refresh() -> i32 {
+    unsafe {
+        let files = &mut (*GUEST.wm.get()).files;
+        let requested = files.web_refresh_requested;
+        files.web_refresh_requested = false;
+        i32::from(requested)
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn app_mount_staging_ptr() -> *mut u8 {
     unsafe { staging_base_ptr() as *mut u8 }
 }
@@ -646,7 +699,7 @@ mod tests {
         let files_menu_x = wm::MENU_X0 + 20;
         assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
         assert_eq!(
-            app_click(files_menu_x, TITLE_H + 16 + 3 * wm::MENU_ITEM_H),
+            app_click(files_menu_x, TITLE_H + 16 + 5 * wm::MENU_ITEM_H),
             CLICK_CHANGED
         );
         assert_eq!(app_selected(), AppSlot::Desktop as i32);
@@ -691,8 +744,8 @@ mod tests {
         app_mount_clear();
         let name_buf = unsafe { core::slice::from_raw_parts_mut(app_mount_name_buf(), 64) };
 
-        // Mount a GitHub file: "github/lib.rs"
-        let f_gh = b"github/lib.rs";
+        // Mount a nested GitHub file: "gh/jpeckenpaugh/mines-sm/lib.rs"
+        let f_gh = b"gh/jpeckenpaugh/mines-sm/lib.rs";
         name_buf[..f_gh.len()].copy_from_slice(f_gh);
         let gh_idx = app_mount_add(f_gh.len(), 4096);
         assert_eq!(gh_idx, 0);
@@ -714,7 +767,10 @@ mod tests {
             app_click(files_menu_x, TITLE_H + 16 + wm::MENU_ITEM_H),
             CLICK_CHANGED
         );
-        assert_eq!(app_active_page(), 0); // Active file is github/lib.rs (index 0)
+        assert_eq!(app_active_page(), -1); // At gh:// root
+        // Open the repository row -> gh://jpeckenpaugh/mines-sm/
+        assert_eq!(app_click(100, TITLE_H + 76 + 46 + 10), CLICK_CHANGED);
+        assert_eq!(app_active_page(), 0); // Active file is lib.rs (index 0)
         assert_eq!(app_mount_pending_idx(), 0);
 
         // Stage Rust source code into text buffer
@@ -750,7 +806,7 @@ mod tests {
         // Toggle via menu item 2 (TOGGLE CONTEXT)
         assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
         assert_eq!(
-            app_click(files_menu_x, TITLE_H + 16 + 2 * wm::MENU_ITEM_H),
+            app_click(files_menu_x, TITLE_H + 16 + 4 * wm::MENU_ITEM_H),
             CLICK_CHANGED
         );
         assert_eq!(app_files_context_mode(), 1);
@@ -758,7 +814,7 @@ mod tests {
         // Toggle back via menu item 2
         assert_eq!(app_click(files_menu_x, 16), CLICK_CHANGED);
         assert_eq!(
-            app_click(files_menu_x, TITLE_H + 16 + 2 * wm::MENU_ITEM_H),
+            app_click(files_menu_x, TITLE_H + 16 + 4 * wm::MENU_ITEM_H),
             CLICK_CHANGED
         );
         assert_eq!(app_files_context_mode(), 0);

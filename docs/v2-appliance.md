@@ -1,10 +1,11 @@
 # Appliance v2: Minimalist `no_std` Rust Wasm Window Manager & Appliance
 
-`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~126 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, a 5x7 bitmap font with Native/Smooth render modes, ten color themes, and built-in system attestation.
+`v2/` represents the next-generation evolution of the `wasm-fb` project. While v1 established the host/guest framebuffer contract in C with compiled-in assets, v2 re-architects the guest as a **~150 KiB `#![no_std]` Rust appliance and window manager** with zero baked-in assets, on-demand host staging, a 5x7 bitmap font with Native/Smooth render modes, ten color themes, and built-in system attestation.
 
 ```
 Browser Host (web/v2/host.js)
   ├── PNG / XML / Text Upstream Decoder (DOMParser, ImageDecoder, Web Speech API)
+  ├── Optional Web Capture Upstream (web://; headless Chromium outside the guest)
   ├── Staging Bridge (RGBA8888, UTF-8 text, KEY=VALUE\n context wire buffer)
   └── Single-threaded Rust Wasm Guest (v2/src/lib.rs)
         ├── Dynamic linear memory paging (__heap_base -> FB + Staging)
@@ -17,7 +18,7 @@ Browser Host (web/v2/host.js)
               ├── Calculator (calc.rs): Desk calculator with formatted numeric display
               ├── Minesweeper (mines.rs, mine_sm.rs): 8x8 bitboard state machine
               └── Files & Preview (files.rs, code.rs): Two-panel finder, code syntax highlighting,
-                  enriched context sidecars, and TTS readback
+                  enriched context sidecars, captured web:// snapshots, and TTS readback
 ```
 
 ---
@@ -26,13 +27,14 @@ Browser Host (web/v2/host.js)
 
 ### 1.1 Pure `#![no_std]` on `wasm32-unknown-unknown`
 - Zero external runtime dependencies, zero standard library (`no_std`), and panic = abort.
-- Compiles down to **~126 KiB** of Wasm bytecode (128,591 B in the current release build).
+- Compiles down to **~150 KiB** of Wasm bytecode (151,906 B locally; 153,940 B in the pinned Docker build).
 - Linear memory is dynamically grown via `memory_grow` above `__heap_base` in `app_init(width, height)` to support dynamic resolutions ranging from mobile (`360x800`) to 1080p (`1920x1080`).
 
 ### 1.2 Upstream Host Decoding vs. Zero Static Bloat
 - In v1, the Wasm binary was ~17.8 MiB because raw RGBA pixels were compiled in.
 - In v2, no images, source samples, or documentation strings are baked into the Wasm binary.
 - The JS hypervisor (`web/v2/host.js`) decodes PNGs into raw RGBA8888, parses XML, and fetches UTF-8 source code, staging them into designated guest linear memory buffers only when selected.
+- Optional `web://` snapshots use a local capture service to load a page in headless Chromium and return raw source, post-load DOM, screenshot, text, and diagnostics. The guest still only receives text and RGBA8888; see [web-capture.md](web-capture.md).
 
 ### 1.3 Appliance Window Manager (`wm.rs`)
 - **32px Title Bar**: `Home`, app, `View`, and `Testing` menus, status, session clock.
@@ -63,4 +65,4 @@ Browser Host (web/v2/host.js)
 | **System** | `system.rs` | System overview, hardware/build attestation, performance telemetry, a Fonts page with a 1x-8x selectable specimen and style ladder, icon galleries, the Theme page, and test patterns. |
 | **Calculator** | `calc.rs` | Interactive desk calculator with integer/decimal entry, thousands grouping, and keyboard entry. |
 | **Minesweeper** | `mines.rs`, `mine_sm.rs` | High-performance 8×8 bitboard engine (`u64` bitmasks for mines, flags, reveals) with SplitMix64 PRNG, RL observation tensor exports (`[f32; 64]`), and Classic/Shielded strike rules. |
-| **Files & Preview** | `files.rs`, `code.rs` | Two-panel explorer (Left 1/3 folder navigation, Right 2/3 live preview) supporting wallpapers, general code samples, task-scoped GitHub repo mounts (`gh://`), syntax highlighting, and TTS. |
+| **Files & Preview** | `files.rs`, `code.rs` | Two-panel explorer (left folder navigation, right live preview) supporting wallpapers, general code samples, nested GitHub repo mounts (`gh://<owner>/<repo>/`), captured web snapshots (`web://<site>/`, four configured sites), syntax highlighting, context metadata, and TTS. |

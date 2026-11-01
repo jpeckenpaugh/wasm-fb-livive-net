@@ -48,6 +48,7 @@ pub enum Key {
     Down = 51,
     Dock = 60,
     MenuBar = 61,
+    Refresh = 62,
 }
 
 impl Key {
@@ -92,6 +93,7 @@ impl Key {
             51 => Some(Key::Down),
             60 => Some(Key::Dock),
             61 => Some(Key::MenuBar),
+            62 => Some(Key::Refresh),
             _ => None,
         }
     }
@@ -225,6 +227,7 @@ mod tests {
         assert_eq!(Key::Down as i32, 51);
         assert_eq!(Key::Dock as i32, 60);
         assert_eq!(Key::MenuBar as i32, 61);
+        assert_eq!(Key::Refresh as i32, 62);
         assert_eq!(Key::from_code(99), None);
     }
 

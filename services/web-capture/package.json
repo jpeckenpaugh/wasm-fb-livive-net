@@ -1,0 +1,11 @@
+{
+  "name": "wasm-fb-web-capture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

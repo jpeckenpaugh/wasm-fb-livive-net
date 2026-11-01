@@ -4,10 +4,11 @@
 //! - Left 1/3 (`x: 0..426`, `w: 426`): `~/` File Browser:
 //!   - `~/wallpapers` (`wallpapers/*`)
 //!   - `~/samples` (`samples/*`)
-//!   - `gh://mines-sm` (`github/*`)
+//!   - `gh://<owner>/<repo>/` (`gh/<owner>/<repo>/*`)
+//!   - `web://<site>/` (`web/<site>/*` captured web snapshot)
 //! - Right 2/3 (`x: 428..1280`, `w: 852`): Live read-only Preview of the selected item
 //!   (folder summary at `~/`, scaled `RGBA8888` image preview inside `~/wallpapers`,
-//!   syntax-highlighted source preview inside `~/samples` / `gh://mines-sm`,
+//!   syntax-highlighted source preview inside `~/samples` / `gh://<owner>/<repo>/`,
 //!   or enriched `.context.xml` Knowledge Graph & Architectural Summary).
 
 use crate::code::{count_total_lines, draw_code_preview, is_image_filename, lang_for_filename};
@@ -22,10 +23,11 @@ use crate::layout::{Metrics, Rect};
 use crate::theme as t;
 use crate::ui;
 
-pub const MAX_MOUNT_FILES: usize = 24;
-pub const MAX_NAME_LEN: usize = 48;
-pub const MAX_TEXT_BYTES: usize = 16384;
+pub const MAX_MOUNT_FILES: usize = 128;
+pub const MAX_NAME_LEN: usize = 64;
+pub const MAX_TEXT_BYTES: usize = 768 * 1024;
 pub const MAX_CONTEXT_BYTES: usize = 4096;
+pub const WEB_META_BYTES: usize = 512;
 
 pub const CODE_CHUNK_LINES: usize = 30;
 
@@ -44,7 +46,7 @@ pub struct FilesGeom {
 
 pub fn files_geom(client_w: i32, client_h: i32) -> FilesGeom {
     let m = Metrics::new(client_w, client_h);
-    let ratio = if client_w < 700 { 48 } else { 33 };
+    let ratio = if client_w < 700 { 48 } else { 37 };
     let left_w = (client_w * ratio / 100).max(120);
     let div_x = left_w;
     let right_x = left_w + 2;
@@ -76,7 +78,10 @@ pub enum FolderLevel {
     HomeRoot = 0,
     HomeWallpapers = 1,
     HomeSamples = 2,
-    GithubRepo = 3,
+    GhRoot = 3,
+    GhRepo = 4,
+    WebRoot = 5,
+    WebSite = 6,
 }
 
 #[derive(Clone, Copy)]
@@ -120,10 +125,48 @@ impl MountEntry {
         if full.starts_with(b"wallpapers/") {
             return true;
         }
-        if full.starts_with(b"samples/") || full.starts_with(b"github/") {
-            return false;
+        if full.starts_with(b"samples/")
+            || full.starts_with(b"gh/")
+            || full.starts_with(b"web/")
+        {
+            return is_image_filename(self.base_name());
         }
         is_image_filename(self.base_name())
+    }
+
+    pub fn is_web(&self) -> bool {
+        self.name_str().as_bytes().starts_with(b"web/")
+    }
+
+    pub fn is_gh(&self) -> bool {
+        self.name_str().as_bytes().starts_with(b"gh/")
+    }
+
+    /// `gh/<owner>/<repo>/...` -> `(owner, repo)`.
+    pub fn gh_repo(&self) -> Option<(&str, &str)> {
+        let rest = self.name_str().strip_prefix("gh/")?;
+        let slash = rest.find('/')?;
+        let owner = &rest[..slash];
+        let rest = &rest[slash + 1..];
+        let slash = rest.find('/')?;
+        let repo = &rest[..slash];
+        if owner.is_empty() || repo.is_empty() {
+            None
+        } else {
+            Some((owner, repo))
+        }
+    }
+
+    /// `web/<site>/...` -> `<site>`.
+    pub fn web_site(&self) -> Option<&str> {
+        let rest = self.name_str().strip_prefix("web/")?;
+        let slash = rest.find('/')?;
+        let site = &rest[..slash];
+        if site.is_empty() {
+            None
+        } else {
+            Some(site)
+        }
     }
 
     pub fn in_folder(&self, level: FolderLevel) -> bool {
@@ -134,15 +177,20 @@ impl MountEntry {
                 full.starts_with(b"wallpapers/")
                     || (self.is_image()
                         && !full.starts_with(b"samples/")
-                        && !full.starts_with(b"github/"))
+                        && !full.starts_with(b"gh/")
+                        && !full.starts_with(b"web/"))
             }
             FolderLevel::HomeSamples => {
                 full.starts_with(b"samples/")
                     || (!self.is_image()
                         && !full.starts_with(b"wallpapers/")
-                        && !full.starts_with(b"github/"))
+                        && !full.starts_with(b"gh/")
+                        && !full.starts_with(b"web/"))
             }
-            FolderLevel::GithubRepo => full.starts_with(b"github/"),
+            FolderLevel::GhRoot
+            | FolderLevel::GhRepo
+            | FolderLevel::WebRoot
+            | FolderLevel::WebSite => false,
         }
     }
 }
@@ -210,7 +258,7 @@ impl FilesFocus {
 pub struct FilesApp {
     pub entries: [MountEntry; MAX_MOUNT_FILES],
     pub count: usize,
-    /// Current folder (`~/`, `~/wallpapers`, `~/samples`, or `gh://mines-sm`).
+    /// Current folder (`~/`, `~/wallpapers`, `~/samples`, `gh://<owner>/<repo>/`, or `web://<site>/`).
     pub level: FolderLevel,
     /// Selected row index inside the current folder view.
     pub row_selected: usize,
@@ -243,6 +291,20 @@ pub struct FilesApp {
     pub focus_visible: bool,
     pub hover_row: Option<usize>,
     pub hover_control: Option<FilesFocus>,
+    /// Selected `gh/<owner>/<repo>` path.
+    pub gh_repo: [u8; MAX_NAME_LEN],
+    pub gh_repo_len: usize,
+    /// Selected `web/<site>` path.
+    pub web_site: [u8; MAX_NAME_LEN],
+    pub web_site_len: usize,
+    /// Host-provided `KEY=VALUE\n` capture metadata for the `web://` root.
+    pub web_meta: [u8; WEB_META_BYTES],
+    pub web_meta_len: usize,
+    /// Guest asked the host to re-capture the site.
+    pub web_refresh_requested: bool,
+    /// Per-mount staging error (`-1` if none).
+    pub error_idx: i32,
+    pub error_code: i32,
 }
 
 impl FilesApp {
@@ -273,6 +335,15 @@ impl FilesApp {
             focus_visible: false,
             hover_row: None,
             hover_control: None,
+            gh_repo: [0; MAX_NAME_LEN],
+            gh_repo_len: 0,
+            web_site: [0; MAX_NAME_LEN],
+            web_site_len: 0,
+            web_meta: [0; WEB_META_BYTES],
+            web_meta_len: 0,
+            web_refresh_requested: false,
+            error_idx: -1,
+            error_code: 0,
         }
     }
 
@@ -298,6 +369,15 @@ impl FilesApp {
         self.focus_visible = false;
         self.hover_row = None;
         self.hover_control = None;
+        self.gh_repo = [0; MAX_NAME_LEN];
+        self.gh_repo_len = 0;
+        self.web_site = [0; MAX_NAME_LEN];
+        self.web_site_len = 0;
+        self.web_meta = [0; WEB_META_BYTES];
+        self.web_meta_len = 0;
+        self.web_refresh_requested = false;
+        self.error_idx = -1;
+        self.error_code = 0;
     }
 
     pub fn add_mount(&mut self, name_bytes: &[u8], byte_size: u32) -> i32 {
@@ -316,10 +396,306 @@ impl FilesApp {
         idx as i32
     }
 
+    pub fn web_field(&self, key: &str) -> Option<&str> {
+        if self.web_meta_len == 0 {
+            return None;
+        }
+        find_context_field(&self.web_meta[..self.web_meta_len], key.as_bytes())
+    }
+
+    pub fn web_state(&self) -> &str {
+        self.web_field("STATE").unwrap_or("unconfigured")
+    }
+
+    pub fn web_configured(&self) -> bool {
+        self.web_state() != "unconfigured" || self.web_site_count() > 0
+    }
+
+    pub fn gh_repo_name(&self) -> &str {
+        core::str::from_utf8(&self.gh_repo[..self.gh_repo_len]).unwrap_or("")
+    }
+
+    pub fn web_site_name(&self) -> &str {
+        core::str::from_utf8(&self.web_site[..self.web_site_len]).unwrap_or("")
+    }
+
+    pub fn gh_repo_count(&self) -> usize {
+        let mut n = 0;
+        for i in 0..self.count {
+            let Some((owner, repo)) = self.entries[i].gh_repo() else {
+                continue;
+            };
+            let mut duplicate = false;
+            for j in 0..i {
+                if let Some((prev_owner, prev_repo)) = self.entries[j].gh_repo() {
+                    if prev_owner == owner && prev_repo == repo {
+                        duplicate = true;
+                        break;
+                    }
+                }
+            }
+            if !duplicate {
+                n += 1;
+            }
+        }
+        n
+    }
+
+    pub fn gh_repo_at(&self, ord: usize) -> Option<&str> {
+        let mut seen = 0;
+        for i in 0..self.count {
+            let Some((owner, repo)) = self.entries[i].gh_repo() else {
+                continue;
+            };
+            let mut duplicate = false;
+            for j in 0..i {
+                if let Some((prev_owner, prev_repo)) = self.entries[j].gh_repo() {
+                    if prev_owner == owner && prev_repo == repo {
+                        duplicate = true;
+                        break;
+                    }
+                }
+            }
+            if duplicate {
+                continue;
+            }
+            if seen == ord {
+                let full = self.entries[i].name_str();
+                let start = 3;
+                let len = owner.len() + 1 + repo.len();
+                return Some(&full[start..start + len]);
+            }
+            seen += 1;
+        }
+        None
+    }
+
+    pub fn gh_repo_row(&self, repo: &str) -> Option<usize> {
+        for ord in 0..self.gh_repo_count() {
+            if self.gh_repo_at(ord) == Some(repo) {
+                return Some(ord + 1);
+            }
+        }
+        None
+    }
+
+    pub fn open_gh_repo_at(&mut self, ord: usize) -> bool {
+        let (len, buf) = {
+            let Some(repo) = self.gh_repo_at(ord) else {
+                return false;
+            };
+            let len = repo.len().min(MAX_NAME_LEN);
+            let mut buf = [0u8; MAX_NAME_LEN];
+            buf[..len].copy_from_slice(&repo.as_bytes()[..len]);
+            (len, buf)
+        };
+        self.gh_repo = buf;
+        self.gh_repo_len = len;
+        self.level = FolderLevel::GhRepo;
+        self.row_selected = if self.folder_file_count(FolderLevel::GhRepo) > 0 {
+            1
+        } else {
+            0
+        };
+        self.code_scroll = 0;
+        self.code_col_scroll = 0;
+        self.context_scroll = 0;
+        self.ensure_selected_staged();
+        true
+    }
+
+    pub fn web_site_count(&self) -> usize {
+        let mut n = 0;
+        for i in 0..self.count {
+            let Some(site) = self.entries[i].web_site() else {
+                continue;
+            };
+            let mut duplicate = false;
+            for j in 0..i {
+                if self.entries[j].web_site() == Some(site) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if !duplicate {
+                n += 1;
+            }
+        }
+        n
+    }
+
+    pub fn web_site_at(&self, ord: usize) -> Option<&str> {
+        let mut seen = 0;
+        for i in 0..self.count {
+            let Some(site) = self.entries[i].web_site() else {
+                continue;
+            };
+            let mut duplicate = false;
+            for j in 0..i {
+                if self.entries[j].web_site() == Some(site) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if duplicate {
+                continue;
+            }
+            if seen == ord {
+                return Some(site);
+            }
+            seen += 1;
+        }
+        None
+    }
+
+    pub fn web_site_row(&self, site: &str) -> Option<usize> {
+        for ord in 0..self.web_site_count() {
+            if self.web_site_at(ord) == Some(site) {
+                return Some(ord + 1);
+            }
+        }
+        None
+    }
+
+    pub fn open_web_site_at(&mut self, ord: usize) -> bool {
+        let (len, buf) = {
+            let Some(site) = self.web_site_at(ord) else {
+                return false;
+            };
+            let len = site.len().min(MAX_NAME_LEN);
+            let mut buf = [0u8; MAX_NAME_LEN];
+            buf[..len].copy_from_slice(&site.as_bytes()[..len]);
+            (len, buf)
+        };
+        self.web_site = buf;
+        self.web_site_len = len;
+        self.level = FolderLevel::WebSite;
+        self.row_selected = if self.folder_file_count(FolderLevel::WebSite) > 0 {
+            1
+        } else {
+            0
+        };
+        self.code_scroll = 0;
+        self.code_col_scroll = 0;
+        self.context_scroll = 0;
+        self.ensure_selected_staged();
+        true
+    }
+
+    fn repo_matches(entry: &MountEntry, repo: &str) -> bool {
+        let Some((owner, name)) = entry.gh_repo() else {
+            return false;
+        };
+        let mut parts = repo.splitn(2, '/');
+        parts.next() == Some(owner) && parts.next() == Some(name)
+    }
+
+    pub fn repo_file_count(&self, repo: &str) -> usize {
+        (0..self.count)
+            .filter(|&i| Self::repo_matches(&self.entries[i], repo))
+            .count()
+    }
+
+    pub fn site_file_count(&self, site: &str) -> usize {
+        (0..self.count)
+            .filter(|&i| self.entries[i].web_site() == Some(site))
+            .count()
+    }
+
+    pub fn entry_in_folder(&self, entry: &MountEntry, folder: FolderLevel) -> bool {
+        match folder {
+            FolderLevel::GhRepo => Self::repo_matches(entry, self.gh_repo_name()),
+            FolderLevel::WebSite => entry.web_site() == Some(self.web_site_name()),
+            FolderLevel::GhRoot | FolderLevel::WebRoot | FolderLevel::HomeRoot => false,
+            _ => entry.in_folder(folder),
+        }
+    }
+
+    pub fn gh_title<'a>(&self, buf: &'a mut [u8; 64]) -> &'a str {
+        let mut pos = 0usize;
+        for &b in b"gh://" {
+            if pos < buf.len() {
+                buf[pos] = b;
+                pos += 1;
+            }
+        }
+        for &b in self.gh_repo_name().as_bytes() {
+            if pos < buf.len() {
+                buf[pos] = b;
+                pos += 1;
+            }
+        }
+        if pos < buf.len() {
+            buf[pos] = b'/';
+            pos += 1;
+        }
+        core::str::from_utf8(&buf[..pos]).unwrap_or("gh://")
+    }
+
+    pub fn web_site_title<'a>(&self, buf: &'a mut [u8; 64]) -> &'a str {
+        let mut pos = 0usize;
+        for &b in b"web://" {
+            if pos < buf.len() {
+                buf[pos] = b;
+                pos += 1;
+            }
+        }
+        for &b in self.web_site_name().as_bytes() {
+            if pos < buf.len() {
+                buf[pos] = b;
+                pos += 1;
+            }
+        }
+        if pos < buf.len() {
+            buf[pos] = b'/';
+            pos += 1;
+        }
+        core::str::from_utf8(&buf[..pos]).unwrap_or("web://")
+    }
+
+    pub fn web_url<'a>(&self, buf: &'a mut [u8; 64]) -> &'a str {
+        let mut pos = 0usize;
+        for &b in b"https://" {
+            if pos < buf.len() {
+                buf[pos] = b;
+                pos += 1;
+            }
+        }
+        for &b in self.web_site_name().as_bytes() {
+            if pos < buf.len() {
+                buf[pos] = b;
+                pos += 1;
+            }
+        }
+        if pos < buf.len() {
+            buf[pos] = b'/';
+            pos += 1;
+        }
+        core::str::from_utf8(&buf[..pos]).unwrap_or("https://")
+    }
+
+    pub fn complete_web_meta(&mut self, byte_len: usize) {
+        self.web_meta_len = byte_len.min(WEB_META_BYTES);
+        if self.level == FolderLevel::WebRoot
+            && self.row_selected == 0
+            && self.web_site_count() > 0
+        {
+            self.row_selected = 1;
+        }
+    }
+
+    pub fn complete_error(&mut self, idx: i32, code: i32) {
+        self.error_idx = idx;
+        self.error_code = code;
+        if self.pending_fetch_idx == idx {
+            self.pending_fetch_idx = -1;
+        }
+    }
+
     pub fn folder_file_count(&self, folder: FolderLevel) -> usize {
         let mut n = 0;
         for i in 0..self.count {
-            if self.entries[i].in_folder(folder) {
+            if self.entry_in_folder(&self.entries[i], folder) {
                 n += 1;
             }
         }
@@ -329,22 +705,29 @@ impl FilesApp {
     /// Number of clickable rows in the Left 1/3 panel for the current `level`.
     pub fn visible_row_count(&self) -> usize {
         match self.level {
-            FolderLevel::HomeRoot => 3, // 0 = wallpapers/, 1 = samples/, 2 = gh://mines-sm/
-            FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
-                1 + self.folder_file_count(self.level) // row 0 = `../`, rows 1..=N = files
-            }
+            FolderLevel::HomeRoot => 4,
+            FolderLevel::GhRoot => 1 + self.gh_repo_count(),
+            FolderLevel::WebRoot => 1 + self.web_site_count(),
+            FolderLevel::HomeWallpapers
+            | FolderLevel::HomeSamples
+            | FolderLevel::GhRepo
+            | FolderLevel::WebSite => 1 + self.folder_file_count(self.level),
         }
     }
 
     /// Maps a `1`-based file row inside a subfolder to its global mount index (`0..count`).
     pub fn global_idx_for_row(&self, level: FolderLevel, row: usize) -> Option<usize> {
-        if level == FolderLevel::HomeRoot || row == 0 {
+        if matches!(
+            level,
+            FolderLevel::HomeRoot | FolderLevel::GhRoot | FolderLevel::WebRoot
+        ) || row == 0
+        {
             return None;
         }
         let target_ord = row - 1;
         let mut ord = 0;
         for i in 0..self.count {
-            if self.entries[i].in_folder(level) {
+            if self.entry_in_folder(&self.entries[i], level) {
                 if ord == target_ord {
                     return Some(i);
                 }
@@ -385,9 +768,11 @@ impl FilesApp {
 
     pub fn open_subfolder(&mut self, folder: FolderLevel) -> bool {
         self.level = folder;
-        let fcount = self.folder_file_count(folder);
-        // Pre-select the first file (`row 1`) when opening a non-empty subfolder so preview appears immediately!
-        self.row_selected = if fcount > 0 { 1 } else { 0 };
+        self.row_selected = match folder {
+            FolderLevel::HomeRoot => 0,
+            _ if self.visible_row_count() > 1 => 1,
+            _ => 0,
+        };
         self.code_scroll = 0;
         self.code_col_scroll = 0;
         self.context_scroll = 0;
@@ -408,9 +793,26 @@ impl FilesApp {
                 self.row_selected = 1;
                 true
             }
-            FolderLevel::GithubRepo => {
+            FolderLevel::GhRoot => {
                 self.level = FolderLevel::HomeRoot;
                 self.row_selected = 2;
+                true
+            }
+            FolderLevel::WebRoot => {
+                self.level = FolderLevel::HomeRoot;
+                self.row_selected = 3;
+                true
+            }
+            FolderLevel::GhRepo => {
+                let row = self.gh_repo_row(self.gh_repo_name()).unwrap_or(1);
+                self.level = FolderLevel::GhRoot;
+                self.row_selected = row;
+                true
+            }
+            FolderLevel::WebSite => {
+                let row = self.web_site_row(self.web_site_name()).unwrap_or(1);
+                self.level = FolderLevel::WebRoot;
+                self.row_selected = row;
                 true
             }
         }
@@ -420,6 +822,9 @@ impl FilesApp {
         self.staged_idx = idx;
         self.staged_w = w;
         self.staged_h = h;
+        if self.error_idx == idx {
+            self.error_idx = -1;
+        }
         if self.pending_fetch_idx == idx {
             self.pending_fetch_idx = -1;
         }
@@ -430,6 +835,9 @@ impl FilesApp {
         self.staged_text_len = byte_len.min(MAX_TEXT_BYTES);
         self.code_scroll = 0;
         self.code_col_scroll = 0;
+        if self.error_idx == idx {
+            self.error_idx = -1;
+        }
         if self.pending_fetch_idx == idx {
             self.pending_fetch_idx = -1;
         }
@@ -463,13 +871,24 @@ pub fn draw_window(
     let text_col = t::TEXT_BODY;
 
     // --- 1. Left 1/3 Panel: Folder / File Browser ---
+    let mut gh_title_buf = [0u8; 64];
+    let mut web_title_buf = [0u8; 64];
     let path_title = match app.level {
         FolderLevel::HomeRoot => "~/",
         FolderLevel::HomeWallpapers => "~/Wallpapers",
         FolderLevel::HomeSamples => "~/Samples",
-        FolderLevel::GithubRepo => "gh://mines-sm",
+        FolderLevel::GhRoot => "gh://",
+        FolderLevel::GhRepo => app.gh_title(&mut gh_title_buf),
+        FolderLevel::WebRoot => "web://",
+        FolderLevel::WebSite => app.web_site_title(&mut web_title_buf),
     };
-    let head_scale = if g.left_w < 240 { 2 } else { 3 };
+    let head_scale = if g.left_w < 240
+        || matches!(app.level, FolderLevel::GhRepo | FolderLevel::WebSite)
+    {
+        2
+    } else {
+        3
+    };
     draw_str(fb, g.pad_x, g.head_y, path_title, head_scale, t::TEXT);
     fb.fill(
         g.pad_x,
@@ -487,11 +906,13 @@ pub fn draw_window(
         FolderLevel::HomeRoot => {
             let wp_count = app.folder_file_count(FolderLevel::HomeWallpapers) as u32;
             let sm_count = app.folder_file_count(FolderLevel::HomeSamples) as u32;
-            let gh_count = app.folder_file_count(FolderLevel::GithubRepo) as u32;
+            let gh_count = app.gh_repo_count() as u32;
+            let web_count = app.web_site_count() as u32;
             let folders = [
                 ("wallpapers/", wp_count),
                 ("samples/", sm_count),
-                ("gh://mines-sm/", gh_count),
+                ("gh://", gh_count),
+                ("web://", web_count),
             ];
 
             for (r, &(fname, fcount)) in folders.iter().enumerate() {
@@ -511,7 +932,7 @@ pub fn draw_window(
                     fb,
                     g.pad_x + 8,
                     ry + (g.row_h - 4 - isz) / 2,
-                    Icon::Folder,
+                    if r == 3 { Icon::Search } else { Icon::Folder },
                     isz,
                     if selected { accent } else { label_col },
                 );
@@ -543,7 +964,92 @@ pub fn draw_window(
                 fb.fill(g.pad_x, ry + g.row_h - 4, row_w, 1, t::BORDER_DARK);
             }
         }
-        FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
+        FolderLevel::GhRoot | FolderLevel::WebRoot => {
+            let is_gh = app.level == FolderLevel::GhRoot;
+            let count = if is_gh {
+                app.gh_repo_count()
+            } else {
+                app.web_site_count()
+            };
+            for r in 0..(1 + count) {
+                let ry = g.row_start_y + (r as i32) * g.row_h;
+                if ry + g.row_h > fb.h {
+                    break;
+                }
+                let selected = r == app.row_selected;
+                let hovered = app.hover_row == Some(r);
+                if selected {
+                    fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_SELECTED);
+                    fb.fill(g.pad_x, ry, 4, g.row_h - 4, accent);
+                } else if hovered {
+                    fb.fill(g.pad_x, ry, row_w, g.row_h - 4, t::SURFACE_HOVER);
+                }
+                let isz = g.row_icon;
+                if r == 0 {
+                    draw_icon(
+                        fb,
+                        g.pad_x + 8,
+                        ry + (g.row_h - 4 - isz) / 2,
+                        Icon::Up,
+                        isz,
+                        if selected { accent } else { label_col },
+                    );
+                    draw_str(
+                        fb,
+                        g.pad_x + 12 + isz,
+                        ry + text_pad_y,
+                        "../",
+                        g.row_scale,
+                        if selected { t::TEXT } else { text_col },
+                    );
+                } else {
+                    let name = if is_gh {
+                        app.gh_repo_at(r - 1).unwrap_or("")
+                    } else {
+                        app.web_site_at(r - 1).unwrap_or("")
+                    };
+                    let display = if is_gh {
+                        name.rsplit('/').next().unwrap_or(name)
+                    } else {
+                        name
+                    };
+                    let mut name_buf = [0u8; 80];
+                    let mut pos = 0usize;
+                    for &b in display.as_bytes() {
+                        if pos < name_buf.len() - 1 {
+                            name_buf[pos] = b;
+                            pos += 1;
+                        }
+                    }
+                    name_buf[pos] = b'/';
+                    pos += 1;
+                    let row_name = core::str::from_utf8(&name_buf[..pos]).unwrap_or("");
+                    draw_icon(
+                        fb,
+                        g.pad_x + 8,
+                        ry + (g.row_h - 4 - isz) / 2,
+                        Icon::Folder,
+                        isz,
+                        if selected { accent } else { label_col },
+                    );
+                    let max_name =
+                        ((row_w - 20 - isz) / char_advance(g.row_scale)).max(4) as usize;
+                    draw_str(
+                        fb,
+                        g.pad_x + 12 + isz,
+                        ry + text_pad_y,
+                        ui::truncate_chars(row_name, max_name),
+                        g.row_scale,
+                        if selected { t::TEXT } else { text_col },
+                    );
+                }
+                fb.fill(g.pad_x, ry + g.row_h - 4, row_w, 1, t::BORDER_DARK);
+            }
+        }
+        FolderLevel::HomeWallpapers
+        | FolderLevel::HomeSamples
+        | FolderLevel::GhRepo
+        | FolderLevel::WebSite => {
             let total_rows = app.visible_row_count();
             for r in 0..total_rows {
                 let ry = g.row_start_y + (r as i32) * g.row_h;
@@ -673,6 +1179,29 @@ pub fn draw_window(
         if app.context_mode {
             let ctx_len = app.staged_context_len.min(staged_context.len());
             draw_context_preview(fb, app, &g, sel_entry, &staged_context[..ctx_len]);
+        } else if app.error_idx == sel_i32
+            && app.staged_idx != sel_i32
+            && app.staged_text_idx != sel_i32
+        {
+            let (title, detail) = match app.error_code {
+                1 => ("Network error", "The host could not fetch this artifact."),
+                2 => ("Capture timed out", "The site did not settle in time."),
+                3 => ("Blocked", "The capture service refused this URL."),
+                4 => ("Artifact too large", "The preview exceeds the staging limit."),
+                5 => ("Unsupported", "This artifact type cannot be previewed."),
+                _ => ("Preview unavailable", "Try another artifact or refresh the capture."),
+            };
+            draw_str_centered(fb, g.right_x, body_y, g.right_w, body_h / 2, title, 3, t::WARNING);
+            draw_str_centered(
+                fb,
+                g.right_x,
+                body_y,
+                g.right_w,
+                body_h / 2 + 34,
+                detail,
+                2,
+                t::TEXT_DIM,
+            );
         } else if sel_entry.is_image() {
             if app.staged_idx == sel_i32 && app.staged_w > 0 && app.staged_h > 0 {
                 fb.blit_scaled(
@@ -731,8 +1260,10 @@ pub fn draw_window(
                     FolderLevel::HomeWallpapers
                 } else if app.row_selected == 1 {
                     FolderLevel::HomeSamples
+                } else if app.row_selected == 2 {
+                    FolderLevel::GhRoot
                 } else {
-                    FolderLevel::GithubRepo
+                    FolderLevel::WebRoot
                 }
             }
             sub => sub,
@@ -872,7 +1403,7 @@ fn draw_preview_control_bar(
         controls_left = controls_left.min(next.x);
     }
     let mut title_buf = [0u8; 64];
-    let title = fmt_file_title(&mut title_buf, app.level, entry.base_name());
+    let title = fmt_file_title(&mut title_buf, app, entry.base_name());
     let max_chars = (((controls_left - (g.right_x + 12) - 8) / char_advance(2)).max(3)) as usize;
     let title = ui::truncate_chars(title, max_chars);
     draw_str(fb, g.right_x + 12, 14, title, 2, t::TEXT);
@@ -923,14 +1454,18 @@ fn draw_preview_control_bar(
     }
 }
 
-fn fmt_file_title<'a>(buf: &'a mut [u8; 64], level: FolderLevel, base_name: &str) -> &'a str {
-    let mut pos = 0;
-    let prefix = match level {
-        FolderLevel::GithubRepo => "gh://mines-sm/",
+fn fmt_file_title<'a>(buf: &'a mut [u8; 64], app: &FilesApp, base_name: &str) -> &'a str {
+    let mut prefix_buf = [0u8; 64];
+    let prefix = match app.level {
+        FolderLevel::GhRepo => app.gh_title(&mut prefix_buf),
+        FolderLevel::WebSite => app.web_site_title(&mut prefix_buf),
         FolderLevel::HomeWallpapers => "~/Wallpapers/",
         FolderLevel::HomeSamples => "~/Samples/",
         FolderLevel::HomeRoot => "~/",
+        FolderLevel::GhRoot => "gh://",
+        FolderLevel::WebRoot => "web://",
     };
+    let mut pos = 0;
     for &b in prefix.as_bytes() {
         if pos < buf.len() {
             buf[pos] = b;
@@ -955,6 +1490,14 @@ fn context_label(key: &str) -> &str {
         "EXPORTS" => "Exports",
         "DEPENDENTS" => "Dependents",
         "INVARIANTS" => "Invariants",
+        "URL" => "Url",
+        "STATUS" => "Status",
+        "VIEWPORT" => "Viewport",
+        "CAPTURED" => "Captured",
+        "RENDER_MS" => "Render",
+        "ARTIFACT" => "Artifact",
+        "BYTES" => "Bytes",
+        "TRUNCATED" => "Truncated",
         other => other,
     }
 }
@@ -977,6 +1520,32 @@ fn draw_context_preview(
 
     let scroll_px = (app.context_scroll as i32) * 14;
     let mut y = 50 - scroll_px;
+    let key_w = 160;
+
+    // Captured web metadata header: URL, STATUS, VIEWPORT, CAPTURED, RENDER_MS.
+    if entry.is_web() {
+        let web_keys = ["URL", "STATUS", "VIEWPORT", "CAPTURED", "RENDER_MS", "BYTES", "TRUNCATED"];
+        for &key in &web_keys {
+            if y >= 40 && y + 16 <= fb.h {
+                draw_str(fb, rx, y, context_label(key), 2, key_col);
+                let val = find_context_field(context_data, key.as_bytes()).unwrap_or("—");
+                let val_w = content_w - key_w;
+                let max_chars = (val_w / 6).max(4) as usize;
+                let val_clamped = if val.len() > max_chars {
+                    &val[..max_chars]
+                } else {
+                    val
+                };
+                draw_str(fb, rx + key_w, y, val_clamped, 2, text_col);
+            }
+            y += 18;
+        }
+        y += 6;
+        if y >= 40 && y < fb.h {
+            fb.fill(rx, y, content_w, 1, t::BORDER);
+        }
+        y += 12;
+    }
 
     // Mini Knowledge Graph rows: SCOPE, RUNTIME, ROLE, IMPORTS, EXPORTS, DEPENDENTS, INVARIANTS
     let keys = [
@@ -989,7 +1558,6 @@ fn draw_context_preview(
         "INVARIANTS",
     ];
 
-    let key_w = 90;
     for &key in &keys {
         if y >= 40 && y + 16 <= fb.h {
             draw_str(fb, rx, y, context_label(key), 2, key_col);
@@ -1138,16 +1706,30 @@ fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, fold
 
     let pad = if g.right_w < 400 { 16 } else { 48 };
     let rx = g.right_x + pad;
+    let mut gh_title_buf = [0u8; 64];
+    let mut web_title_buf = [0u8; 64];
     let title = match folder {
         FolderLevel::HomeWallpapers => "~/Wallpapers",
         FolderLevel::HomeSamples => "~/Samples",
-        FolderLevel::GithubRepo => "gh://mines-sm",
+        FolderLevel::GhRoot => "gh://",
+        FolderLevel::GhRepo => app.gh_title(&mut gh_title_buf),
+        FolderLevel::WebRoot => "web://",
+        FolderLevel::WebSite => app.web_site_title(&mut web_title_buf),
         FolderLevel::HomeRoot => "~/",
     };
     let subtitle = match folder {
         FolderLevel::HomeWallpapers => "RGBA8888 Upstream Images",
         FolderLevel::HomeSamples => "UTF-8 General Code Samples",
-        FolderLevel::GithubRepo => "Bitboard Minesweeper State Machine",
+        FolderLevel::GhRoot => "GitHub Repositories",
+        FolderLevel::GhRepo => "GitHub Repository",
+        FolderLevel::WebRoot => match app.web_state() {
+            "ready" => "Captured Web Sites",
+            "capturing" => "Capturing Web Sites...",
+            "stale" => "Stale Web Captures",
+            "error" | "partial" => "Some Web Captures Failed",
+            _ => "Captured Web Sites",
+        },
+        FolderLevel::WebSite => "Captured Web Snapshot",
         FolderLevel::HomeRoot => "",
     };
 
@@ -1174,13 +1756,76 @@ fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, fold
     let rule_y = g.head_y + line_height(head_sc) + 4 + line_height(body_sc) + 4;
     fb.fill(rx, rule_y, (g.right_w - 2 * pad).max(40), 1, t::BORDER);
 
+    if folder == FolderLevel::GhRoot || folder == FolderLevel::WebRoot {
+        let is_gh = folder == FolderLevel::GhRoot;
+        let count = if is_gh {
+            app.gh_repo_count()
+        } else {
+            app.web_site_count()
+        };
+        let step = 34;
+        for r in 0..count {
+            let ry = rule_y + 18 + r as i32 * step;
+            if ry + 16 > fb.h {
+                break;
+            }
+            let name = if is_gh {
+                app.gh_repo_at(r).unwrap_or("")
+            } else {
+                app.web_site_at(r).unwrap_or("")
+            };
+            let files = if is_gh {
+                app.repo_file_count(name)
+            } else {
+                app.site_file_count(name)
+            };
+            let max_name = ((g.right_w - 2 * pad - 90) / char_advance(body_sc)).max(4) as usize;
+            draw_str(
+                fb,
+                rx,
+                ry,
+                ui::truncate_chars(name, max_name),
+                body_sc,
+                text_col,
+            );
+            let mut cnt_buf = [b' '; 16];
+            let cnt_str = f::items_str(&mut cnt_buf, files as u32);
+            let cw = text_width(cnt_str, body_sc);
+            draw_str(
+                fb,
+                rx + (g.right_w - 2 * pad) - cw,
+                ry,
+                cnt_str,
+                body_sc,
+                label_col,
+            );
+        }
+        return;
+    }
+
+    let list_y = if folder == FolderLevel::WebSite {
+        let mut url_buf = [0u8; 64];
+        let url = app.web_url(&mut url_buf);
+        let max_url = ((g.right_w - 2 * pad) / char_advance(body_sc)).max(4) as usize;
+        draw_str(
+            fb,
+            rx,
+            rule_y + 16,
+            ui::truncate_chars(url, max_url),
+            body_sc,
+            t::TEXT_DIM,
+        );
+        rule_y + 44
+    } else {
+        rule_y + 18
+    };
     let mut row = 0i32;
     let step = if body_sc == 1 { 22 } else { 34 };
     for i in 0..app.count {
-        if !app.entries[i].in_folder(folder) {
+        if !app.entry_in_folder(&app.entries[i], folder) {
             continue;
         }
-        let ry = rule_y + 18 + row * step;
+        let ry = list_y + row * step;
         if ry + 16 > fb.h {
             break;
         }
@@ -1233,12 +1878,29 @@ pub fn click_window(
                     FolderLevel::HomeWallpapers
                 } else if row == 1 {
                     FolderLevel::HomeSamples
+                } else if row == 2 {
+                    FolderLevel::GhRoot
                 } else {
-                    FolderLevel::GithubRepo
+                    FolderLevel::WebRoot
                 };
                 return InputResult::from(app.open_subfolder(folder));
             }
-            FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
+            FolderLevel::GhRoot => {
+                if row == 0 {
+                    return InputResult::from(app.go_parent());
+                }
+                return InputResult::from(app.open_gh_repo_at(row - 1));
+            }
+            FolderLevel::WebRoot => {
+                if row == 0 {
+                    return InputResult::from(app.go_parent());
+                }
+                return InputResult::from(app.open_web_site_at(row - 1));
+            }
+            FolderLevel::HomeWallpapers
+            | FolderLevel::HomeSamples
+            | FolderLevel::GhRepo
+            | FolderLevel::WebSite => {
                 if row == 0 {
                     return InputResult::from(app.go_parent());
                 }
@@ -1353,6 +2015,10 @@ pub fn key_window(app: &mut FilesApp, key: Key, mods: Mods) -> InputResult {
     }
     if key == Key::Info {
         app.context_mode = !app.context_mode;
+        return InputResult::Changed;
+    }
+    if key == Key::Refresh && app.web_configured() {
+        app.web_refresh_requested = true;
         return InputResult::Changed;
     }
 
@@ -1486,12 +2152,29 @@ fn enter_browser_row(app: &mut FilesApp) -> InputResult {
                 FolderLevel::HomeWallpapers
             } else if app.row_selected == 1 {
                 FolderLevel::HomeSamples
+            } else if app.row_selected == 2 {
+                FolderLevel::GhRoot
             } else {
-                FolderLevel::GithubRepo
+                FolderLevel::WebRoot
             };
             InputResult::from(app.open_subfolder(folder))
         }
-        FolderLevel::HomeWallpapers | FolderLevel::HomeSamples | FolderLevel::GithubRepo => {
+        FolderLevel::GhRoot => {
+            if app.row_selected == 0 {
+                return InputResult::from(app.go_parent());
+            }
+            InputResult::from(app.open_gh_repo_at(app.row_selected - 1))
+        }
+        FolderLevel::WebRoot => {
+            if app.row_selected == 0 {
+                return InputResult::from(app.go_parent());
+            }
+            InputResult::from(app.open_web_site_at(app.row_selected - 1))
+        }
+        FolderLevel::HomeWallpapers
+        | FolderLevel::HomeSamples
+        | FolderLevel::GhRepo
+        | FolderLevel::WebSite => {
             if app.row_selected == 0 {
                 return InputResult::from(app.go_parent());
             }
@@ -1562,4 +2245,79 @@ pub fn draw_dock_tile(
     let mut sub_buf = [b' '; 16];
     let sub_str = f::mount_count(&mut sub_buf, app.count as u32);
     draw_str_prop(fb, x + 48, y + 42, sub_str, 2, t::ACCENT);
+}
+
+#[cfg(test)]
+mod web_tests {
+    use super::*;
+
+    fn app_with_web() -> FilesApp {
+        let mut app = FilesApp::new();
+        app.add_mount(b"wallpapers/01.png", 10);
+        app.add_mount(b"samples/app.js", 10);
+        app.add_mount(b"gh/jpeckenpaugh/mines-sm/lib.rs", 10);
+        app.add_mount(b"gh/jpeckenpaugh/mines-sm/Cargo.toml", 10);
+        app.add_mount(b"web/livive.net/index.html", 10);
+        app.add_mount(b"web/livive.net/page.png", 10);
+        app.add_mount(b"web/gm.livive.net/index.html", 10);
+        app
+    }
+
+    #[test]
+    fn namespaces_do_not_leak_into_home_folders() {
+        let app = app_with_web();
+        assert_eq!(app.gh_repo_count(), 1);
+        assert_eq!(app.gh_repo_at(0), Some("jpeckenpaugh/mines-sm"));
+        assert_eq!(app.web_site_count(), 2);
+        assert_eq!(app.web_site_at(0), Some("livive.net"));
+        assert!(!app.entries[2].in_folder(FolderLevel::HomeSamples));
+        assert!(!app.entries[4].in_folder(FolderLevel::HomeSamples));
+        assert!(!app.entries[5].in_folder(FolderLevel::HomeWallpapers));
+        assert!(app.entries[5].is_image());
+        assert!(!app.entries[4].is_image());
+    }
+
+    #[test]
+    fn nested_gh_and_web_folders_open_and_parent_correctly() {
+        let mut app = app_with_web();
+        assert!(app.open_gh_repo_at(0));
+        assert_eq!(app.level, FolderLevel::GhRepo);
+        assert_eq!(app.gh_repo_name(), "jpeckenpaugh/mines-sm");
+        assert_eq!(app.active_file_idx(), Some(2));
+        assert!(app.go_parent());
+        assert_eq!(app.level, FolderLevel::GhRoot);
+        assert_eq!(app.row_selected, 1);
+        assert!(app.go_parent());
+        assert_eq!(app.level, FolderLevel::HomeRoot);
+        assert_eq!(app.row_selected, 2);
+
+        app.row_selected = 3;
+        assert!(app.open_subfolder(FolderLevel::WebRoot));
+        assert_eq!(app.row_selected, 1);
+        assert!(app.open_web_site_at(0));
+        assert_eq!(app.level, FolderLevel::WebSite);
+        assert_eq!(app.web_site_name(), "livive.net");
+        assert_eq!(app.active_file_idx(), Some(4));
+        assert!(app.go_parent());
+        assert_eq!(app.level, FolderLevel::WebRoot);
+        assert_eq!(app.row_selected, 1);
+    }
+
+    #[test]
+    fn web_meta_does_not_change_home_row_count() {
+        let mut app = app_with_web();
+        assert_eq!(app.visible_row_count(), 4);
+        let meta = b"STATE=ready
+SITES=2
+";
+        app.complete_web_meta(meta.len());
+        app.web_meta[..meta.len()].copy_from_slice(meta);
+        app.complete_web_meta(meta.len());
+        assert!(app.web_configured());
+        assert_eq!(app.visible_row_count(), 4);
+        app.level = FolderLevel::WebRoot;
+        app.row_selected = 0;
+        app.complete_web_meta(meta.len());
+        assert_eq!(app.row_selected, 1);
+    }
 }

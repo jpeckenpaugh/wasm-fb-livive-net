@@ -20,7 +20,7 @@ This repository includes two generations:
 
 ### 1. Appliance v2 (Rust `#![no_std]` Window Manager) — Recommended
 Located in `v2/` and served at `/v2/`:
-- **Size**: **~126 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
+- **Size**: **~150 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
 - **Architecture**: Bare-metal `#![no_std]` Rust (`wasm32-unknown-unknown`), dynamic resolution scaling (360×800 up to 1080p), zero-allocation 2D software rasterizer, and a `FiveSeven` 5×7 bitmap font with Native and Smooth render modes at absolute scales (1× is the 5×7 base in both; Smooth is the default). Shared `theme`, `layout`, `ui`, `fmt`, and `input` modules keep colors, size classes, chrome, formatting, and key/result contracts in one place.
 - **Theme page**: `System → Theme` selects one of ten built-in color themes; `System → Fonts` owns the global render mode and a selectable 1×–8× specimen ladder. See [docs/v2-themes.md](docs/v2-themes.md), [docs/v2-smooth.md](docs/v2-smooth.md), and [docs/glyphs.md](docs/glyphs.md).
 - **Window Manager (`wm.rs`)**: 32px Title Bar with `Home`, app, `View`, and `Testing` menus; the App Home drawer is the `Home` dropdown. Mouse and keyboard share one focus model (`F9`/`Alt+D` Home drawer, `F10`/`Alt+M` menu bar, `Tab` client traversal, `Enter`/`Space` activation); see [docs/v2-input.md](docs/v2-input.md).
@@ -28,8 +28,8 @@ Located in `v2/` and served at `/v2/`:
   - **System**: FNV-1a 64-bit build attestation (`build.rs`), performance telemetry, a Fonts page with a live 1×–8× specimen and style ladder, icon galleries, a theme picker, and test patterns.
   - **Calculator**: Interactive desk calculator with formatted separators.
   - **Minesweeper**: High-performance 8×8 bitboard engine with Classic/Shielded modes and RL observation tensors (`[f32; 64]`).
-  - **Files & Preview**: Two-panel finder browsing `~/wallpapers`, `~/samples`, and upstream GitHub repositories (`gh://mines-sm`). Includes **dynamic font scaling (`+`/`-`)**, **2D scrolling**, **enriched `.context.xml` knowledge graphs**, and **in-browser Text-to-Speech (TTS) narration**.
-- See [docs/v2-appliance.md](docs/v2-appliance.md) and [docs/context-and-tts.md](docs/context-and-tts.md) for full design specifications.
+  - **Files & Preview**: Two-panel finder browsing `~/wallpapers`, `~/samples`, upstream GitHub repositories (`gh://jpeckenpaugh/mines-sm`, `gh://jpeckenpaugh/mines-livive-net`, `gh://jpeckenpaugh/gm-livive-net`), and **captured web snapshots (`web://` → `livive.net`, `mines.livive.net`, `mines-sm.livive.net`, `gm.livive.net`)** with raw source, post-load DOM, screenshot, context metadata, refresh, and TTS. Includes **dynamic font scaling (`+`/`-`)**, **2D scrolling**, **enriched `.context.xml` knowledge graphs**, and **in-browser Text-to-Speech (TTS) narration**.
+- See [docs/v2-appliance.md](docs/v2-appliance.md), [docs/context-and-tts.md](docs/context-and-tts.md), and [docs/web-capture.md](docs/web-capture.md) for full design specifications.
 
 ### 2. v1 Media Browser (C99 + Emscripten)
 Located in `src/` and served at `/`:
@@ -48,6 +48,25 @@ docker compose up --build serve   # http://localhost:8080
 That builds the wasm module inside the pinned toolchain image (Emscripten
 6.0.13 + Pillow 11.3.0) and serves `web/` with nginx. Nothing is written to the
 host filesystem.
+
+### Optional `web://` snapshots
+
+`web://` is a virtual folder over a small capture service; the appliance itself
+still has no browser or network stack. Run the capture service and the appliance:
+
+```bash
+# terminal 1
+make web-capture
+
+# terminal 2
+make serve
+# open http://localhost:8080/v2/
+```
+
+Then open `Files → web://` and select `livive.net`, `mines.livive.net`,
+`mines-sm.livive.net`, or `gm.livive.net`. Inside a site select `index.html`,
+`rendered.html`, or `page.png`. `Enter` on `page.png` pins the full-screen
+snapshot as the Desktop wallpaper. See [docs/web-capture.md](docs/web-capture.md).
 
 The console boots the first guest automatically; **+ new guest** starts another.
 Each guest is a tab with its own state, framebuffer and telemetry row; the top
