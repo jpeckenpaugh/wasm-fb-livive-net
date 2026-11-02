@@ -861,7 +861,7 @@ fn color_for(kind: TokenKind) -> u32 {
     }
 }
 
-fn expand_tabs(src: &[u8], dst: &mut [u8; 160]) -> usize {
+fn expand_tabs(src: &[u8], dst: &mut [u8; 256]) -> usize {
     let mut o = 0;
     for &b in src {
         if o >= dst.len() {
@@ -907,7 +907,7 @@ pub fn draw_code_preview(
     };
     let gutter_w = (4 * char_adv + 8).max(34);
     let text_x = x + gutter_w + (if scale <= 2 { 10 } else { 16 });
-    let max_cols = ((w - gutter_w - 20).max(0) / char_adv) as usize;
+    let max_cols = ((w - gutter_w - 20 - char_adv).max(0) / char_adv) as usize;
     let visible_lines = ((h - 2 * pad_top).max(0) / line_h) as usize;
 
     // Subtle gutter divider line
@@ -944,10 +944,14 @@ pub fn draw_code_preview(
             );
 
             // Expand tabs and tokenize
-            let mut expanded = [b' '; 160];
+            let mut expanded = [b' '; 256];
             let elen = expand_tabs(&text[start..end], &mut expanded);
             let mut toks = [CodeToken::empty(); 64];
             let nt = tokenize_line(lang, &expanded[..elen], &mut toks);
+
+            if col_scroll > 0 && elen > 0 {
+                draw_str(fb, x + gutter_w + 2, ly, "<", 1, t::ACCENT);
+            }
 
             for t in toks.iter().take(nt) {
                 let token_end = t.start + t.len;
@@ -970,6 +974,12 @@ pub fn draw_code_preview(
                     let tx = text_x + (col_offset as i32) * char_adv;
                     draw_str(fb, tx, ly, seg, scale, color_for(t.kind));
                 }
+            }
+
+            // Right-edge overflow indicator when the line extends past the visible columns
+            if elen > col_scroll + max_cols && max_cols > 0 {
+                let ind_x = (x + w - char_adv - 4).max(text_x);
+                draw_str(fb, ind_x, ly, ">", scale, t::ACCENT);
             }
 
             drawn += 1;

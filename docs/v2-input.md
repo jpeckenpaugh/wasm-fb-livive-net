@@ -14,8 +14,8 @@ reachable from either source, and both paths activate the same action.
 | `MenuBar { menu }` | A title-bar menu header is focused; no dropdown yet. |
 | `Menu { menu, item }` | A dropdown/drawer is open and one item is selected. |
 
-`menu` is one of `Home`, `App`, `View`, or `Testing`. The app menu title changes
-with the active app (`System`, `Calc`, `Files`, `Mines`). There is no separate
+`menu` is one of `Home` or `App`. The app menu title changes
+with the active app (`Desktop`, `System`, `Calc`, `Files`, `Mines`). There is no separate
 dock focus state: the App Home drawer is simply `Menu { Home, .. }`.
 
 `WmState.hover` is pointer-only preview state. Moving the mouse never steals
@@ -58,7 +58,7 @@ the App Home drawer.
 
 | Key | Action |
 |---|---|
-| `Left` / `Right` | Previous / next header (Home, App, View, Testing) |
+| `Left` / `Right` | Previous / next header (`Home`, `App`) |
 | `Tab` / `Shift+Tab` | Previous / next header |
 | `Down` / `Enter` | Open the menu and select the first item |
 | `Up` / `Down` | Move item selection |

@@ -299,14 +299,14 @@
       </select>
       <button class="btn-bar" id="new-vm" type="button">+ new guest</button>
       <div class="controls-right">
-        <button class="btn-bar primary" id="step1-btn" type="button" title="Run automated Step 1 pipeline: Open Dock -> Launch About -> Capture Snapshot">▶ run step 1</button>
+        <button class="btn-bar primary" id="step1-btn" type="button" title="Run automated Step 1 pipeline: Open Home [≡] -> Launch System -> Capture Snapshot">▶ run step 1</button>
         <button class="btn-bar" id="snap-btn" type="button" title="Capture framebuffer snapshot of active guest">📷 snapshot</button>
         <label class="diag"><input id="pattern" type="checkbox"> diag pattern</label>
       </div>
     </div>
     <div class="panels" id="panels"></div>
     <div class="statusbar">
-      <span id="sb-left"><span class="ok">ready</span> · click top-left dock button to launch about</span>
+      <span id="sb-left"><span class="ok">ready</span> · click Home [≡] to launch System / Calc / Files / Mines</span>
       <span>rgba8888 · <b id="sb-res">1280×720</b> · rust wasm32 · <b id="sb-copies">0</b> framebuffer copies</span>
     </div>
   </main>
@@ -320,8 +320,8 @@
   </section>
 
   <footer class="page">
-    <span>shortcuts: dock <kbd>[≡]</kbd> · calc <kbd>0-9 + - * / = Esc</kbd> · mines <kbd>F (flag)</kbd> <kbd>N (new)</kbd> · files <kbd>Tab / I</kbd> (context) · <kbd>[ / ]</kbd> (page).</span>
-    <span>pipeline: click dock <kbd>[≡]</kbd> → <kbd>ABOUT</kbd> → <kbd>TESTING → CAPTURE SNAPSHOT</kbd> or press <kbd>📷 snapshot</kbd>.</span>
+    <span>shortcuts: home <kbd>[≡]</kbd> · calc <kbd>0-9 + - * / = Esc</kbd> · mines <kbd>F (flag)</kbd> <kbd>N (new)</kbd> · files <kbd>Tab / I</kbd> (context) · <kbd>[ / ]</kbd> (page).</span>
+    <span>pipeline: click <kbd>Home [≡]</kbd> → <kbd>System / Calc / Files / Mines</kbd> and press <kbd>📷 snapshot</kbd> to capture a receipt.</span>
   </footer>
 
   <script type="module" src="./host.js"></script>

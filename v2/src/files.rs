@@ -16,6 +16,7 @@ use crate::fb::Framebuffer;
 use crate::fmt as f;
 use crate::font::{
     char_advance, draw_str, draw_str_centered, draw_str_prop, glyph_height, line_height, text_width,
+    text_width_prop,
 };
 use crate::icon::{draw_icon, Icon};
 use crate::input::{InputResult, Key, Mods};
@@ -311,6 +312,7 @@ pub struct FilesApp {
     pub focus: FilesFocus,
     pub focus_visible: bool,
     pub hover_row: Option<usize>,
+    pub hover_summary_row: Option<usize>,
     pub hover_control: Option<FilesFocus>,
     /// Selected `gh/<owner>/<repo>` path.
     pub gh_repo: [u8; MAX_NAME_LEN],
@@ -358,6 +360,7 @@ impl FilesApp {
             focus: FilesFocus::Browser,
             focus_visible: false,
             hover_row: None,
+            hover_summary_row: None,
             hover_control: None,
             gh_repo: [0; MAX_NAME_LEN],
             gh_repo_len: 0,
@@ -394,6 +397,7 @@ impl FilesApp {
         self.focus = FilesFocus::Browser;
         self.focus_visible = false;
         self.hover_row = None;
+        self.hover_summary_row = None;
         self.hover_control = None;
         self.gh_repo = [0; MAX_NAME_LEN];
         self.gh_repo_len = 0;
@@ -519,6 +523,7 @@ impl FilesApp {
         };
         self.gh_repo = buf;
         self.gh_repo_len = len;
+        self.hover_summary_row = None;
         self.level = FolderLevel::GhRepo;
         self.row_selected = if self.folder_file_count(FolderLevel::GhRepo) > 0 {
             1
@@ -549,6 +554,24 @@ impl FilesApp {
                 n += 1;
             }
         }
+        if let Some(list) = self.web_field("SITES_LIST") {
+            for part in list.split(',') {
+                let s = part.trim();
+                if s.is_empty() {
+                    continue;
+                }
+                let mut duplicate = false;
+                for i in 0..self.count {
+                    if self.entries[i].web_site() == Some(s) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if !duplicate {
+                    n += 1;
+                }
+            }
+        }
         n
     }
 
@@ -572,6 +595,28 @@ impl FilesApp {
                 return Some(site);
             }
             seen += 1;
+        }
+        if let Some(list) = self.web_field("SITES_LIST") {
+            for part in list.split(',') {
+                let s = part.trim();
+                if s.is_empty() {
+                    continue;
+                }
+                let mut duplicate = false;
+                for i in 0..self.count {
+                    if self.entries[i].web_site() == Some(s) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if duplicate {
+                    continue;
+                }
+                if seen == ord {
+                    return Some(s);
+                }
+                seen += 1;
+            }
         }
         None
     }
@@ -597,6 +642,7 @@ impl FilesApp {
         };
         self.web_site = buf;
         self.web_site_len = len;
+        self.hover_summary_row = None;
         self.level = FolderLevel::WebSite;
         self.row_selected = if self.folder_file_count(FolderLevel::WebSite) > 0 {
             1
@@ -810,6 +856,67 @@ impl FilesApp {
         n
     }
 
+    /// Folder currently summarized in the right pane when no file is active.
+    pub fn target_folder(&self) -> FolderLevel {
+        match self.level {
+            FolderLevel::HomeRoot => match self.row_selected {
+                0 => FolderLevel::HomeWallpapers,
+                1 => FolderLevel::HomeSamples,
+                2 => FolderLevel::GhRoot,
+                _ => FolderLevel::WebRoot,
+            },
+            sub => sub,
+        }
+    }
+
+    pub fn summary_item_count(&self, folder: FolderLevel) -> usize {
+        match folder {
+            FolderLevel::GhRoot => self.gh_repo_count(),
+            FolderLevel::WebRoot => self.web_site_count(),
+            FolderLevel::HomeRoot => 0,
+            _ => self.folder_file_count(folder),
+        }
+    }
+
+    pub fn summary_entry_at(&self, folder: FolderLevel, ord: usize) -> Option<&MountEntry> {
+        let mut seen = 0;
+        for i in 0..self.count {
+            if self.entry_in_folder(&self.entries[i], folder) {
+                if seen == ord {
+                    return Some(&self.entries[i]);
+                }
+                seen += 1;
+            }
+        }
+        None
+    }
+
+    pub fn open_summary_row(&mut self, folder: FolderLevel, row: usize) -> bool {
+        match folder {
+            FolderLevel::GhRoot => self.open_gh_repo_at(row),
+            FolderLevel::WebRoot => self.open_web_site_at(row),
+            FolderLevel::HomeWallpapers
+            | FolderLevel::HomeSamples
+            | FolderLevel::GhRepo
+            | FolderLevel::WebSite => {
+                if row >= self.folder_file_count(folder) {
+                    return false;
+                }
+                if self.level == FolderLevel::HomeRoot {
+                    self.hover_summary_row = None;
+                    self.level = folder;
+                }
+                self.row_selected = row + 1;
+                self.code_scroll = 0;
+                self.code_col_scroll = 0;
+                self.context_scroll = 0;
+                self.ensure_selected_staged();
+                true
+            }
+            FolderLevel::HomeRoot => false,
+        }
+    }
+
     /// Number of clickable rows in the Left 1/3 panel for the current `level`.
     pub fn visible_row_count(&self) -> usize {
         match self.level {
@@ -875,6 +982,9 @@ impl FilesApp {
     }
 
     pub fn open_subfolder(&mut self, folder: FolderLevel) -> bool {
+        if self.level != folder {
+            self.hover_summary_row = None;
+        }
         self.level = folder;
         self.row_selected = match folder {
             FolderLevel::HomeRoot => 0,
@@ -889,6 +999,7 @@ impl FilesApp {
     }
 
     pub fn go_parent(&mut self) -> bool {
+        self.hover_summary_row = None;
         match self.level {
             FolderLevel::HomeRoot => false,
             FolderLevel::HomeWallpapers => {
@@ -1362,21 +1473,7 @@ pub fn draw_window(
         }
     } else {
         // Folder or `../` selected: show a clean directory summary in the right pane
-        let target_folder = match app.level {
-            FolderLevel::HomeRoot => {
-                if app.row_selected == 0 {
-                    FolderLevel::HomeWallpapers
-                } else if app.row_selected == 1 {
-                    FolderLevel::HomeSamples
-                } else if app.row_selected == 2 {
-                    FolderLevel::GhRoot
-                } else {
-                    FolderLevel::WebRoot
-                }
-            }
-            sub => sub,
-        };
-        draw_folder_summary(fb, app, &g, target_folder);
+        draw_folder_summary(fb, app, &g, app.target_folder());
     }
 }
 
@@ -1388,6 +1485,7 @@ struct PreviewControls {
     open: Option<Rect>,
     prev: Option<Rect>,
     next: Option<Rect>,
+    compact: bool,
 }
 
 impl PreviewControls {
@@ -1402,6 +1500,20 @@ impl PreviewControls {
             FilesFocus::Next => self.next,
             FilesFocus::Browser => None,
         }
+    }
+
+    fn leftmost_x(&self) -> i32 {
+        let mut left = self.mode.x.min(self.ap.x).min(self.am.x).min(self.tts.x);
+        if let Some(open) = self.open {
+            left = left.min(open.x);
+        }
+        if let Some(prev) = self.prev {
+            left = left.min(prev.x);
+        }
+        if let Some(next) = self.next {
+            left = left.min(next.x);
+        }
+        left
     }
 }
 
@@ -1439,7 +1551,15 @@ fn control_labels(
                 "Context"
             },
             tts: if app.tts_active { "Stop" } else { "TTS" },
-            open: if is_web || is_gh { "\u{2197}" } else { "" },
+            open: if narrow {
+                if is_web || is_gh { "\u{2197}" } else { "" }
+            } else if is_web {
+                "\u{2197} Live"
+            } else if is_gh {
+                "\u{2197} GitHub"
+            } else {
+                ""
+            },
             ap: "A+",
             am: "A-",
             prev: "<",
@@ -1472,23 +1592,37 @@ fn control_labels(
     }
 }
 
-fn preview_controls(app: &FilesApp, g: &FilesGeom, entry: &MountEntry) -> PreviewControls {
-    let compact = g.right_w < 620;
-    let labels = control_labels(app, compact, g.right_w < 420, entry);
-    let mode_w = text_width(labels.mode, 2) + 12;
-    let mode_x = g.right_x + g.right_w - mode_w - 12;
+fn preview_controls_with_compact(
+    app: &FilesApp,
+    g: &FilesGeom,
+    entry: &MountEntry,
+    compact: bool,
+) -> PreviewControls {
+    let narrow = g.right_w < 420;
+    let ultra_narrow = g.right_w < 300;
+    let labels = control_labels(app, compact, narrow, entry);
+    let text_sc = if compact { 1 } else { 2 };
+    let gap = if narrow { 4 } else { 8 };
+    let pad = if narrow { 8 } else { 12 };
 
-    let ap_w = text_width(labels.ap, 2) + 8;
-    let am_w = text_width(labels.am, 2) + 8;
-    let ap_x = mode_x - ap_w - 8;
+    let mode_w = text_width_prop(labels.mode, text_sc) + pad;
+    let mode_x = g.right_x + g.right_w - mode_w - if narrow { 6 } else { 12 };
+
+    let ap_w = text_width_prop(labels.ap, text_sc) + if narrow { 6 } else { 8 };
+    let am_w = text_width_prop(labels.am, text_sc) + if narrow { 6 } else { 8 };
+    let ap_x = mode_x - ap_w - gap;
     let am_x = ap_x - am_w - 4;
 
-    let tts_w = text_width(labels.tts, 2) + 10;
-    let tts_x = am_x - tts_w - 8;
+    let tts_w = text_width_prop(labels.tts, text_sc) + if narrow { 8 } else { 10 };
+    let tts_x = am_x - tts_w - gap;
 
     let has_open = entry.is_web() || entry.is_gh();
-    let open_w = if has_open { text_width(labels.open, 2) + 10 } else { 0 };
-    let open_x = tts_x - open_w - if has_open { 8 } else { 0 };
+    let open_w = if has_open {
+        text_width_prop(labels.open, text_sc) + if narrow { 8 } else { 10 }
+    } else {
+        0
+    };
+    let open_x = tts_x - open_w - if has_open { gap } else { 0 };
     let open = if has_open {
         Some(Rect::new(open_x, 8, open_w, 24))
     } else {
@@ -1496,15 +1630,19 @@ fn preview_controls(app: &FilesApp, g: &FilesGeom, entry: &MountEntry) -> Previe
     };
     let paging_right = open.map(|r| r.x).unwrap_or(tts_x);
 
-    let (prev, next) = if show_paging(app, entry.is_image()) {
-        let next_w = text_width(labels.next, 2) + 8;
-        let prev_w = text_width(labels.prev, 2) + 8;
-        let next_x = paging_right - next_w - 8;
+    let (prev, next) = if !ultra_narrow && show_paging(app, entry.is_image()) {
+        let next_w = text_width_prop(labels.next, text_sc) + 8;
+        let prev_w = text_width_prop(labels.prev, text_sc) + 8;
+        let next_x = paging_right - next_w - gap;
         let prev_x = next_x - prev_w - 4;
-        (
-            Some(Rect::new(prev_x, 8, prev_w, 24)),
-            Some(Rect::new(next_x, 8, next_w, 24)),
-        )
+        if prev_x >= g.right_x + 48 {
+            (
+                Some(Rect::new(prev_x, 8, prev_w, 24)),
+                Some(Rect::new(next_x, 8, next_w, 24)),
+            )
+        } else {
+            (None, None)
+        }
     } else {
         (None, None)
     };
@@ -1517,6 +1655,19 @@ fn preview_controls(app: &FilesApp, g: &FilesGeom, entry: &MountEntry) -> Previe
         open,
         prev,
         next,
+        compact,
+    }
+}
+
+fn preview_controls(app: &FilesApp, g: &FilesGeom, entry: &MountEntry) -> PreviewControls {
+    if g.right_w < 620 {
+        return preview_controls_with_compact(app, g, entry, true);
+    }
+    let full = preview_controls_with_compact(app, g, entry, false);
+    if full.leftmost_x() - (g.right_x + 12) < 160 {
+        preview_controls_with_compact(app, g, entry, true)
+    } else {
+        full
     }
 }
 
@@ -1530,18 +1681,8 @@ fn draw_preview_control_bar(
     ui::toolbar(fb, Rect::new(g.right_x, 0, g.right_w, 40));
 
     let c = preview_controls(app, g, entry);
-    let compact = g.right_w < 620;
-    let labels = control_labels(app, compact, g.right_w < 420, entry);
-    let mut controls_left = c.mode.x.min(c.ap.x).min(c.am.x).min(c.tts.x);
-    if let Some(open) = c.open {
-        controls_left = controls_left.min(open.x);
-    }
-    if let Some(prev) = c.prev {
-        controls_left = controls_left.min(prev.x);
-    }
-    if let Some(next) = c.next {
-        controls_left = controls_left.min(next.x);
-    }
+    let labels = control_labels(app, c.compact, g.right_w < 420, entry);
+    let controls_left = c.leftmost_x();
     let mut title_buf = [0u8; 64];
     let title = fmt_file_title(&mut title_buf, app, entry.base_name());
     let max_chars = (((controls_left - (g.right_x + 12) - 8) / char_advance(2)).max(3)) as usize;
@@ -1626,6 +1767,7 @@ fn fmt_file_title<'a>(buf: &'a mut [u8; 64], app: &FilesApp, base_name: &str) ->
 
 fn context_label(key: &str) -> &str {
     match key {
+        "FILE" => "File",
         "SCOPE" => "Scope",
         "RUNTIME" => "Runtime",
         "ROLE" => "Role",
@@ -1643,6 +1785,60 @@ fn context_label(key: &str) -> &str {
         "TRUNCATED" => "Truncated",
         other => other,
     }
+}
+
+fn draw_context_kv_row(
+    fb: &mut Framebuffer,
+    rx: i32,
+    mut y: i32,
+    key_w: i32,
+    content_w: i32,
+    label: &str,
+    val: &str,
+    key_col: u32,
+    val_col: u32,
+) -> i32 {
+    if y >= 40 && y + 16 <= fb.h {
+        draw_str(fb, rx, y, label, 2, key_col);
+    }
+    let val_w = (content_w - key_w).max(40);
+    let max_chars = (val_w / char_advance(2)).max(6) as usize;
+    let bytes = val.as_bytes();
+    if bytes.is_empty() {
+        return y + 20;
+    }
+    let mut start = 0;
+    let mut lines_drawn = 0;
+    while start < bytes.len() && lines_drawn < 3 {
+        while start < bytes.len() && bytes[start] == b' ' {
+            start += 1;
+        }
+        if start >= bytes.len() {
+            break;
+        }
+        let rem = bytes.len() - start;
+        let line_len = if rem <= max_chars {
+            rem
+        } else {
+            let mut break_at = None;
+            for i in (start..start + max_chars).rev() {
+                if bytes[i] == b' ' || bytes[i] == b',' || bytes[i] == b'/' {
+                    break_at = Some(i + 1);
+                    break;
+                }
+            }
+            break_at.map(|b| b - start).unwrap_or(max_chars)
+        };
+        if let Ok(seg) = core::str::from_utf8(&bytes[start..start + line_len]) {
+            if y >= 40 && y + 16 <= fb.h {
+                draw_str(fb, rx + key_w, y, seg, 2, val_col);
+            }
+        }
+        y += 20;
+        start += line_len;
+        lines_drawn += 1;
+    }
+    y
 }
 
 fn draw_context_preview(
@@ -1663,25 +1859,37 @@ fn draw_context_preview(
 
     let scroll_px = (app.context_scroll as i32) * 14;
     let mut y = 50 - scroll_px;
-    let key_w = 160;
+    let key_w = if g.right_w < 400 { 112 } else { 150 };
+
+    // Always show the full file path at the top so narrow viewports never hide it.
+    y = draw_context_kv_row(
+        fb,
+        rx,
+        y,
+        key_w,
+        content_w,
+        context_label("FILE"),
+        entry.name_str(),
+        key_col,
+        t::TEXT,
+    );
 
     // Captured web metadata header: URL, STATUS, VIEWPORT, CAPTURED, RENDER_MS.
     if entry.is_web() {
         let web_keys = ["URL", "STATUS", "VIEWPORT", "CAPTURED", "RENDER_MS", "BYTES", "TRUNCATED"];
         for &key in &web_keys {
-            if y >= 40 && y + 16 <= fb.h {
-                draw_str(fb, rx, y, context_label(key), 2, key_col);
-                let val = find_context_field(context_data, key.as_bytes()).unwrap_or("—");
-                let val_w = content_w - key_w;
-                let max_chars = (val_w / 6).max(4) as usize;
-                let val_clamped = if val.len() > max_chars {
-                    &val[..max_chars]
-                } else {
-                    val
-                };
-                draw_str(fb, rx + key_w, y, val_clamped, 2, text_col);
-            }
-            y += 18;
+            let val = find_context_field(context_data, key.as_bytes()).unwrap_or("—");
+            y = draw_context_kv_row(
+                fb,
+                rx,
+                y,
+                key_w,
+                content_w,
+                context_label(key),
+                val,
+                key_col,
+                text_col,
+            );
         }
         y += 6;
         if y >= 40 && y < fb.h {
@@ -1702,28 +1910,22 @@ fn draw_context_preview(
     ];
 
     for &key in &keys {
-        if y >= 40 && y + 16 <= fb.h {
-            draw_str(fb, rx, y, context_label(key), 2, key_col);
-
-            let val =
-                find_context_field(context_data, key.as_bytes()).unwrap_or(if key == "SCOPE" {
-                    entry.name_str()
-                } else {
-                    "—"
-                });
-
-            // Max characters fitting in remaining width
-            let val_w = content_w - key_w;
-            let max_chars = (val_w / 6).max(4) as usize;
-            let val_clamped = if val.len() > max_chars {
-                &val[..max_chars]
-            } else {
-                val
-            };
-
-            draw_str(fb, rx + key_w, y, val_clamped, 2, text_col);
-        }
-        y += 18;
+        let val = find_context_field(context_data, key.as_bytes()).unwrap_or(if key == "SCOPE" {
+            entry.name_str()
+        } else {
+            "—"
+        });
+        y = draw_context_kv_row(
+            fb,
+            rx,
+            y,
+            key_w,
+            content_w,
+            context_label(key),
+            val,
+            key_col,
+            text_col,
+        );
     }
 
     y += 6;
@@ -1738,7 +1940,7 @@ fn draw_context_preview(
     if y + 16 >= 40 && y < fb.h {
         draw_str(fb, rx, y, "Technical Summary", 2, accent);
     }
-    y += 16;
+    y += 20;
     let summary_val = find_context_field(context_data, b"SUMMARY")
         .unwrap_or("No context metadata staged for this file.");
     y = draw_word_wrapped_paragraph(fb, rx, y, content_w, summary_val, text_col, font_scale);
@@ -1749,7 +1951,7 @@ fn draw_context_preview(
         if y + 16 >= 40 && y < fb.h {
             draw_str(fb, rx, y, "Architectural Fit", 2, accent);
         }
-        y += 16;
+        y += 20;
         draw_word_wrapped_paragraph(fb, rx, y, content_w, arch_val, label_col, font_scale);
     }
 }
@@ -1842,13 +2044,109 @@ pub fn draw_word_wrapped_paragraph(
     y
 }
 
+struct SummaryGeom {
+    rx: i32,
+    row_w: i32,
+    head_sc: i32,
+    body_sc: i32,
+    rule_y: i32,
+    list_y: i32,
+    step: i32,
+    row_h: i32,
+    count: usize,
+    retry_btn: Option<Rect>,
+    open_btn: Option<Rect>,
+}
+
+impl SummaryGeom {
+    fn row_at(&self, cx: i32, cy: i32, client_h: i32) -> Option<usize> {
+        if cx < self.rx || cx >= self.rx + self.row_w || cy < self.list_y {
+            return None;
+        }
+        let rel = cy - self.list_y;
+        let idx = (rel / self.step) as usize;
+        let in_row = (rel % self.step) < self.row_h;
+        let ry = self.list_y + (idx as i32) * self.step;
+        if idx < self.count && in_row && ry + self.row_h <= client_h {
+            Some(idx)
+        } else {
+            None
+        }
+    }
+}
+
+fn summary_geom(app: &FilesApp, g: &FilesGeom, folder: FolderLevel) -> SummaryGeom {
+    let pad = if g.right_w < 400 { 16 } else { 48 };
+    let rx = g.right_x + pad;
+    let row_w = (g.right_w - 2 * pad).max(40);
+    let head_sc = if g.right_w < 360 { 2 } else { 3 };
+    let body_sc = 2;
+    let rule_y = g.head_y + line_height(head_sc) + 4 + line_height(body_sc) + 4;
+    let list_y = if folder == FolderLevel::WebSite {
+        rule_y + 44
+    } else {
+        rule_y + 18
+    };
+    let step = 34;
+    let row_h = 30;
+    let count = app.summary_item_count(folder);
+
+    let needs_web_diag = matches!(folder, FolderLevel::WebRoot | FolderLevel::WebSite)
+        && (matches!(
+            app.web_state(),
+            "failed" | "error" | "partial" | "unconfigured" | "stale"
+        ) || (folder == FolderLevel::WebSite && count == 0));
+
+    let retry_w = if row_w < 260 { 108 } else { 156 };
+    let retry_btn = if needs_web_diag {
+        Some(Rect::new(
+            (rx + row_w - retry_w).max(rx),
+            g.head_y + 2,
+            retry_w.min(row_w),
+            26,
+        ))
+    } else {
+        None
+    };
+
+    let open_w = if row_w < 240 { 76 } else { 96 };
+    let open_btn = if folder == FolderLevel::WebSite {
+        Some(Rect::new(
+            (rx + row_w - open_w).max(rx),
+            rule_y + 10,
+            open_w.min(row_w),
+            24,
+        ))
+    } else {
+        None
+    };
+
+    SummaryGeom {
+        rx,
+        row_w,
+        head_sc,
+        body_sc,
+        rule_y,
+        list_y,
+        step,
+        row_h,
+        count,
+        retry_btn,
+        open_btn,
+    }
+}
+
 fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, folder: FolderLevel) {
     let accent = t::ACCENT;
     let label_col = t::TEXT_DIM;
     let text_col = t::TEXT_BODY;
+    let sg = summary_geom(app, g, folder);
+    let rx = sg.rx;
+    let row_w = sg.row_w;
+    let head_sc = sg.head_sc;
+    let body_sc = sg.body_sc;
+    let rule_y = sg.rule_y;
 
-    let pad = if g.right_w < 400 { 16 } else { 48 };
-    let rx = g.right_x + pad;
     let mut gh_title_buf = [0u8; 64];
     let mut web_title_buf = [0u8; 64];
     let title = match folder {
@@ -1860,26 +2158,36 @@ fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, fold
         FolderLevel::WebSite => app.web_site_title(&mut web_title_buf),
         FolderLevel::HomeRoot => "~/",
     };
-    let subtitle = match folder {
-        FolderLevel::HomeWallpapers => "RGBA8888 Upstream Images",
-        FolderLevel::HomeSamples => "UTF-8 General Code Samples",
-        FolderLevel::GhRoot => "GitHub Repositories",
-        FolderLevel::GhRepo => "GitHub Repository",
+    let (subtitle, sub_col) = match folder {
+        FolderLevel::HomeWallpapers => ("RGBA8888 Upstream Images", accent),
+        FolderLevel::HomeSamples => ("UTF-8 General Code Samples", accent),
+        FolderLevel::GhRoot => ("GitHub Repositories", accent),
+        FolderLevel::GhRepo => ("GitHub Repository", accent),
         FolderLevel::WebRoot => match app.web_state() {
-            "ready" => "Captured Web Sites",
-            "capturing" => "Capturing Web Sites...",
-            "stale" => "Stale Web Captures",
-            "error" | "partial" => "Some Web Captures Failed",
-            _ => "Captured Web Sites",
+            "ready" => ("Captured Web Snapshots", accent),
+            "capturing" => ("Capturing Web Snapshots...", accent),
+            "partial" => ("Partial Web Captures", t::WARNING),
+            "failed" | "error" => ("Capture Service Unavailable (0 Captured)", t::WARNING),
+            "stale" => ("Stale Web Captures", t::WARNING),
+            "unconfigured" => ("Web Capture Not Configured", label_col),
+            _ => ("Captured Web Snapshots", accent),
         },
-        FolderLevel::WebSite => "Captured Web Snapshot",
-        FolderLevel::HomeRoot => "",
+        FolderLevel::WebSite => {
+            if sg.count == 0 {
+                ("Live Web Site (No Local Snapshot)", t::WARNING)
+            } else {
+                ("Captured Web Snapshot", accent)
+            }
+        }
+        FolderLevel::HomeRoot => ("", accent),
     };
 
-    let head_sc = if g.right_w < 360 { 2 } else { 3 };
-    let body_sc = 2;
-    let max_title = ((g.right_w - 2 * pad) / char_advance(head_sc)).max(4) as usize;
-    let max_sub = ((g.right_w - 2 * pad) / char_advance(body_sc)).max(4) as usize;
+    let title_avail = sg
+        .retry_btn
+        .map(|b| (b.x - rx - 8).max(48))
+        .unwrap_or(row_w);
+    let max_title = (title_avail / char_advance(head_sc)).max(4) as usize;
+    let max_sub = (row_w / char_advance(body_sc)).max(4) as usize;
     draw_str(
         fb,
         rx,
@@ -1894,23 +2202,57 @@ fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, fold
         g.head_y + line_height(head_sc) + 4,
         ui::truncate_chars(subtitle, max_sub),
         body_sc,
-        accent,
+        sub_col,
     );
-    let rule_y = g.head_y + line_height(head_sc) + 4 + line_height(body_sc) + 4;
-    fb.fill(rx, rule_y, (g.right_w - 2 * pad).max(40), 1, t::BORDER);
+    if let Some(retry) = sg.retry_btn {
+        let lbl = if retry.w < 140 {
+            "Retry (F5)"
+        } else {
+            "[ Retry Capture ]"
+        };
+        ui::button(fb, retry, lbl, ui::Tone::Accent, 1);
+    }
+    fb.fill(rx, rule_y, row_w, 1, t::BORDER);
+
+    if folder == FolderLevel::WebSite {
+        let mut url_buf = [0u8; 64];
+        let url = app.web_url(&mut url_buf);
+        let url_avail = sg
+            .open_btn
+            .map(|b| (b.x - rx - 8).max(48))
+            .unwrap_or(row_w);
+        let max_url = (url_avail / char_advance(body_sc)).max(4) as usize;
+        draw_str(
+            fb,
+            rx,
+            rule_y + 16,
+            ui::truncate_chars(url, max_url),
+            body_sc,
+            t::TEXT_DIM,
+        );
+        if let Some(open) = sg.open_btn {
+            let lbl = if open.w < 90 {
+                "\u{2197} Live"
+            } else {
+                "[ \u{2197} Live ]"
+            };
+            ui::button(fb, open, lbl, ui::Tone::Accent, 1);
+        }
+    }
+
+    let text_pad_y = (sg.row_h - glyph_height(body_sc)) / 2;
+    let mut rows_end_y = sg.list_y;
 
     if folder == FolderLevel::GhRoot || folder == FolderLevel::WebRoot {
         let is_gh = folder == FolderLevel::GhRoot;
-        let count = if is_gh {
-            app.gh_repo_count()
-        } else {
-            app.web_site_count()
-        };
-        let step = 34;
-        for r in 0..count {
-            let ry = rule_y + 18 + r as i32 * step;
-            if ry + 16 > fb.h {
+        for r in 0..sg.count {
+            let ry = sg.list_y + (r as i32) * sg.step;
+            if ry + sg.row_h > fb.h {
                 break;
+            }
+            let hovered = app.hover_summary_row == Some(r);
+            if hovered {
+                fb.fill(rx, ry, row_w, sg.row_h, t::SURFACE_HOVER);
             }
             let name = if is_gh {
                 app.gh_repo_at(r).unwrap_or("")
@@ -1922,79 +2264,138 @@ fn draw_folder_summary(fb: &mut Framebuffer, app: &FilesApp, g: &FilesGeom, fold
             } else {
                 app.site_file_count(name)
             };
-            let max_name = ((g.right_w - 2 * pad - 90) / char_advance(body_sc)).max(4) as usize;
-            draw_str(
+            draw_icon(
                 fb,
-                rx,
-                ry,
-                ui::truncate_chars(name, max_name),
-                body_sc,
-                text_col,
+                rx + 6,
+                ry + (sg.row_h - 16) / 2,
+                Icon::Folder,
+                16,
+                if hovered { accent } else { label_col },
             );
             let mut cnt_buf = [b' '; 16];
-            let cnt_str = f::items_str(&mut cnt_buf, files as u32);
+            let cnt_str = if !is_gh && files == 0 {
+                "Live (\u{2197} O)"
+            } else {
+                f::items_str(&mut cnt_buf, files as u32)
+            };
             let cw = text_width(cnt_str, body_sc);
+            let max_name = ((row_w - 36 - cw - 12) / char_advance(body_sc)).max(4) as usize;
             draw_str(
                 fb,
-                rx + (g.right_w - 2 * pad) - cw,
-                ry,
+                rx + 28,
+                ry + text_pad_y,
+                ui::truncate_chars(name, max_name),
+                body_sc,
+                if hovered { t::TEXT } else { text_col },
+            );
+            draw_str(
+                fb,
+                rx + row_w - cw - 6,
+                ry + text_pad_y,
                 cnt_str,
+                body_sc,
+                if !is_gh && files == 0 {
+                    accent
+                } else {
+                    label_col
+                },
+            );
+            fb.fill(rx, ry + sg.row_h, row_w, 1, t::BORDER_DARK);
+            rows_end_y = ry + sg.step;
+        }
+    } else {
+        for r in 0..sg.count {
+            let ry = sg.list_y + (r as i32) * sg.step;
+            if ry + sg.row_h > fb.h {
+                break;
+            }
+            let Some(entry) = app.summary_entry_at(folder, r) else {
+                break;
+            };
+            let hovered = app.hover_summary_row == Some(r);
+            if hovered {
+                fb.fill(rx, ry, row_w, sg.row_h, t::SURFACE_HOVER);
+            }
+            let icon = if entry.is_image() {
+                Icon::Image
+            } else {
+                Icon::Document
+            };
+            draw_icon(
+                fb,
+                rx + 6,
+                ry + (sg.row_h - 16) / 2,
+                icon,
+                16,
+                if hovered { accent } else { label_col },
+            );
+
+            let mut sz_buf = [b' '; 16];
+            let sz_str = f::size_str(&mut sz_buf, entry.byte_size);
+            let sw = text_width(sz_str, body_sc);
+            let max_name = ((row_w - 36 - sw - 12) / char_advance(body_sc)).max(4) as usize;
+            draw_str(
+                fb,
+                rx + 28,
+                ry + text_pad_y,
+                ui::truncate_chars(entry.base_name(), max_name),
+                body_sc,
+                if hovered { t::TEXT } else { text_col },
+            );
+            draw_str(
+                fb,
+                rx + row_w - sw - 6,
+                ry + text_pad_y,
+                sz_str,
                 body_sc,
                 label_col,
             );
+            fb.fill(rx, ry + sg.row_h, row_w, 1, t::BORDER_DARK);
+            rows_end_y = ry + sg.step;
         }
-        return;
     }
 
-    let list_y = if folder == FolderLevel::WebSite {
-        let mut url_buf = [0u8; 64];
-        let url = app.web_url(&mut url_buf);
-        let max_url = ((g.right_w - 2 * pad) / char_advance(body_sc)).max(4) as usize;
-        draw_str(
-            fb,
-            rx,
-            rule_y + 16,
-            ui::truncate_chars(url, max_url),
-            body_sc,
-            t::TEXT_DIM,
-        );
-        rule_y + 44
-    } else {
-        rule_y + 18
-    };
-    let mut row = 0i32;
-    let step = if body_sc == 1 { 22 } else { 34 };
-    for i in 0..app.count {
-        if !app.entry_in_folder(&app.entries[i], folder) {
-            continue;
+    if matches!(folder, FolderLevel::WebRoot | FolderLevel::WebSite)
+        && (matches!(
+            app.web_state(),
+            "failed" | "error" | "partial" | "unconfigured"
+        ) || (folder == FolderLevel::WebSite && sg.count == 0))
+    {
+        let mut dy = rows_end_y + 12;
+        if dy + 24 <= fb.h {
+            let endpoint = app
+                .web_field("ENDPOINT")
+                .unwrap_or("http://127.0.0.1:8791");
+            let detail = app
+                .web_field("DETAIL")
+                .unwrap_or("Capture service unreachable or not started.");
+            let key_w = if row_w < 360 { 88 } else { 112 };
+            dy = draw_context_kv_row(
+                fb,
+                rx,
+                dy,
+                key_w,
+                row_w,
+                "Endpoint",
+                endpoint,
+                t::WARNING,
+                text_col,
+            );
+            dy = draw_context_kv_row(
+                fb,
+                rx,
+                dy,
+                key_w,
+                row_w,
+                "Status",
+                detail,
+                t::WARNING,
+                text_col,
+            );
+            dy += 4;
+            let help = "Start `make web-capture` locally and allow local-network access in your browser, then press F5 or click Retry Capture. Press O or click a site to open the live URL in a new tab.";
+            draw_word_wrapped_paragraph(fb, rx, dy, row_w, help, label_col, 2);
         }
-        let ry = list_y + row * step;
-        if ry + 16 > fb.h {
-            break;
-        }
-        let entry = &app.entries[i];
-        let max_name = ((g.right_w - 2 * pad - 90) / char_advance(body_sc)).max(4) as usize;
-        draw_str(
-            fb,
-            rx,
-            ry,
-            ui::truncate_chars(entry.base_name(), max_name),
-            body_sc,
-            text_col,
-        );
-
-        let mut sz_buf = [b' '; 16];
-        let sz_str = f::size_str(&mut sz_buf, entry.byte_size);
-        let sw = text_width(sz_str, body_sc);
-        draw_str(
-            fb,
-            rx + (g.right_w - 2 * pad) - sw,
-            ry,
-            sz_str,
-            body_sc,
-            label_col,
-        );
-        row += 1;
     }
 }
 
@@ -2105,6 +2506,27 @@ pub fn click_window(
                     return activate_control(app, FilesFocus::Next);
                 }
             }
+        }
+    }
+
+    // Right panel: folder summary rows & web action buttons when no file is active.
+    if cx >= g.right_x && app.active_file_idx().is_none() {
+        app.focus = FilesFocus::Browser;
+        let folder = app.target_folder();
+        let sg = summary_geom(app, &g, folder);
+        if let Some(retry) = sg.retry_btn {
+            if retry.contains(cx, cy) {
+                app.web_refresh_requested = true;
+                return InputResult::Changed;
+            }
+        }
+        if let Some(open) = sg.open_btn {
+            if open.contains(cx, cy) {
+                return app.request_open();
+            }
+        }
+        if let Some(r) = sg.row_at(cx, cy, client_h) {
+            return InputResult::from(app.open_summary_row(folder, r));
         }
     }
 
@@ -2352,36 +2774,49 @@ pub fn pointer_move(app: &mut FilesApp, cx: i32, cy: i32, client_w: i32, client_
     let g = files_geom(client_w, client_h);
     let mut row = None;
     let mut control = None;
+    let mut summary_row = None;
 
     if cx < g.left_w && cy >= g.row_start_y {
         let candidate = ((cy - g.row_start_y) / g.row_h) as usize;
         if candidate < app.visible_row_count() {
             row = Some(candidate);
         }
-    } else if cx >= g.right_x && cy < 40 {
+    } else if cx >= g.right_x {
         if let Some(sel_idx) = app.active_file_idx() {
-            let c = preview_controls(app, &g, &app.entries[sel_idx]);
-            for focus in FilesFocus::CONTROLS {
-                if let Some(r) = c.rect_for(focus) {
-                    if r.contains(cx, cy) {
-                        control = Some(focus);
-                        break;
+            if cy < 40 {
+                let c = preview_controls(app, &g, &app.entries[sel_idx]);
+                for focus in FilesFocus::CONTROLS {
+                    if let Some(r) = c.rect_for(focus) {
+                        if r.contains(cx, cy) {
+                            control = Some(focus);
+                            break;
+                        }
                     }
                 }
             }
+        } else {
+            let folder = app.target_folder();
+            let sg = summary_geom(app, &g, folder);
+            summary_row = sg.row_at(cx, cy, client_h);
         }
     }
 
-    let changed = app.hover_row != row || app.hover_control != control;
+    let changed = app.hover_row != row
+        || app.hover_control != control
+        || app.hover_summary_row != summary_row;
     app.hover_row = row;
     app.hover_control = control;
+    app.hover_summary_row = summary_row;
     changed
 }
 
 pub fn pointer_leave(app: &mut FilesApp) -> bool {
-    let changed = app.hover_row.is_some() || app.hover_control.is_some();
+    let changed = app.hover_row.is_some()
+        || app.hover_control.is_some()
+        || app.hover_summary_row.is_some();
     app.hover_row = None;
     app.hover_control = None;
+    app.hover_summary_row = None;
     changed
 }
 
@@ -2506,5 +2941,131 @@ SITES=2
         app.row_selected = 0;
         app.complete_web_meta(meta.len());
         assert_eq!(app.row_selected, 1);
+    }
+
+    #[test]
+    fn right_pane_summary_clicks_activate_files_and_folders() {
+        let mut app = FilesApp::new();
+        app.add_mount(b"wallpapers/01.png", 100);
+        app.add_mount(b"wallpapers/02.png", 200);
+        app.add_mount(b"samples/app.js", 300);
+        app.add_mount(b"samples/lib.rs", 400);
+        app.add_mount(b"gh/jpeckenpaugh/mines-sm/lib.rs", 500);
+        app.add_mount(b"gh/jpeckenpaugh/wasm-fb/main.rs", 600);
+        app.add_mount(b"web/livive.net/index.html", 700);
+        app.add_mount(b"web/gm.livive.net/index.html", 800);
+
+        let cw = 1280;
+        let ch = 684;
+        let g = files_geom(cw, ch);
+
+        // 1. At HomeRoot with row_selected = 0 (wallpapers/), click 1st and 2nd right-pane summary entries.
+        assert_eq!(app.level, FolderLevel::HomeRoot);
+        assert_eq!(app.row_selected, 0);
+        let sg = summary_geom(&app, &g, app.target_folder());
+        let rx = sg.rx + 40;
+        let row0_y = sg.list_y + 10;
+        let row1_y = sg.list_y + sg.step + 10;
+
+        assert!(pointer_move(&mut app, rx, row1_y, cw, ch));
+        assert_eq!(app.hover_summary_row, Some(1));
+
+        // Clicking blank space below the list returns Noop.
+        let blank_y = sg.list_y + 5 * sg.step + 10;
+        assert_eq!(click_window(&mut app, rx, blank_y, cw, ch), InputResult::Noop);
+        assert_eq!(app.level, FolderLevel::HomeRoot);
+
+        // Clicking 2nd wallpaper opens HomeWallpapers with row_selected = 2 (index 1).
+        assert_eq!(click_window(&mut app, rx, row1_y, cw, ch), InputResult::Changed);
+        assert_eq!(app.level, FolderLevel::HomeWallpapers);
+        assert_eq!(app.row_selected, 2);
+        assert_eq!(app.active_file_idx(), Some(1));
+        assert_eq!(app.pending_fetch_idx, 1);
+
+        // Go back to HomeRoot, select samples/ (row 1), click 1st sample in right pane.
+        assert!(app.go_parent());
+        app.row_selected = 1;
+        assert_eq!(click_window(&mut app, rx, row0_y, cw, ch), InputResult::Changed);
+        assert_eq!(app.level, FolderLevel::HomeSamples);
+        assert_eq!(app.row_selected, 1);
+        assert_eq!(app.active_file_idx(), Some(2));
+
+        // Go to GhRoot, select "../" (row 0) so right pane summarizes GhRoot, click 2nd repo.
+        app.level = FolderLevel::GhRoot;
+        app.row_selected = 0;
+        assert_eq!(click_window(&mut app, rx, row1_y, cw, ch), InputResult::Changed);
+        assert_eq!(app.level, FolderLevel::GhRepo);
+        assert_eq!(app.gh_repo_name(), "jpeckenpaugh/wasm-fb");
+        assert_eq!(app.active_file_idx(), Some(5));
+
+        // Go to WebRoot, select "../" (row 0) so right pane summarizes WebRoot, click 2nd site.
+        app.level = FolderLevel::WebRoot;
+        app.row_selected = 0;
+        assert_eq!(click_window(&mut app, rx, row1_y, cw, ch), InputResult::Changed);
+        assert_eq!(app.level, FolderLevel::WebSite);
+        assert_eq!(app.web_site_name(), "gm.livive.net");
+        assert_eq!(app.active_file_idx(), Some(7));
+    }
+
+    #[test]
+    fn web_failed_state_lists_configured_sites_and_retry_button_works() {
+        let mut app = FilesApp::new();
+        let meta = b"STATE=failed\nSITES=4\nREADY=0/4\nENDPOINT=http://127.0.0.1:8791\nSITES_LIST=livive.net,gm.livive.net,jpeckenpaugh.com,jeapostrophy.github.io\nDETAIL=0/4 captured\n";
+        app.web_meta[..meta.len()].copy_from_slice(meta);
+        app.complete_web_meta(meta.len());
+
+        assert_eq!(app.web_state(), "failed");
+        assert_eq!(app.web_site_count(), 4);
+        assert_eq!(app.web_site_at(0), Some("livive.net"));
+        assert_eq!(app.web_site_at(2), Some("jpeckenpaugh.com"));
+
+        app.level = FolderLevel::WebRoot;
+        app.row_selected = 0;
+        let cw = 1280;
+        let ch = 684;
+        let g = files_geom(cw, ch);
+        let sg = summary_geom(&app, &g, app.target_folder());
+        let retry = sg.retry_btn.expect("failed web state should expose retry button");
+        assert_eq!(
+            click_window(&mut app, retry.x + 8, retry.y + 8, cw, ch),
+            InputResult::Changed
+        );
+        assert!(app.web_refresh_requested);
+
+        // Clicking a site row in the right pane opens WebSite and allows live URL open (`O`).
+        let row2_y = sg.list_y + 2 * sg.step + 10;
+        assert_eq!(
+            click_window(&mut app, sg.rx + 40, row2_y, cw, ch),
+            InputResult::Changed
+        );
+        assert_eq!(app.level, FolderLevel::WebSite);
+        assert_eq!(app.web_site_name(), "jpeckenpaugh.com");
+        assert_eq!(app.request_open(), InputResult::Open);
+        assert_eq!(
+            &app.open_target[..app.open_target_len],
+            b"web/jpeckenpaugh.com"
+        );
+    }
+
+    #[test]
+    fn preview_controls_switch_to_compact_before_overflowing_file_title() {
+        let mut app = app_with_web();
+        assert!(app.open_web_site_at(0));
+        app.row_selected = 1; // web/livive.net/index.html (text file)
+        let idx = app.active_file_idx().unwrap();
+        app.complete_stage_text(idx as i32, 100);
+
+        for &(cw, ch) in &[(1280, 684), (960, 564), (390, 808), (360, 764)] {
+            let g = files_geom(cw, ch);
+            let c = preview_controls(&app, &g, &app.entries[idx]);
+            assert!(
+                c.leftmost_x() > g.right_x + 48,
+                "controls overflowed at {}x{}: leftmost={} right_x={}",
+                cw,
+                ch,
+                c.leftmost_x(),
+                g.right_x
+            );
+        }
     }
 }

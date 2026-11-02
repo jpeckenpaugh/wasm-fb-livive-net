@@ -92,10 +92,17 @@ function oneLine(value) {
   return String(value == null ? '' : value).replace(/[\r\n]+/g, ' ').trim();
 }
 
-function webMetaText(state, detail, sites = []) {
+function webMetaText(state, detail, sites = [], opts = {}) {
+  const ready = opts.ready ?? 0;
+  const total = sites.length;
+  const endpoint = opts.endpoint || 'http://127.0.0.1:8787/api/captures';
+  const siteIds = sites.map((s) => s.id).filter(Boolean).join(',');
   const lines = [
     `STATE=${state}`,
-    `SITES=${sites.length}`,
+    `SITES=${total}`,
+    `READY=${ready}/${total}`,
+    `ENDPOINT=${oneLine(endpoint)}`,
+    `SITES_LIST=${siteIds}`,
     `DETAIL=${oneLine(detail)}`,
   ];
   return `${lines.join('\n')}\n`;
@@ -107,7 +114,9 @@ function writeWebMeta(guest, text) {
   const ptr = guest.exports.app_web_meta_ptr();
   new Uint8Array(guest.exports.memory.buffer).set(bytes, ptr);
   guest.exports.app_web_commit_meta(bytes.byteLength);
-  if (guest.blitToCanvas) {
+  if (guest.render) {
+    guest.render();
+  } else if (guest.blitToCanvas) {
     const t = performance.now();
     guest.blitToCanvas(t, t);
   }
@@ -153,6 +162,7 @@ async function captureSite(site, width, height, opts = {}) {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         },
       }),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined,
     });
     if (!res.ok) throw new Error(`capture request failed: HTTP ${res.status}`);
     const job = await res.json();
@@ -284,9 +294,15 @@ async function stageWebArtifact(guest, idx, item) {
 async function initWebForGuest(guest) {
   try {
     const cfg = await loadWebConfig();
-    if (!cfg || !cfg.captureEndpoint || !Array.isArray(cfg.sites) || !cfg.sites.length) return;
+    if (!cfg || !cfg.captureEndpoint || !Array.isArray(cfg.sites) || !cfg.sites.length) {
+      if (!guest.disposed && guest.exports) {
+        writeWebMeta(guest, webMetaText('unconfigured', 'No capture endpoint or sites configured', [], { ready: 0, endpoint: 'unconfigured' }));
+      }
+      return;
+    }
     if (guest.disposed || !guest.exports) return;
     guest.webConfig = cfg;
+    const endpoint = cfg.captureEndpoint;
     const sites = (guest.webSiteId
       ? cfg.sites.filter((candidate) => candidate.id === guest.webSiteId)
       : cfg.sites
@@ -294,7 +310,7 @@ async function initWebForGuest(guest) {
     if (!sites.length) return;
     guest.webSites = sites;
     guest.webSnapshots = new Map();
-    writeWebMeta(guest, webMetaText('capturing', `Capturing ${sites.length} web sites...`, sites));
+    writeWebMeta(guest, webMetaText('capturing', `Capturing ${sites.length} web sites...`, sites, { ready: 0, endpoint }));
     const results = await Promise.all(
       sites.map(async (site) => {
         try {
@@ -322,24 +338,29 @@ async function initWebForGuest(guest) {
           'capturing',
           `${ready}/${sites.length} web sites ready${error ? ` · ${site.id} failed` : ''}`,
           sites,
+          { ready, endpoint },
         ),
       );
     }
     if (guest.render) guest.render();
-    const state = failed === 0 ? 'ready' : ready > 0 ? 'partial' : 'error';
+    const state = failed === 0 ? 'ready' : ready > 0 ? 'partial' : 'failed';
+    const detail = state === 'failed'
+      ? `0/${sites.length} captured · capture service unreachable at ${endpoint}`
+      : `${ready}/${sites.length} web sites captured`;
     writeWebMeta(
       guest,
-      webMetaText(state, `${ready}/${sites.length} web sites captured`, sites),
+      webMetaText(state, detail, sites, { ready, endpoint }),
     );
     if (guest.render) guest.render();
     if (guest.exports.app_mount_pending_idx && guest.exports.app_mount_pending_idx() >= 0) {
       servicePendingMountFetch(guest).catch((error) => console.error(error));
     }
-    setStatus(`${guest.name} · captured ${ready}/${sites.length} web sites`, true);
+    setStatus(`${guest.name} · captured ${ready}/${sites.length} web sites`, ready > 0);
   } catch (error) {
     console.error(error);
     if (!guest.disposed && guest.exports) {
-      writeWebMeta(guest, webMetaText('error', error.message || error, guest.webSites || []));
+      const endpoint = guest.webConfig?.captureEndpoint || 'http://127.0.0.1:8787/api/captures';
+      writeWebMeta(guest, webMetaText('failed', error.message || error, guest.webSites || [], { ready: 0, endpoint }));
     }
     setStatus(`${guest.name} · web capture failed: ${error.message || error}`);
   }
@@ -351,7 +372,8 @@ async function refreshWebForGuest(guest) {
     await initWebForGuest(guest);
     return;
   }
-  writeWebMeta(guest, webMetaText('capturing', `Refreshing ${sites.length} web sites...`, sites));
+  const endpoint = guest.webConfig?.captureEndpoint || 'http://127.0.0.1:8787/api/captures';
+  writeWebMeta(guest, webMetaText('capturing', `Refreshing ${sites.length} web sites...`, sites, { ready: 0, endpoint }));
   const results = await Promise.all(
     sites.map(async (site) => {
       try {
@@ -378,11 +400,14 @@ async function refreshWebForGuest(guest) {
     }
     writeWebMeta(
       guest,
-      webMetaText('capturing', `${ready}/${sites.length} web sites refreshed`, sites),
+      webMetaText('capturing', `${ready}/${sites.length} web sites refreshed`, sites, { ready, endpoint }),
     );
   }
-  const state = failed === 0 ? 'ready' : ready > 0 ? 'partial' : guest.webSnapshots.size ? 'stale' : 'error';
-  writeWebMeta(guest, webMetaText(state, `${ready}/${sites.length} web sites refreshed`, sites));
+  const state = failed === 0 ? 'ready' : ready > 0 ? 'partial' : guest.webSnapshots.size ? 'stale' : 'failed';
+  const detail = state === 'failed'
+    ? `0/${sites.length} captured · capture service unreachable at ${endpoint}`
+    : `${ready}/${sites.length} web sites refreshed`;
+  writeWebMeta(guest, webMetaText(state, detail, sites, { ready, endpoint }));
   const selected = guest.exports.app_active_page ? guest.exports.app_active_page() : -1;
   if (selected >= 0 && guest.mounts[selected]?.source === 'web') {
     await stageWebArtifact(guest, selected, guest.mounts[selected]);
@@ -392,7 +417,7 @@ async function refreshWebForGuest(guest) {
   if (guest.exports.app_mount_pending_idx && guest.exports.app_mount_pending_idx() >= 0) {
     servicePendingMountFetch(guest).catch((error) => console.error(error));
   }
-  setStatus(`${guest.name} · refreshed ${ready}/${sites.length} web sites`, true);
+  setStatus(`${guest.name} · refreshed ${ready}/${sites.length} web sites`, ready > 0);
 }
 
 function safeExternalUrl(value) {
@@ -677,8 +702,8 @@ const selectionLabel = (guest) => {
   return 'Desktop';
 };
 
-/* Focus codes mirror `v2/src/wm.rs`; menu order is Home, App, View, Testing. */
-const MENU_NAMES = ['Home', 'App', 'View', 'Testing'];
+/* Focus codes mirror `v2/src/wm.rs`; menu order is Home, App. */
+const MENU_NAMES = ['Home', 'App'];
 const focusLabel = (code) => {
   if (code === 0) return 'client';
   if (code >= 200) {

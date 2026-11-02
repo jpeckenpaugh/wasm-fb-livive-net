@@ -615,8 +615,8 @@ mod tests {
     use crate::fb::rgb;
     use crate::font::RenderMode;
     use crate::wm::{
-        dock_icon_y, CLICK_CHANGED, CLICK_NOOP, CLICK_SNAPSHOT, CLICK_TTS, DOCK_ICON_H,
-        DOCK_ICON_W, DOCK_X, DOCK_Y, TITLE_H,
+        dock_icon_y, CLICK_CHANGED, CLICK_NOOP, CLICK_TTS, DOCK_ICON_H, DOCK_ICON_W, DOCK_X,
+        DOCK_Y, TITLE_H,
     };
 
     #[test]
@@ -716,14 +716,16 @@ mod tests {
         assert_eq!(app_selected(), AppSlot::Desktop as i32);
         assert_ne!(app_fb_hash(), desktop_hash); // Desktop now renders the mounted wallpaper!
 
-        // 6. Open "Testing" menu (menu index 2) and click "SNAPSHOT"
-        let testing_menu_x = wm::MENU_X0 + 2 * wm::MENU_HEADER_W + 20;
-        assert_eq!(app_click(testing_menu_x, 16), CLICK_CHANGED);
-        assert_eq!(app_click(testing_menu_x, TITLE_H + 16), CLICK_SNAPSHOT);
+        // 6. Record a snapshot via the host ABI (`app_record_snapshot`) and toggle Test Pattern from the Home drawer
+        let snap_hash = app_record_snapshot();
+        assert_ne!(snap_hash, 0);
         assert_eq!(app_snapshot_count(), 1);
 
+        // Open Home drawer and click item 4 ("Test Pattern")
+        assert_eq!(app_click(16, 16), CLICK_CHANGED);
+        assert_eq!(app_click(icon_x, dock_icon_y(4) + 14), CLICK_CHANGED);
+
         // 7. Verify diagnostic test pattern channel & orientation contract
-        app_set_test_pattern(1);
         let ptr = app_framebuffer();
         let px = unsafe { core::slice::from_raw_parts(ptr as *const u32, 1280 * 720) };
         assert_eq!(px[8 * 1280 + 8], rgb(0, 0, 0));
@@ -731,6 +733,7 @@ mod tests {
         assert_eq!(px[50 * 1280 + 900], rgb(0, 255, 0));
         assert_eq!(px[500 * 1280 + 100], rgb(0, 0, 255));
         assert_eq!(px[(720 - 20) * 1280 + (1280 - 20)], rgb(255, 0, 255));
+        app_set_test_pattern(0);
 
         // 8. Verify per-session resolution constraint for mobile portrait (390x844) and 1080p (1920x1080)
         assert_eq!(app_init(390, 844), 1);
@@ -850,9 +853,7 @@ mod tests {
         // Test TTS button click and C export
         assert_eq!(app_tts_active(), 0);
         // Compute click on TTS button in Control bar:
-        // Control labels are drawn at scale 2 (advance 12). The TTS button
-        // sits left of A+/A- at y = TITLE_H + 8..32 (layout-dependent).
-        let tts_click_x = 880;
+        let tts_click_x = 1135;
         let tts_click_y = TITLE_H + 16;
         assert_eq!(app_click(tts_click_x, tts_click_y), CLICK_TTS);
         assert_eq!(app_tts_active(), 1);

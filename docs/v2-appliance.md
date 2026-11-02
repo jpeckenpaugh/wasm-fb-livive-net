@@ -37,8 +37,8 @@ Browser Host (web/v2/host.js)
 - Optional `web://` snapshots use a local capture service to load a page in headless Chromium and return raw source, post-load DOM, screenshot, text, and diagnostics. The guest still only receives text and RGBA8888; see [web-capture.md](web-capture.md).
 
 ### 1.3 Appliance Window Manager (`wm.rs`)
-- **32px Title Bar**: `Home`, app, `View`, and `Testing` menus, status, session clock.
-- **App Home Drawer**: The `Home` menu's dropdown, using 1/10th scale preview tiles (`128x72`) that overlay the active surface without displacing client windows and close when an app launches.
+- **32px Title Bar**: `Home` (`[≡]`) and active-app menus, status, session clock.
+- **App Home Drawer**: The `Home` menu's dropdown, using 1/10th scale preview tiles (`128x72`) plus a compact `Test Pattern` action that overlay the active surface without displacing client windows and close when an app launches.
 - **Flat Maximized Surface**: Zero nested frame borders or redundant window chrome.
 
 ### 1.4 Deterministic Attestation (`build.rs`)

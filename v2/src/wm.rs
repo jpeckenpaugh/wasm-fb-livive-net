@@ -1,12 +1,12 @@
 //! Minimalist Appliance Window Manager (`wm.rs`).
 //!
 //! 1. 32px Title Bar (`y: 0..32`):
-//!    - App Home menu (`x: 0..44`) with its app drawer as the dropdown
-//!    - Context menus (`System`/`Calc`/`Files`/`Mines`, `View`, `Testing`)
+//!    - App Home menu (`x: 0..44`) with its app drawer + Test Pattern as the dropdown
+//!    - Context menu (`Desktop`/`System`/`Calc`/`Files`/`Mines`)
 //!    - Right-aligned user, session, and date/time (`Tester · VM-01 · ...`)
 //! 2. App Home Drawer:
-//!    - Four `128x72` tiles (1/10th scale), drawn as the Home menu's dropdown
-//!      below the Home header.
+//!    - Four `128x72` tiles (1/10th scale) plus a compact `Test Pattern` button,
+//!      drawn as the Home menu's dropdown below the Home header.
 //! 3. Maximized Client Window:
 //!    - Flat surface directly below the title bar at the session resolution.
 //!
@@ -34,12 +34,13 @@ pub const HOME_BTN_W: i32 = 44;
 // vertically and drawn as the Home menu's dropdown.
 pub const DOCK_ICON_W: i32 = 128;
 pub const DOCK_ICON_H: i32 = 72;
+pub const DOCK_ACT_H: i32 = 28;
 pub const DOCK_GAP: i32 = 10;
 pub const DOCK_X: i32 = 12;
 pub const DOCK_Y: i32 = TITLE_H + 10;
 
-// Menu Bar geometry (Home + app + View + Testing).
-pub const MENU_COUNT: usize = 4;
+// Menu Bar geometry (Home + App).
+pub const MENU_COUNT: usize = 2;
 pub const MENU_X0: i32 = HOME_BTN_W + 4;
 pub const MENU_HEADER_W: i32 = 104;
 pub const MENU_DROP_W: i32 = 224;
@@ -55,18 +56,18 @@ pub const CLICK_HANDLED: i32 = InputResult::Handled as i32;
 
 #[inline]
 pub const fn dock_icon_y(slot_idx: usize) -> i32 {
-    DOCK_Y + (slot_idx as i32) * (DOCK_ICON_H + DOCK_GAP)
+    if slot_idx < AppSlot::APP_COUNT {
+        DOCK_Y + (slot_idx as i32) * (DOCK_ICON_H + DOCK_GAP)
+    } else {
+        DOCK_Y
+            + (AppSlot::APP_COUNT as i32) * (DOCK_ICON_H + DOCK_GAP)
+            + ((slot_idx - AppSlot::APP_COUNT) as i32) * (DOCK_ACT_H + DOCK_GAP)
+    }
 }
 
 #[inline]
-pub const fn menu_header_w(fb_w: i32) -> i32 {
-    if fb_w < 540 {
-        72
-    } else if fb_w < 720 {
-        88
-    } else {
-        MENU_HEADER_W
-    }
+pub const fn menu_header_w(_fb_w: i32) -> i32 {
+    MENU_HEADER_W
 }
 
 /// App surfaces. `Desktop` is a real surface (wallpaper or backdrop), not a
@@ -128,12 +129,10 @@ impl AppSlot {
 pub enum MenuId {
     Home = 0,
     App = 1,
-    View = 2,
-    Testing = 3,
 }
 
 impl MenuId {
-    pub const ALL: [MenuId; 4] = [MenuId::Home, MenuId::App, MenuId::View, MenuId::Testing];
+    pub const ALL: [MenuId; 2] = [MenuId::Home, MenuId::App];
 
     pub const fn index(self) -> usize {
         self as usize
@@ -143,8 +142,6 @@ impl MenuId {
         match idx {
             0 => Some(MenuId::Home),
             1 => Some(MenuId::App),
-            2 => Some(MenuId::View),
-            3 => Some(MenuId::Testing),
             _ => None,
         }
     }
@@ -152,18 +149,14 @@ impl MenuId {
     pub const fn next(self) -> Self {
         match self {
             MenuId::Home => MenuId::App,
-            MenuId::App => MenuId::View,
-            MenuId::View => MenuId::Testing,
-            MenuId::Testing => MenuId::Home,
+            MenuId::App => MenuId::Home,
         }
     }
 
     pub const fn prev(self) -> Self {
         match self {
-            MenuId::Home => MenuId::Testing,
+            MenuId::Home => MenuId::App,
             MenuId::App => MenuId::Home,
-            MenuId::View => MenuId::App,
-            MenuId::Testing => MenuId::View,
         }
     }
 }
@@ -227,6 +220,10 @@ const MENU_HOME: &[MenuItem] = &[
     MenuItem {
         label: "Mines",
         command: Command::Launch(AppSlot::Mines),
+    },
+    MenuItem {
+        label: "Test Pattern",
+        command: Command::TestPattern,
     },
 ];
 const MENU_DESKTOP: &[MenuItem] = &[
@@ -335,14 +332,6 @@ const MENU_MINES: &[MenuItem] = &[
         command: Command::CloseWindow,
     },
 ];
-const MENU_VIEW: &[MenuItem] = &[MenuItem {
-    label: "Test Pattern",
-    command: Command::TestPattern,
-}];
-const MENU_TESTING: &[MenuItem] = &[MenuItem {
-    label: "Snapshot",
-    command: Command::Snapshot,
-}];
 
 /// Title-bar / dropdown geometry derived once per frame from the session width.
 #[derive(Clone, Copy, Debug)]
@@ -383,8 +372,10 @@ impl WmLayout {
 
     pub fn dropdown_rect(&self, menu: MenuId, item_count: usize, fb_w: i32) -> Rect {
         if menu == MenuId::Home {
-            let h = (item_count as i32) * (DOCK_ICON_H + DOCK_GAP) - DOCK_GAP;
-            return Rect::new(DOCK_X, DOCK_Y, DOCK_ICON_W, h.max(DOCK_ICON_H));
+            let last = item_count.saturating_sub(1);
+            let last_r = self.menu_item_rect(MenuId::Home, last, item_count, fb_w);
+            let h = (last_r.bottom() - DOCK_Y).max(DOCK_ICON_H);
+            return Rect::new(DOCK_X, DOCK_Y, DOCK_ICON_W, h);
         }
         let w = MENU_DROP_W.min(fb_w - 16);
         let x = self.header_rect(menu).x.min(fb_w - w - 4).max(0);
@@ -394,7 +385,12 @@ impl WmLayout {
 
     pub fn menu_item_rect(&self, menu: MenuId, item: usize, item_count: usize, fb_w: i32) -> Rect {
         if menu == MenuId::Home {
-            return Rect::new(DOCK_X, dock_icon_y(item), DOCK_ICON_W, DOCK_ICON_H);
+            let h = if item < AppSlot::APP_COUNT {
+                DOCK_ICON_H
+            } else {
+                DOCK_ACT_H
+            };
+            return Rect::new(DOCK_X, dock_icon_y(item), DOCK_ICON_W, h);
         }
         let r = self.dropdown_rect(menu, item_count, fb_w);
         Rect::new(r.x, r.y + 4 + (item as i32) * MENU_ITEM_H, r.w, MENU_ITEM_H)
@@ -482,8 +478,6 @@ impl WmState {
         match menu {
             MenuId::Home => "",
             MenuId::App => self.active_app.title(),
-            MenuId::View => "View",
-            MenuId::Testing => "Testing",
         }
     }
 
@@ -497,8 +491,6 @@ impl WmState {
                 AppSlot::Files => MENU_FILES,
                 AppSlot::Mines => MENU_MINES,
             },
-            MenuId::View => MENU_VIEW,
-            MenuId::Testing => MENU_TESTING,
         }
     }
 
@@ -676,7 +668,7 @@ impl WmState {
             layout.right_compact,
         );
         let rw = text_width_prop(right_str, layout.right_scale);
-        let menu_end = layout.header_rect(MenuId::Testing).right() + 8;
+        let menu_end = layout.header_rect(MenuId::App).right() + 8;
         if menu_end + rw + 10 <= fb.w {
             draw_str_prop(
                 fb,
@@ -698,23 +690,37 @@ impl WmState {
         fb.fill(r.x - 6, r.y - 6, r.w + 12, r.h + 12, t::SURFACE);
         fb.border(r.x - 6, r.y - 6, r.w + 12, r.h + 12, 2, t::ACCENT);
 
-        for (idx, slot) in AppSlot::DOCK_APPS.iter().enumerate() {
+        for (idx, item) in items.iter().enumerate() {
             let tr = layout.menu_item_rect(MenuId::Home, idx, items.len(), fb.w);
-            let active = self.active_app == *slot;
-            match slot {
-                AppSlot::System => {
-                    system::draw_dock_tile(fb, &self.system, tr.x, tr.y, tr.w, tr.h, active)
+            if let Some(slot) = AppSlot::from_dock_index(idx) {
+                let active = self.active_app == slot;
+                match slot {
+                    AppSlot::System => {
+                        system::draw_dock_tile(fb, &self.system, tr.x, tr.y, tr.w, tr.h, active)
+                    }
+                    AppSlot::Calc => {
+                        calc::draw_dock_tile(fb, &self.calc, tr.x, tr.y, tr.w, tr.h, active)
+                    }
+                    AppSlot::Files => {
+                        files::draw_dock_tile(fb, &self.files, tr.x, tr.y, tr.w, tr.h, active)
+                    }
+                    AppSlot::Mines => {
+                        mines::draw_dock_tile(fb, &self.mines, tr.x, tr.y, tr.w, tr.h, active)
+                    }
+                    AppSlot::Desktop => {}
                 }
-                AppSlot::Calc => {
-                    calc::draw_dock_tile(fb, &self.calc, tr.x, tr.y, tr.w, tr.h, active)
-                }
-                AppSlot::Files => {
-                    files::draw_dock_tile(fb, &self.files, tr.x, tr.y, tr.w, tr.h, active)
-                }
-                AppSlot::Mines => {
-                    mines::draw_dock_tile(fb, &self.mines, tr.x, tr.y, tr.w, tr.h, active)
-                }
-                AppSlot::Desktop => {}
+            } else {
+                ui::button(
+                    fb,
+                    tr,
+                    item.label,
+                    if self.test_pattern {
+                        ui::Tone::Accent
+                    } else {
+                        ui::Tone::Neutral
+                    },
+                    1,
+                );
             }
             let focused = self.focus_visible
                 && matches!(self.focus, Focus::Menu { menu: MenuId::Home, item } if item == idx);
@@ -792,6 +798,7 @@ impl WmState {
         let layout = WmLayout::new(self.width);
         self.focus_visible = false;
         self.files.hover_row = None;
+        self.files.hover_summary_row = None;
         self.files.hover_control = None;
         self.system.hover_tab = None;
 
@@ -964,6 +971,7 @@ impl WmState {
         self.hover = None;
         self.focus_visible = false;
         self.files.hover_row = None;
+        self.files.hover_summary_row = None;
         self.files.hover_control = None;
         self.system.hover_tab = None;
         InputResult::Changed
@@ -994,7 +1002,7 @@ impl WmState {
                 InputResult::Changed
             }
             Command::FilesWeb => {
-                self.files.open_subfolder(files::FolderLevel::WebSite);
+                self.files.open_subfolder(files::FolderLevel::WebRoot);
                 InputResult::Changed
             }
             Command::FilesWebRefresh => {
@@ -1162,9 +1170,7 @@ impl WmState {
                 InputResult::Changed
             }
             Key::End => {
-                self.focus = Focus::MenuBar {
-                    menu: MenuId::Testing,
-                };
+                self.focus = Focus::MenuBar { menu: MenuId::App };
                 InputResult::Changed
             }
             _ => InputResult::Handled,
@@ -1438,14 +1444,9 @@ mod tests {
             files.menu_items(MenuId::App)[7].command,
             Command::CloseWindow
         );
-        assert_eq!(
-            WmState::new().menu_items(MenuId::View)[0].command,
-            Command::TestPattern
-        );
-        assert_eq!(
-            WmState::new().menu_items(MenuId::Testing)[0].command,
-            Command::Snapshot
-        );
+        let home_items = WmState::new().menu_items(MenuId::Home);
+        assert_eq!(home_items.len(), 5);
+        assert_eq!(home_items[4].command, Command::TestPattern);
     }
 
     #[test]
@@ -1474,12 +1475,15 @@ mod tests {
     fn layout_geometry_is_consistent() {
         let full = WmLayout::new(1280);
         let compact = WmLayout::new(390);
+        let narrow = WmLayout::new(360);
         assert_eq!(full.header_w, MENU_HEADER_W);
-        assert_eq!(compact.header_w, 72);
+        assert_eq!(compact.header_w, MENU_HEADER_W);
+        assert_eq!(narrow.header_w, MENU_HEADER_W);
         assert_eq!(full.menu_scale, 2);
         assert_eq!(compact.menu_scale, 2);
         assert!(!full.right_compact);
         assert!(compact.right_compact);
+        assert!(narrow.right_compact);
 
         assert_eq!(
             full.header_rect(MenuId::Home),
@@ -1489,10 +1493,34 @@ mod tests {
             let r = full.dropdown_rect(menu, 5, 1280);
             assert!(r.x >= 0 && r.right() <= 1280);
             assert!(r.contains(r.x + 1, r.y + 1));
-            let item = full.menu_item_rect(menu, 3, 5, 1280);
-            assert!(item.x >= r.x && item.right() <= r.right());
+            for i in 0..5 {
+                let item = full.menu_item_rect(menu, i, 5, 1280);
+                assert!(item.x >= r.x && item.right() <= r.right());
+                assert!(item.y >= r.y && item.bottom() <= r.bottom());
+            }
         }
-        let r = compact.dropdown_rect(MenuId::Testing, 1, 390);
+        let r = compact.dropdown_rect(MenuId::App, 4, 390);
         assert!(r.x >= 0 && r.right() <= 390);
+
+        // Verify all app titles and compact status string fit without collision at 360x800 and 390x844
+        for &w in &[360, 390, 1280] {
+            let l = WmLayout::new(w);
+            let app_r = l.header_rect(MenuId::App);
+            for slot in [
+                AppSlot::Desktop,
+                AppSlot::System,
+                AppSlot::Calc,
+                AppSlot::Files,
+                AppSlot::Mines,
+            ] {
+                let tw = text_width_prop(slot.title(), l.menu_scale);
+                assert!(10 + tw + 6 <= app_r.w, "{} in {}", slot.title(), w);
+            }
+            let mut right_buf = [b' '; 64];
+            let right_str = f::title_right(&mut right_buf, 1, 2026, 10, 30, 6, 45, 0, l.right_compact);
+            let rw = text_width_prop(right_str, l.right_scale);
+            let menu_end = app_r.right() + 8;
+            assert!(menu_end + rw + 10 <= w, "right status in {}", w);
+        }
     }
 }
