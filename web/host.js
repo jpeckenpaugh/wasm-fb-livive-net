@@ -27,6 +27,7 @@ const DEFAULT_MOUNTS = [
   { name: 'wallpapers/05_orbits.png',  url: './assets/05_orbits.png',  bytes: 158720, kind: 'image' },
   { name: 'samples/app.js',            url: './demo/app.js',           bytes: 1045,   kind: 'code' },
   { name: 'samples/data.json',         url: './demo/data.json',        bytes: 527,    kind: 'code' },
+  { name: 'samples/entangled.md',      url: './demo/entangled.md',     bytes: 9860,   kind: 'code', contextUrl: './demo/.context.xml' },
   { name: 'samples/feed.xml',          url: './demo/feed.xml',         bytes: 1051,   kind: 'code' },
   { name: 'samples/hello.c',           url: './demo/hello.c',          bytes: 755,    kind: 'code' },
   { name: 'samples/page.html',         url: './demo/page.html',        bytes: 851,    kind: 'code' },

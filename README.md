@@ -18,11 +18,13 @@ Browser Host (HTML + JS)
 
 This repository serves three routes:
 
-### 1. Appliance v3 (Root `/`) — Build Registry, Split View & 2-Player Match Broker
+### 1. Appliance v3.1 (Root `/`) — Build Registry, Checkers + Mines 2P Broker & Entangled Hypervisors
 Served at `/` (`web/index.html`, `web/host.js`, `web/registry.json`):
-- **Immutable Build Registry (`web/registry.json`)**: Select and instantiate historical and current `.wasm` appliance builds (`build-02` v3.0 2P Mines + Registry vs. `build-01` v2.0 `7ac8a67` 1P Baseline) per guest tab, with clickable GitHub commit provenance links (`↗ commit`).
-- **Side-by-Side Split View (`⧉ split view` & `⇄ A/B builds`)**: Compare multiple guests or A/B test Build #1 (`7ac8a67`) against Build #2 (`v3.0`) side-by-side in one click.
-- **2-Player Turn-Based Minesweeper & In-Browser FastAPI/SQLite Broker (`🎮 2P mines match`)**: Wraps `mine_sm.rs` (`BoardState`) in a 2-player turn-based state machine with Wasm TX/RX mailboxes (`app_mines_set_mp`, `app_mines_take_tx`, `app_mines_apply_rx`) and an in-browser FastAPI + SQLite match broker (`window.__broker` with live `matches` and `match_events` tables).
+- **Immutable Build Registry (`web/registry.json`)**: Select and instantiate historical and current `.wasm` appliance builds (`build-03` v3.1 Checkers + AI + 2P Broker, `build-02` v3.0 `aea4b4b` 2P Mines, `build-01` v2.0 `7ac8a67` 1P Baseline) per guest tab, with clickable GitHub commit provenance links (`↗ commit`).
+- **Side-by-Side Split View (`⧉ split view` & `⇄ A/B builds`)**: Compare multiple guests or A/B test Build #3 (`v3.1`) against Build #2 (`aea4b4b`) side-by-side in one click.
+- **English Draughts (Checkers) + Alpha-Beta Minimax AI (`♟️ 2P checkers match`)**: Pure `#![no_std]` 32-square PDN draughts engine (`v2/src/checkers_sm.rs`, `v2/src/checkers.rs`) with mandatory jumps, multi-jump continuation, 2/4/6-ply alpha-beta Minimax + quiescence AI, Seat P2 perspective auto-flip, and 2-guest match brokering.
+- **2-Player Turn-Based Minesweeper (`🎮 2P mines match`)**: Wraps `mine_sm.rs` (`BoardState`) in a 2-player turn-based state machine with Wasm TX/RX mailboxes and an in-browser FastAPI + SQLite match broker (`window.__broker` with live `matches` and `match_events` tables).
+- **Peer-to-Peer Entangled Hypervisors & Live Trajectory Branching**: See [**docs/v3-entangled-hypervisors.md**](docs/v3-entangled-hypervisors.md) (and `~/samples/entangled.md` inside the `Files` app) for the architectural manifesto and LAN/WebRTC causal trajectory specification.
 
 ### 2. Appliance v2 (`/v2/`) — Frozen Rust `#![no_std]` Window Manager Baseline
 Located in `v2/` and served at `/v2/`:

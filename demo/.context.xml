@@ -112,6 +112,24 @@
       color palettes from application business logic.
     </architecture>
   </file>
+  <file name="entangled.md" runtime="Markdown (Architecture Manifesto)" role="Peer-to-Peer Entangled Hypervisors &amp; Trajectory Spec">
+    <graph>
+      <imports>web/registry.json, v2/src/checkers_sm.rs, v2/src/mine_sm.rs, web/host.js</imports>
+      <exports>wasm-fb.trajectory/v1 schema, HELLO/TRANSITION LAN entanglement protocol</exports>
+      <dependents>Future autonomous coding agents, LAN/WebRTC peer transports, trajectory branching UI</dependents>
+      <invariants>Zero master/slave parity; State_N = F(BuildHash, Seed, Transitions); Framebuffer_i = Render(State_N, Lens_i)</invariants>
+    </graph>
+    <summary>
+      Defines the Peer-to-Peer Entangled Hypervisors with Live Trajectory Branching architecture for wasm-fb.
+      Establishes the five foundational laws that replace client/server state replication with symmetric causal
+      transition exchange, FNV-1a state-hash verification, orthogonal perspective rendering, and sub-millisecond
+      counterfactual trajectory branching.
+    </summary>
+    <architecture>
+      Serves as the durable anti-amnesia grounding specification for human engineers and autonomous sub-agents
+      extending wasm-fb across local Split View, BroadcastChannel, LAN WebSockets, and WebRTC data channels.
+    </architecture>
+  </file>
   <file name="types.ts" runtime="TypeScript" role="Domain Model Type Definitions">
     <graph>
       <imports>TypeScript type system</imports>
