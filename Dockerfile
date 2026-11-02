@@ -39,11 +39,14 @@ FROM scratch AS artifacts
 COPY --from=build /src/build/ /
 
 FROM nginx:1.29-alpine AS serve
-COPY --from=build /src/build/media_browser.mjs /usr/share/nginx/html/build/
-COPY --from=build /src/build/media_browser.wasm /usr/share/nginx/html/build/
-COPY --from=build /src/build/v2/appliance.wasm /usr/share/nginx/html/v2/build/
+COPY web /usr/share/nginx/html/
 COPY assets /usr/share/nginx/html/assets/
 COPY demo /usr/share/nginx/html/demo/
 COPY gh /usr/share/nginx/html/gh/
-COPY web /usr/share/nginx/html/
+COPY --from=build /src/build/media_browser.mjs /usr/share/nginx/html/build/
+COPY --from=build /src/build/media_browser.wasm /usr/share/nginx/html/build/
+COPY --from=build /src/build/media_browser.mjs /usr/share/nginx/html/v1/build/
+COPY --from=build /src/build/media_browser.wasm /usr/share/nginx/html/v1/build/
+COPY --from=build /src/build/v2/appliance.wasm /usr/share/nginx/html/build/
+COPY web/builds/appliance-v2-7ac8a67.wasm /usr/share/nginx/html/v2/build/appliance.wasm
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf

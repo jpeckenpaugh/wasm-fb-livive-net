@@ -1,0 +1,29 @@
+{
+  "captureEndpoint": "http://127.0.0.1:8787/api/captures",
+  "sites": [
+    {
+      "id": "livive.net",
+      "label": "livive.net",
+      "url": "https://livive.net/",
+      "maxAgeMinutes": 15
+    },
+    {
+      "id": "mines.livive.net",
+      "label": "mines.livive.net",
+      "url": "https://mines.livive.net/",
+      "maxAgeMinutes": 15
+    },
+    {
+      "id": "mines-sm.livive.net",
+      "label": "mines-sm.livive.net",
+      "url": "https://mines-sm.livive.net/",
+      "maxAgeMinutes": 15
+    },
+    {
+      "id": "gm.livive.net",
+      "label": "gm.livive.net",
+      "url": "https://gm.livive.net/",
+      "maxAgeMinutes": 15
+    }
+  ]
+}

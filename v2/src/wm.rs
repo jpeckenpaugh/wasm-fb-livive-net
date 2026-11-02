@@ -194,6 +194,7 @@ pub enum Command {
     MinesReplay,
     MinesToggleFlag,
     MinesToggleRules,
+    MinesToggleMp,
     TestPattern,
     Snapshot,
 }
@@ -326,6 +327,10 @@ const MENU_MINES: &[MenuItem] = &[
     MenuItem {
         label: "Toggle Shield Rule",
         command: Command::MinesToggleRules,
+    },
+    MenuItem {
+        label: "Toggle 2P Match (M)",
+        command: Command::MinesToggleMp,
     },
     MenuItem {
         label: "Close Window",
@@ -1047,6 +1052,10 @@ impl WmState {
             }
             Command::MinesToggleRules => {
                 self.mines.toggle_rules();
+                InputResult::Changed
+            }
+            Command::MinesToggleMp => {
+                self.mines.toggle_mp();
                 InputResult::Changed
             }
             Command::TestPattern => {

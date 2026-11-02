@@ -3,8 +3,9 @@
 //! Flat, single-surface layout inside the maximized client surface:
 //! - Crisp 8×8 bitboard grid (`64` cells)
 //! - Clean telemetry & controls column (or top/bottom strip in portrait viewports)
-//! - Supports `ActionType::Reveal` and `ActionType::Flag`, seed cycling, and
-//!   Classic (`max_strikes: 1`) vs. Shielded (`max_strikes: 3`) rules.
+//! - Supports `ActionType::Reveal` and `ActionType::Flag`, seed cycling,
+//!   Classic (`max_strikes: 1`) vs. Shielded (`max_strikes: 3`) rules, and
+//!   a 2-Player Turn-Based multiplayer wrapper over `BoardState`.
 
 use crate::fb::Framebuffer;
 use crate::fmt as f;
@@ -12,16 +13,31 @@ use crate::font::{draw_str, draw_str_centered, draw_str_prop, line_height};
 use crate::icon::{draw_icon, Icon};
 use crate::input::{InputResult, Key};
 use crate::layout::{Metrics, Rect};
-use crate::mine_sm::{Action, ActionType, BoardState, Rules};
+use crate::mine_sm::{Action, ActionType, BoardState, Rules, StepResult};
 use crate::theme as t;
 use crate::ui;
 
 pub const DEFAULT_SEED: u64 = 42;
 pub const DEFAULT_BOMBS: u8 = 10;
 
+pub const TX_REVEAL: u8 = 0;
+pub const TX_FLAG: u8 = 1;
+pub const TX_NEW_MATCH: u8 = 2;
+
 pub struct MinesApp {
     pub board: BoardState,
     pub flag_mode: bool,
+    pub mp_enabled: bool,
+    pub match_id: u32,
+    pub local_seat: u8,
+    pub active_turn: u8,
+    pub p1_score: i32,
+    pub p2_score: i32,
+    pub winner_seat: u8,
+    pub mp_seq: u32,
+    pub tx_pending: bool,
+    pub tx_action: u8,
+    pub tx_cell: u8,
 }
 
 impl MinesApp {
@@ -42,18 +58,74 @@ impl MinesApp {
                 is_won: false,
             },
             flag_mode: false,
+            mp_enabled: false,
+            match_id: 1,
+            local_seat: 0,
+            active_turn: 1,
+            p1_score: 0,
+            p2_score: 0,
+            winner_seat: 0,
+            mp_seq: 0,
+            tx_pending: false,
+            tx_action: 0,
+            tx_cell: 0,
         }
     }
 
     pub fn init_default(&mut self) {
         self.board = BoardState::new(DEFAULT_SEED, DEFAULT_BOMBS, Rules { max_strikes: 1 });
         self.flag_mode = false;
+        self.mp_enabled = false;
+        self.match_id = 1;
+        self.local_seat = 0;
+        self.active_turn = 1;
+        self.p1_score = 0;
+        self.p2_score = 0;
+        self.winner_seat = 0;
+        self.mp_seq = 0;
+        self.tx_pending = false;
+        self.tx_action = 0;
+        self.tx_cell = 0;
+    }
+
+    pub fn configure_mp(
+        &mut self,
+        enabled: bool,
+        match_id: u32,
+        seat: u8,
+        seed: u64,
+        max_strikes: u8,
+    ) {
+        let strikes = if max_strikes > 1 { 3 } else { 1 };
+        self.board = BoardState::new(seed, DEFAULT_BOMBS, Rules { max_strikes: strikes });
+        self.flag_mode = false;
+        self.mp_enabled = enabled;
+        self.match_id = if match_id > 0 { match_id } else { 1 };
+        self.local_seat = if enabled { seat.clamp(1, 2) } else { 0 };
+        self.active_turn = 1;
+        self.p1_score = 0;
+        self.p2_score = 0;
+        self.winner_seat = 0;
+        self.mp_seq = 0;
+        self.tx_pending = false;
+        self.tx_action = 0;
+        self.tx_cell = 0;
     }
 
     pub fn reset_seed(&mut self, seed: u64) {
         let rules = self.board.rules;
         let bombs = self.board.num_bombs;
         self.board = BoardState::new(seed, bombs, rules);
+        self.active_turn = 1;
+        self.p1_score = 0;
+        self.p2_score = 0;
+        self.winner_seat = 0;
+        if self.mp_enabled {
+            self.mp_seq = self.mp_seq.wrapping_add(1);
+            self.tx_pending = true;
+            self.tx_action = TX_NEW_MATCH;
+            self.tx_cell = 0;
+        }
     }
 
     pub fn next_seed(&mut self) {
@@ -78,10 +150,118 @@ impl MinesApp {
                 max_strikes: next_strikes,
             },
         );
+        self.active_turn = 1;
+        self.p1_score = 0;
+        self.p2_score = 0;
+        self.winner_seat = 0;
+        if self.mp_enabled {
+            self.mp_seq = self.mp_seq.wrapping_add(1);
+            self.tx_pending = true;
+            self.tx_action = TX_NEW_MATCH;
+            self.tx_cell = 0;
+        }
+    }
+
+    pub fn toggle_mp(&mut self) {
+        if !self.mp_enabled {
+            self.mp_enabled = true;
+            self.local_seat = 1;
+        } else if self.local_seat == 1 {
+            self.local_seat = 2;
+        } else {
+            self.mp_enabled = false;
+            self.local_seat = 0;
+        }
+        self.board = BoardState::new(self.board.seed, self.board.num_bombs, self.board.rules);
+        self.active_turn = 1;
+        self.p1_score = 0;
+        self.p2_score = 0;
+        self.winner_seat = 0;
+        if self.mp_enabled {
+            self.mp_seq = self.mp_seq.wrapping_add(1);
+            self.tx_pending = true;
+            self.tx_action = TX_NEW_MATCH;
+            self.tx_cell = 0;
+        } else {
+            self.tx_pending = false;
+        }
+    }
+
+    pub fn apply_move(&mut self, seat: u8, action_type: ActionType, cell: u8) -> StepResult {
+        let res = self.board.step(Action { action_type, cell });
+        if !res.valid_move {
+            return res;
+        }
+
+        if self.mp_enabled {
+            let effective_seat = if seat == 2 { 2 } else { 1 };
+            if action_type == ActionType::Reveal {
+                if res.hit_bomb {
+                    if self.board.rules.max_strikes > 1 {
+                        if effective_seat == 1 {
+                            self.p1_score -= 5;
+                        } else {
+                            self.p2_score -= 5;
+                        }
+                    }
+                    if res.terminal {
+                        self.winner_seat = if effective_seat == 1 { 2 } else { 1 };
+                    }
+                } else {
+                    let pts = res.newly_revealed as i32;
+                    if effective_seat == 1 {
+                        self.p1_score += pts;
+                    } else {
+                        self.p2_score += pts;
+                    }
+                    if res.terminal && res.won {
+                        self.winner_seat = if self.p1_score > self.p2_score {
+                            1
+                        } else if self.p2_score > self.p1_score {
+                            2
+                        } else {
+                            3
+                        };
+                    }
+                }
+
+                if !self.board.is_terminal {
+                    self.active_turn = if effective_seat == 1 { 2 } else { 1 };
+                }
+            }
+            self.mp_seq = self.mp_seq.wrapping_add(1);
+        }
+
+        res
     }
 
     pub fn status_str(&self) -> &'static str {
-        if self.board.is_terminal {
+        if self.mp_enabled {
+            if self.board.is_terminal {
+                match self.winner_seat {
+                    1 => "P1 Wins!",
+                    2 => "P2 Wins!",
+                    3 => "Draw!",
+                    _ => {
+                        if self.board.is_won {
+                            "Cleared (Won)"
+                        } else {
+                            "Detonated"
+                        }
+                    }
+                }
+            } else if self.local_seat == self.active_turn {
+                if self.local_seat == 2 {
+                    "Your Turn (P2)"
+                } else {
+                    "Your Turn (P1)"
+                }
+            } else if self.active_turn == 2 {
+                "Wait for P2..."
+            } else {
+                "Wait for P1..."
+            }
+        } else if self.board.is_terminal {
             if self.board.is_won {
                 "Cleared (Won)"
             } else {
@@ -91,6 +271,21 @@ impl MinesApp {
             "Ready"
         } else {
             "Playing"
+        }
+    }
+
+    pub fn mp_button_label(&self) -> &'static str {
+        if !self.mp_enabled {
+            "Match: Solo (1P)"
+        } else {
+            match (self.local_seat, self.active_turn) {
+                (1, 1) => "2P · Seat P1 (Turn: P1)",
+                (1, _) => "2P · Seat P1 (Turn: P2)",
+                (2, 1) => "2P · Seat P2 (Turn: P1)",
+                (2, _) => "2P · Seat P2 (Turn: P2)",
+                (_, 1) => "2P · Turn: P1",
+                _ => "2P · Turn: P2",
+            }
         }
     }
 }
@@ -107,6 +302,7 @@ struct MinesGeom {
     btn_mode: Rect,
     btn_seed: Rect,
     btn_rule: Rect,
+    btn_mp: Rect,
 }
 
 fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
@@ -128,8 +324,10 @@ fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
 
         let info_x = board_x + grid_px + 48;
         let info_y = board_y;
-        let btn_h = if cell < 40 { 34 } else { 42 };
-        let btn_y0 = info_y + (grid_px - (3 * btn_h + 20)).max(160);
+        let btn_h = if cell < 42 { 32 } else { 38 };
+        let btn_gap = 8;
+        let stack_h = 4 * btn_h + 3 * btn_gap;
+        let btn_y0 = info_y + (grid_px - stack_h).max(164);
 
         MinesGeom {
             board_x,
@@ -141,11 +339,12 @@ fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
             info_y,
             info_w,
             btn_mode: Rect::new(info_x, btn_y0, info_w, btn_h),
-            btn_seed: Rect::new(info_x, btn_y0 + btn_h + 10, info_w, btn_h),
-            btn_rule: Rect::new(info_x, btn_y0 + 2 * (btn_h + 10), info_w, btn_h),
+            btn_seed: Rect::new(info_x, btn_y0 + (btn_h + btn_gap), info_w, btn_h),
+            btn_rule: Rect::new(info_x, btn_y0 + 2 * (btn_h + btn_gap), info_w, btn_h),
+            btn_mp: Rect::new(info_x, btn_y0 + 3 * (btn_h + btn_gap), info_w, btn_h),
         }
     } else {
-        // Portrait / compact layout: board on top, telemetry + buttons below
+        // Portrait / compact layout: board on top, telemetry + 2×2 buttons below
         let avail_w = client_w - 32;
         let avail_h = (client_h * 58 / 100).max(200);
         let avail = avail_w.min(avail_h);
@@ -173,7 +372,13 @@ fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
             info_w,
             btn_mode: Rect::new(info_x, btn_y0, half_w, btn_h),
             btn_seed: Rect::new(info_x + half_w + 8, btn_y0, info_w - half_w - 8, btn_h),
-            btn_rule: Rect::new(info_x, btn_y0 + btn_h + 8, info_w, btn_h),
+            btn_rule: Rect::new(info_x, btn_y0 + btn_h + 8, half_w, btn_h),
+            btn_mp: Rect::new(
+                info_x + half_w + 8,
+                btn_y0 + btn_h + 8,
+                info_w - half_w - 8,
+                btn_h,
+            ),
         }
     }
 }
@@ -253,13 +458,28 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     let head_sc = if compact_info { 2 } else { 3 };
     let row_sc = 2;
 
-    draw_str(fb, g.info_x, g.info_y, "Mines 8x8", head_sc, t::TEXT);
+    let title_str = if app.mp_enabled {
+        "Mines 2P Match"
+    } else {
+        "Mines 8x8"
+    };
+    draw_str(fb, g.info_x, g.info_y, title_str, head_sc, t::TEXT);
     let bar_col = if b.is_terminal {
-        if b.is_won {
+        if app.mp_enabled {
+            if app.winner_seat == 3 {
+                t::WARNING
+            } else if app.winner_seat == app.local_seat || app.local_seat == 0 {
+                t::SUCCESS
+            } else {
+                t::DANGER
+            }
+        } else if b.is_won {
             t::SUCCESS
         } else {
             t::DANGER
         }
+    } else if app.mp_enabled && app.local_seat != 0 && app.local_seat != app.active_turn {
+        t::WARNING
     } else {
         accent
     };
@@ -276,7 +496,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     let flags_placed = b.flagged_mask.count_ones();
 
     let mut y = g.info_y + line_height(head_sc) + 14;
-    let step_y = if compact_info { 20 } else { 28 };
+    let step_y = if compact_info { 20 } else { 26 };
 
     let row = |y: i32| Rect::new(g.info_x, y, g.info_w, step_y);
     ui::kv_row(
@@ -290,20 +510,33 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     );
     y += step_y;
 
-    let mut seed_buf = [b' '; 16];
-    let seed_str = f::u32_str(&mut seed_buf, b.seed as u32);
-    ui::kv_row(fb, row(y), "Seed", seed_str, row_sc, label_col, text_col);
-    y += step_y;
+    if app.mp_enabled && y + step_y <= g.btn_mode.y {
+        let mut score_buf = [b' '; 32];
+        let score_str = f::mp_score_str(&mut score_buf, app.p1_score, app.p2_score);
+        ui::kv_row(fb, row(y), "Score", score_str, row_sc, label_col, t::ACCENT);
+        y += step_y;
+    }
 
-    let mut safe_buf = [b' '; 16];
-    let safe_str = f::ratio_str(&mut safe_buf, safe_rev, safe_total);
-    ui::kv_row(fb, row(y), "Cleared", safe_str, row_sc, label_col, text_col);
-    y += step_y;
+    if y + step_y <= g.btn_mode.y {
+        let mut seed_buf = [b' '; 16];
+        let seed_str = f::u32_str(&mut seed_buf, b.seed as u32);
+        ui::kv_row(fb, row(y), "Seed", seed_str, row_sc, label_col, text_col);
+        y += step_y;
+    }
 
-    let mut flag_buf = [b' '; 16];
-    let flag_str = f::ratio_str(&mut flag_buf, flags_placed, b.num_bombs as u32);
-    ui::kv_row(fb, row(y), "Flags", flag_str, row_sc, label_col, text_col);
-    y += step_y;
+    if y + step_y <= g.btn_mode.y {
+        let mut safe_buf = [b' '; 16];
+        let safe_str = f::ratio_str(&mut safe_buf, safe_rev, safe_total);
+        ui::kv_row(fb, row(y), "Cleared", safe_str, row_sc, label_col, text_col);
+        y += step_y;
+    }
+
+    if y + step_y <= g.btn_mode.y {
+        let mut flag_buf = [b' '; 16];
+        let flag_str = f::ratio_str(&mut flag_buf, flags_placed, b.num_bombs as u32);
+        ui::kv_row(fb, row(y), "Flags", flag_str, row_sc, label_col, text_col);
+        y += step_y;
+    }
 
     if y + step_y <= g.btn_mode.y {
         let mut strike_buf = [b' '; 16];
@@ -343,11 +576,20 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
     ui::button(fb, g.btn_seed, "New Seed (N)", ui::Tone::Neutral, row_sc);
 
     let rule_lbl = if b.rules.max_strikes > 1 {
-        "Rule: Shielded (3 Strikes)"
+        "Rule: Shielded (3)"
     } else {
-        "Rule: Classic (1 Strike)"
+        "Rule: Classic (1)"
     };
     ui::button(fb, g.btn_rule, rule_lbl, ui::Tone::Neutral, row_sc);
+
+    let mp_tone = if !app.mp_enabled {
+        ui::Tone::Neutral
+    } else if app.local_seat == app.active_turn {
+        ui::Tone::Accent
+    } else {
+        ui::Tone::Warning
+    };
+    ui::button(fb, g.btn_mp, app.mp_button_label(), mp_tone, row_sc);
 }
 
 pub fn click_window(
@@ -371,13 +613,34 @@ pub fn click_window(
             && (rel_x % stride) < g.cell
             && (rel_y % stride) < g.cell
         {
+            if app.mp_enabled
+                && app.local_seat != 0
+                && app.active_turn != app.local_seat
+                && !app.board.is_terminal
+            {
+                return InputResult::Noop;
+            }
             let cell = (row * 8 + col) as u8;
             let action_type = if app.flag_mode {
                 ActionType::Flag
             } else {
                 ActionType::Reveal
             };
-            let res = app.board.step(Action { action_type, cell });
+            let seat = if app.local_seat != 0 {
+                app.local_seat
+            } else {
+                app.active_turn
+            };
+            let res = app.apply_move(seat, action_type, cell);
+            if res.valid_move && app.mp_enabled {
+                app.tx_pending = true;
+                app.tx_action = if action_type == ActionType::Flag {
+                    TX_FLAG
+                } else {
+                    TX_REVEAL
+                };
+                app.tx_cell = cell;
+            }
             return InputResult::from(res.valid_move);
         }
     }
@@ -392,6 +655,10 @@ pub fn click_window(
     }
     if g.btn_rule.contains(cx, cy) {
         app.toggle_rules();
+        return InputResult::Changed;
+    }
+    if g.btn_mp.contains(cx, cy) {
+        app.toggle_mp();
         return InputResult::Changed;
     }
 
@@ -410,6 +677,10 @@ pub fn key_window(app: &mut MinesApp, key: Key) -> InputResult {
         }
         Key::Replay => {
             app.reset_seed(app.board.seed);
+            InputResult::Changed
+        }
+        Key::ToggleMp => {
+            app.toggle_mp();
             InputResult::Changed
         }
         Key::Enter if app.board.is_terminal => {
@@ -435,11 +706,20 @@ pub fn draw_dock_tile(
     draw_str_prop(fb, x + 48, y + 18, "Mines", 2, t::TEXT);
 
     let sub = if app.board.is_terminal {
-        if app.board.is_won {
+        if app.mp_enabled {
+            match app.winner_seat {
+                1 => "P1 Win",
+                2 => "P2 Win",
+                3 => "Draw",
+                _ => "Done",
+            }
+        } else if app.board.is_won {
             "Won"
         } else {
             "Boom"
         }
+    } else if app.mp_enabled {
+        "2P Turn"
     } else {
         "Seeded"
     };
@@ -454,5 +734,86 @@ fn count_color(cnt: u8) -> u32 {
         4 => t::PURPLE,         // Purple
         5 => t::WARNING_BRIGHT, // Amber
         _ => t::ACCENT,         // Teal
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn turn_enforcement_and_scoring_in_2p_mode() {
+        let mut app = MinesApp::new_const();
+        app.configure_mp(true, 7, 1, 42, 1);
+        assert!(app.mp_enabled);
+        assert_eq!(app.match_id, 7);
+        assert_eq!(app.local_seat, 1);
+        assert_eq!(app.active_turn, 1);
+
+        let g = mines_geom(1280, 688);
+        let cell0_x = g.board_x + g.cell / 2;
+        let cell0_y = g.board_y + g.cell / 2;
+
+        // P1 can click cell 0 on turn 1
+        assert_eq!(
+            click_window(&mut app, cell0_x, cell0_y, 1280, 688),
+            InputResult::Changed
+        );
+        assert!(app.tx_pending);
+        assert_eq!(app.tx_action, TX_REVEAL);
+        assert_eq!(app.tx_cell, 0);
+        assert!(app.p1_score > 0);
+        assert_eq!(app.active_turn, 2);
+
+        // Find an unrevealed safe cell for next turn
+        let next_cell = (0..64u8)
+            .find(|&c| {
+                (app.board.revealed_mask & (1u64 << c)) == 0
+                    && (app.board.mine_mask & (1u64 << c)) == 0
+            })
+            .unwrap();
+        let nc_x = g.board_x + (next_cell as i32 % 8) * (g.cell + g.gap) + g.cell / 2;
+        let nc_y = g.board_y + (next_cell as i32 / 8) * (g.cell + g.gap) + g.cell / 2;
+
+        // P1 cannot move when active_turn == 2
+        assert_eq!(
+            click_window(&mut app, nc_x, nc_y, 1280, 688),
+            InputResult::Noop
+        );
+
+        // Apply P2's move via apply_move
+        let res = app.apply_move(2, ActionType::Reveal, next_cell);
+        assert!(res.valid_move);
+        assert!(app.p2_score > 0);
+        assert_eq!(app.active_turn, 1);
+    }
+
+    #[test]
+    fn sudden_death_and_shielded_bomb_scoring() {
+        // 1. Sudden death (max_strikes = 1): P1 reveals safe cell, P2 hits a bomb -> P1 wins
+        let mut app = MinesApp::new_const();
+        app.configure_mp(true, 1, 1, 42, 1);
+        let safe_cell = (0..64u8)
+            .find(|&c| (app.board.mine_mask & (1u64 << c)) == 0)
+            .unwrap();
+        app.apply_move(1, ActionType::Reveal, safe_cell);
+        assert_eq!(app.active_turn, 2);
+
+        let bomb_cell = (0..64u8)
+            .find(|&c| (app.board.mine_mask & (1u64 << c)) != 0)
+            .unwrap();
+        let res = app.apply_move(2, ActionType::Reveal, bomb_cell);
+        assert!(res.valid_move && res.hit_bomb && res.terminal);
+        assert_eq!(app.winner_seat, 1);
+        assert_eq!(app.status_str(), "P1 Wins!");
+
+        // 2. Shielded mode (max_strikes = 3): hitting a bomb deducts 5 points and passes turn
+        let mut shielded = MinesApp::new_const();
+        shielded.configure_mp(true, 2, 1, 42, 3);
+        shielded.apply_move(1, ActionType::Reveal, safe_cell);
+        let res2 = shielded.apply_move(2, ActionType::Reveal, bomb_cell);
+        assert!(res2.valid_move && res2.hit_bomb && !res2.terminal);
+        assert_eq!(shielded.p2_score, -5);
+        assert_eq!(shielded.active_turn, 1);
     }
 }

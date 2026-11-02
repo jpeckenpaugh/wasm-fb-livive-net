@@ -1,0 +1,30 @@
+{
+  "defaultBuild": "build-02",
+  "repository": "https://github.com/jpeckenpaugh/wasm-fb-livive-net",
+  "builds": [
+    {
+      "id": "build-02",
+      "label": "Build #2 · v3.0 (2P Mines + Registry)",
+      "shortLabel": "build-02 · v3.0",
+      "version": "v3.0",
+      "wasmUrl": "./build/appliance.wasm",
+      "gitCommit": "HEAD",
+      "githubUrl": "https://github.com/jpeckenpaugh/wasm-fb-livive-net/commits/main",
+      "minesBuild": "Mines Build #2 (2P Turn-Based + Scoring)",
+      "supportsMultiplayer": true,
+      "notes": "Adds 2-player turn-based Minesweeper wrapper, Wasm MP mailbox ABI, and v3 registry"
+    },
+    {
+      "id": "build-01",
+      "label": "Build #1 · v2.0 (7ac8a67 · 1P Baseline)",
+      "shortLabel": "build-01 · 7ac8a67",
+      "version": "v2.0",
+      "wasmUrl": "./builds/appliance-v2-7ac8a67.wasm",
+      "gitCommit": "7ac8a67",
+      "githubUrl": "https://github.com/jpeckenpaugh/wasm-fb-livive-net/commit/7ac8a67",
+      "minesBuild": "Mines Build #1 (1P Bitboard)",
+      "supportsMultiplayer": false,
+      "notes": "Frozen v2 baseline with single-player Minesweeper, right-pane Files activation, and simplified menus"
+    }
+  ]
+}

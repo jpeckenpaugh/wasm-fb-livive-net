@@ -2,6 +2,8 @@ build/
 build-*/
 out/
 v2/target/
+web/build/
+web/v1/build/
 web/v2/build/
 web/assets/
 web/demo/

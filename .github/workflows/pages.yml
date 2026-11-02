@@ -37,17 +37,22 @@ jobs:
       - name: Assemble static site
         run: |
           set -eu
-          mkdir -p site/build site/v2/build site/assets site/demo site/gh
+          mkdir -p site/build site/v1/build site/v2/build site/assets site/demo site/gh
           cp -R web/. site/
           cp assets/*.png assets/.context.xml site/assets/
           cp demo/* demo/.context.xml site/demo/
           cp -R gh/mines-sm gh/mines-livive-net gh/gm-livive-net site/gh/
           cp wasm-out/media_browser.mjs wasm-out/media_browser.wasm site/build/
-          cp wasm-out/v2/appliance.wasm site/v2/build/
+          cp wasm-out/media_browser.mjs wasm-out/media_browser.wasm site/v1/build/
+          cp wasm-out/v2/appliance.wasm site/build/
+          cp web/builds/appliance-v2-7ac8a67.wasm site/v2/build/appliance.wasm
           printf 'wasm-fb.livive.net\n' > site/CNAME
           touch site/.nojekyll
-          test -s site/build/media_browser.wasm
-          test -s site/build/media_browser.mjs
+          test -s site/build/appliance.wasm
+          test -s site/builds/appliance-v2-7ac8a67.wasm
+          test -s site/registry.json
+          test -s site/v1/build/media_browser.wasm
+          test -s site/v1/build/media_browser.mjs
           test -s site/v2/build/appliance.wasm
           test -s site/gh/mines-sm/lib.rs
           test -s site/gh/mines-sm/.context.xml

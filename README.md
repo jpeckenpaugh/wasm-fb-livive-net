@@ -16,23 +16,29 @@ Browser Host (HTML + JS)
 
 ## Implementations
 
-This repository includes two generations:
+This repository serves three routes:
 
-### 1. Appliance v2 (Rust `#![no_std]` Window Manager) — Recommended
+### 1. Appliance v3 (Root `/`) — Build Registry, Split View & 2-Player Match Broker
+Served at `/` (`web/index.html`, `web/host.js`, `web/registry.json`):
+- **Immutable Build Registry (`web/registry.json`)**: Select and instantiate historical and current `.wasm` appliance builds (`build-02` v3.0 2P Mines + Registry vs. `build-01` v2.0 `7ac8a67` 1P Baseline) per guest tab, with clickable GitHub commit provenance links (`↗ commit`).
+- **Side-by-Side Split View (`⧉ split view` & `⇄ A/B builds`)**: Compare multiple guests or A/B test Build #1 (`7ac8a67`) against Build #2 (`v3.0`) side-by-side in one click.
+- **2-Player Turn-Based Minesweeper & In-Browser FastAPI/SQLite Broker (`🎮 2P mines match`)**: Wraps `mine_sm.rs` (`BoardState`) in a 2-player turn-based state machine with Wasm TX/RX mailboxes (`app_mines_set_mp`, `app_mines_take_tx`, `app_mines_apply_rx`) and an in-browser FastAPI + SQLite match broker (`window.__broker` with live `matches` and `match_events` tables).
+
+### 2. Appliance v2 (`/v2/`) — Frozen Rust `#![no_std]` Window Manager Baseline
 Located in `v2/` and served at `/v2/`:
-- **Size**: **~150 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
+- **Size**: **~156 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
 - **Architecture**: Bare-metal `#![no_std]` Rust (`wasm32-unknown-unknown`), dynamic resolution scaling (360×800 up to 1080p), zero-allocation 2D software rasterizer, and a `FiveSeven` 5×7 bitmap font with Native and Smooth render modes at absolute scales (1× is the 5×7 base in both; Smooth is the default). Shared `theme`, `layout`, `ui`, `fmt`, and `input` modules keep colors, size classes, chrome, formatting, and key/result contracts in one place.
 - **Theme page**: `System → Theme` selects one of ten built-in color themes; `System → Fonts` owns the global render mode and a selectable 1×–8× specimen ladder. See [docs/v2-themes.md](docs/v2-themes.md), [docs/v2-smooth.md](docs/v2-smooth.md), and [docs/glyphs.md](docs/glyphs.md).
 - **Window Manager (`wm.rs`)**: 32px Title Bar with `Home` (`[≡]`) and active-app menus; the App Home drawer is the `Home` dropdown (containing the 4 app tiles plus `Test Pattern`). Mouse and keyboard share one focus model (`F9`/`Alt+D` Home drawer, `F10`/`Alt+M` menu bar, `Tab` client traversal, `Enter`/`Space` activation); see [docs/v2-input.md](docs/v2-input.md).
 - **Applications**:
   - **System**: FNV-1a 64-bit build attestation (`build.rs`), performance telemetry, a Fonts page with a live 1×–8× specimen and style ladder, icon galleries, a theme picker, and test patterns.
   - **Calculator**: Interactive desk calculator with formatted separators.
-  - **Minesweeper**: High-performance 8×8 bitboard engine with Classic/Shielded modes and RL observation tensors (`[f32; 64]`).
+  - **Minesweeper**: High-performance 8×8 bitboard engine with Classic/Shielded modes, 2-Player Turn-Based match wrapper, and RL observation tensors (`[f32; 64]`).
   - **Files & Preview**: Two-panel finder browsing `~/wallpapers`, `~/samples`, upstream GitHub repositories (`gh://jpeckenpaugh/mines-sm`, `gh://jpeckenpaugh/mines-livive-net`, `gh://jpeckenpaugh/gm-livive-net`), and **captured web snapshots (`web://` → `livive.net`, `mines.livive.net`, `mines-sm.livive.net`, `gm.livive.net`)** with raw source, post-load DOM, screenshot, context metadata, refresh, TTS, and **Open in Browser** live tabs for both `web://` and `gh://`. Includes **dynamic font scaling (`+`/`-`)**, **2D scrolling**, **enriched `.context.xml` knowledge graphs**, and **in-browser Text-to-Speech (TTS) narration**.
 - See [docs/v2-appliance.md](docs/v2-appliance.md), [docs/context-and-tts.md](docs/context-and-tts.md), and [docs/web-capture.md](docs/web-capture.md) for full design specifications.
 
-### 2. v1 Media Browser (C99 + Emscripten)
-Located in `src/` and served at `/`:
+### 3. v1 Media Browser (`/v1/`, C99 + Emscripten)
+Located in `src/` and served at `/v1/`:
 - **Size**: ~17.8 MiB `.wasm` binary with compiled-in raw RGBA8888 wallpaper assets.
 - **Navigation**: Horizontal bottom tile carousel (Calendar, Clock, Files, Preview, Calculator).
 - **Design Notes**: See `docs/calc.md`, `docs/clock.md`, `docs/code.md`, `docs/fonts.md`, `docs/markdown.md`.

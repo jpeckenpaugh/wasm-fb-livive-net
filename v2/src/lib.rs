@@ -601,6 +601,130 @@ pub extern "C" fn app_tts_set_active(active: i32) {
     });
 }
 
+// --- 2-Player Turn-Based Minesweeper Host Mailbox ABI ---
+
+#[no_mangle]
+pub extern "C" fn app_mines_set_mp(
+    enabled: i32,
+    match_id: u32,
+    seat: i32,
+    seed: u32,
+    max_strikes: i32,
+) {
+    with_state(|wm, fb, st, txt, ctx| {
+        wm.mines.configure_mp(
+            enabled != 0,
+            match_id,
+            seat.clamp(0, 2) as u8,
+            seed as u64,
+            max_strikes.clamp(1, 3) as u8,
+        );
+        wm.active_app = AppSlot::Mines;
+        wm.focus = wm::Focus::Client;
+        if wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn app_mines_tx_pending() -> i32 {
+    unsafe { i32::from((*GUEST.wm.get()).mines.tx_pending) }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mines_take_tx() -> u32 {
+    unsafe {
+        let m = &mut (*GUEST.wm.get()).mines;
+        m.tx_pending = false;
+        (m.tx_action as u32)
+            | ((m.tx_cell as u32) << 8)
+            | ((m.local_seat as u32) << 16)
+            | ((m.board.rules.max_strikes as u32) << 24)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mines_seed() -> u32 {
+    unsafe { (*GUEST.wm.get()).mines.board.seed as u32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mines_seq() -> u32 {
+    unsafe { (*GUEST.wm.get()).mines.mp_seq }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mines_turn() -> i32 {
+    unsafe { (*GUEST.wm.get()).mines.active_turn as i32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mines_p1_score() -> i32 {
+    unsafe { (*GUEST.wm.get()).mines.p1_score }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mines_p2_score() -> i32 {
+    unsafe { (*GUEST.wm.get()).mines.p2_score }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mines_winner() -> i32 {
+    unsafe { (*GUEST.wm.get()).mines.winner_seat as i32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_mines_apply_rx(
+    seq: u32,
+    seat: i32,
+    action: i32,
+    cell: i32,
+    seed: u32,
+    max_strikes: i32,
+) -> i32 {
+    with_state(|wm, fb, st, txt, ctx| {
+        if action == mines::TX_NEW_MATCH as i32 {
+            let strikes = if max_strikes > 1 { 3 } else { 1 };
+            wm.mines.board = mine_sm::BoardState::new(
+                seed as u64,
+                mines::DEFAULT_BOMBS,
+                mine_sm::Rules {
+                    max_strikes: strikes,
+                },
+            );
+            wm.mines.active_turn = 1;
+            wm.mines.p1_score = 0;
+            wm.mines.p2_score = 0;
+            wm.mines.winner_seat = 0;
+            wm.mines.mp_seq = seq;
+            wm.mines.tx_pending = false;
+            if wm.ready {
+                wm.render(fb, st, txt, ctx);
+            }
+            return 1;
+        }
+
+        if seq > wm.mines.mp_seq {
+            let act_type = if action == mines::TX_FLAG as i32 {
+                mine_sm::ActionType::Flag
+            } else {
+                mine_sm::ActionType::Reveal
+            };
+            let _ = wm
+                .mines
+                .apply_move(seat.clamp(1, 2) as u8, act_type, cell.clamp(0, 63) as u8);
+            wm.mines.mp_seq = seq;
+            wm.mines.tx_pending = false;
+            if wm.ready {
+                wm.render(fb, st, txt, ctx);
+            }
+            return 1;
+        }
+        0
+    })
+}
+
 #[no_mangle]
 pub extern "C" fn app_destroy() {
     unsafe {
@@ -990,5 +1114,50 @@ mod tests {
         assert_eq!(app_pointer_move(56, 16), CLICK_NOOP);
         assert_eq!(app_pointer_move(10, 400), CLICK_CHANGED); // leaves the header
         assert_eq!(app_pointer_leave(), CLICK_NOOP);
+    }
+
+    #[test]
+    fn mines_multiplayer_abi_roundtrip() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(app_init(1280, 720), 1);
+
+        // Configure Seat 1 on match #99, seed 42, classic rules (max_strikes = 1)
+        app_mines_set_mp(1, 99, 1, 42, 1);
+        assert_eq!(app_selected(), AppSlot::Mines as i32);
+        assert_eq!(app_mines_seed(), 42);
+        assert_eq!(app_mines_seq(), 0);
+        assert_eq!(app_mines_turn(), 1);
+        assert_eq!(app_mines_tx_pending(), 0);
+
+        // Click top-left cell (cell 0) on the 1280x720 Mines board
+        // At 1280x688 client area, board_x = 150, board_y = 54, cell = 68
+        assert_eq!(app_click(170, TITLE_H + 70), CLICK_CHANGED);
+        assert_eq!(app_mines_tx_pending(), 1);
+        let word = app_mines_take_tx();
+        assert_eq!(app_mines_tx_pending(), 0);
+
+        let tx_action = (word & 0xff) as i32;
+        let tx_cell = ((word >> 8) & 0xff) as i32;
+        let tx_seat = ((word >> 16) & 0xff) as i32;
+        let tx_strikes = ((word >> 24) & 0xff) as i32;
+        assert_eq!(tx_action, 0); // Reveal
+        assert_eq!(tx_cell, 0);
+        assert_eq!(tx_seat, 1);
+        assert_eq!(tx_strikes, 1);
+        assert_eq!(app_mines_seq(), 1);
+        assert_eq!(app_mines_turn(), 2);
+        let p1_after_move1 = app_mines_p1_score();
+        assert!(p1_after_move1 > 0);
+
+        // Simulate Seat 2 guest receiving P1's move via app_mines_apply_rx
+        app_mines_set_mp(1, 99, 2, 42, 1);
+        assert_eq!(app_mines_seq(), 0);
+        assert_eq!(
+            app_mines_apply_rx(1, tx_seat, tx_action, tx_cell, 42, tx_strikes),
+            1
+        );
+        assert_eq!(app_mines_seq(), 1);
+        assert_eq!(app_mines_turn(), 2);
+        assert_eq!(app_mines_p1_score(), p1_after_move1);
     }
 }

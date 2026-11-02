@@ -43,6 +43,26 @@ pub fn u32_str(buf: &mut [u8; 16], val: u32) -> &str {
     core::str::from_utf8(&buf[..pos]).unwrap_or("0")
 }
 
+/// Write a signed decimal at `pos`; returns the new position.
+pub fn write_i32(buf: &mut [u8], mut pos: usize, val: i32) -> usize {
+    if val < 0 {
+        push(buf, &mut pos, b'-');
+        write_u32(buf, pos, val.unsigned_abs())
+    } else {
+        write_u32(buf, pos, val as u32)
+    }
+}
+
+/// `P1: a  P2: b`
+pub fn mp_score_str(buf: &mut [u8; 32], p1: i32, p2: i32) -> &str {
+    let mut pos = 0;
+    push_bytes(buf, &mut pos, b"P1: ");
+    pos = write_i32(buf, pos, p1);
+    push_bytes(buf, &mut pos, b"  P2: ");
+    pos = write_i32(buf, pos, p2);
+    core::str::from_utf8(&buf[..pos]).unwrap_or("")
+}
+
 /// `0-999 B`, `1-1023 K`, `1-1023 M`, then `G`.
 pub fn size_str(buf: &mut [u8; 16], bytes: u32) -> &str {
     let (value, suffix) = if bytes < 1024 {

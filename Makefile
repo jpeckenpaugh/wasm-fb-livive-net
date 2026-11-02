@@ -58,8 +58,17 @@ $(V2_WASM_OUT): $(wildcard v2/Cargo.toml v2/build.rs v2/src/*.rs v2/glyphs/*/*.t
 	@mkdir -p $(dir $@)
 	cargo build --manifest-path v2/Cargo.toml --target wasm32-unknown-unknown --release
 	cp v2/target/wasm32-unknown-unknown/release/appliance.wasm $@
-	@mkdir -p web/v2/build web/assets web/demo web/gh
-	@cp $@ web/v2/build/appliance.wasm
+	@mkdir -p web/build web/v1/build web/v2/build web/assets web/demo web/gh
+	@cp $@ web/build/appliance.wasm
+	@if [ -f web/builds/appliance-v2-7ac8a67.wasm ]; then \
+		cp web/builds/appliance-v2-7ac8a67.wasm web/v2/build/appliance.wasm; \
+	else \
+		cp $@ web/v2/build/appliance.wasm; \
+	fi
+	@if [ -f $(BUILD)/media_browser.mjs ] && [ -f $(BUILD)/media_browser.wasm ]; then \
+		cp $(BUILD)/media_browser.mjs $(BUILD)/media_browser.wasm web/build/; \
+		cp $(BUILD)/media_browser.mjs $(BUILD)/media_browser.wasm web/v1/build/; \
+	fi
 	@cp assets/*.png assets/.context.xml web/assets/
 	@cp demo/* demo/.context.xml web/demo/
 	@cp -R gh/mines-sm gh/mines-livive-net gh/gm-livive-net web/gh/
@@ -106,6 +115,9 @@ $(OBJ)/wasm/%.o: $(GEN)/%.c $(GEN)/assets_gen.h
 
 $(WASM_OUT): $(WASM_OBJS)
 	$(EMCC) $^ -o $@ $(WASM_LDFLAGS)
+	@mkdir -p web/build web/v1/build
+	@cp $(BUILD)/media_browser.mjs $(BUILD)/media_browser.wasm web/build/
+	@cp $(BUILD)/media_browser.mjs $(BUILD)/media_browser.wasm web/v1/build/
 	@ls -l $(BUILD)/media_browser.wasm | awk '{printf "wasm: %d bytes\n", $$5}'
 
 $(OBJ)/native/%.o: %.c $(GEN)/assets_gen.h
@@ -189,4 +201,4 @@ serve:
 	docker compose up --build serve
 
 clean:
-	rm -rf $(BUILD) build-debug web/v2/build web/assets web/demo web/gh v2/target
+	rm -rf $(BUILD) build-debug web/build web/v1/build web/v2/build web/assets web/demo web/gh v2/target
