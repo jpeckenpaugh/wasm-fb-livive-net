@@ -41,7 +41,7 @@ NATIVE_ASSETS := $(OBJ)/native/$(GEN)/assets_gen.o \
                  $(OBJ)/native/$(GEN)/about_gen.o \
                  $(OBJ)/native/$(GEN)/demo_gen.o
 
-.PHONY: all v2 v2-folded test-v2 assets test clean debug release serve serve-web web-capture
+.PHONY: all v2 v2-folded test-v2 assets test clean debug release serve serve-web web-capture broker serve-relay
 
 all: $(WASM_OUT) $(V2_WASM_OUT)
 
@@ -193,6 +193,12 @@ release: all
 
 serve-web:
 	python3 -m http.server 8081 --directory web
+
+broker:
+	node services/broker/server.mjs
+
+serve-relay:
+	node services/broker/server.mjs
 
 web-capture:
 	cd services/web-capture && npm install && npm start

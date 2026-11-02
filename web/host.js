@@ -145,7 +145,7 @@ function getBuildInfo(buildId) {
 }
 
 /* --------------------------------------------------------------------------
- * Theme 2: Zero-Setup In-Browser FastAPI + SQLite Match Broker
+ * Theme 2: Zero-Setup FastAPI + SQLite Match Broker & SSE Network Relay
  * -------------------------------------------------------------------------- */
 class FastApiSqliteBroker {
   constructor() {
@@ -156,10 +156,24 @@ class FastApiSqliteBroker {
     this.nextMatchId = 1;
     this.nextEventId = 1;
     this.activeMatchId = null;
+    this.mode = 'local'; // 'local' or 'network'
+    this.relayUrl = window.location.origin;
+    this.clientId = 'client-' + Math.random().toString(36).slice(2, 9);
+    this.sseSource = null;
   }
 
   nowIso() {
     return new Date().toISOString().slice(11, 19);
+  }
+
+  setNetworkMode(enabled) {
+    this.mode = enabled ? 'network' : 'local';
+    const badge = document.getElementById('net-relay-status');
+    if (badge) {
+      badge.textContent = enabled ? 'Mode: Network Relay (Live SSE)' : 'Mode: Local Memory';
+      badge.style.color = enabled ? '#34d399' : '#38bdf8';
+      badge.style.borderColor = enabled ? '#34d399' : '#38bdf8';
+    }
   }
 
   logEvent(matchId, seq, vmName, seat, action, cell, httpLine) {
@@ -182,8 +196,142 @@ class FastApiSqliteBroker {
     return row;
   }
 
-  /* Simulated FastAPI endpoint router (`POST /api/matches`, `POST /api/matches/:id/moves`, etc.) */
+  connectSse(matchId) {
+    if (this.sseSource) {
+      this.sseSource.close();
+      this.sseSource = null;
+    }
+    this.activeMatchId = matchId;
+    this.setNetworkMode(true);
+
+    try {
+      const url = `${this.relayUrl}/api/matches/${matchId}/events`;
+      const sse = new EventSource(url);
+      this.sseSource = sse;
+
+      sse.addEventListener('init', (e) => {
+        try {
+          const matchData = JSON.parse(e.data);
+          const idx = this.tables.matches.findIndex((m) => m.id === matchData.id);
+          if (idx >= 0) {
+            this.tables.matches[idx] = matchData;
+          } else {
+            this.tables.matches.unshift(matchData);
+          }
+          this.renderDrawer();
+          updateHostStats();
+        } catch (err) {
+          console.error('[SSE init error]', err);
+        }
+      });
+
+      sse.addEventListener('move', (e) => {
+        try {
+          const ev = JSON.parse(e.data);
+          if (ev.source_client_id === this.clientId) {
+            return; // ignore echo of our own move
+          }
+          this.applyIncomingMove(ev);
+        } catch (err) {
+          console.error('[SSE move error]', err);
+        }
+      });
+
+      sse.onerror = (err) => {
+        console.warn('[SSE connection error or closed]', err);
+      };
+    } catch (err) {
+      console.warn('Failed to initialize EventSource:', err);
+    }
+  }
+
+  applyIncomingMove(ev) {
+    const matchId = ev.matchId;
+    let match = this.tables.matches.find((m) => m.id === matchId);
+    if (!match) {
+      match = {
+        id: matchId,
+        game: ev.game,
+        status: ev.status || 'PLAYING',
+        seq: ev.seq,
+        turn_seat: ev.turn_seat,
+        p1_score: ev.p1_score,
+        p2_score: ev.p2_score,
+        state_hash: ev.state_hash,
+      };
+      this.tables.matches.unshift(match);
+    } else {
+      match.seq = ev.seq;
+      match.turn_seat = ev.turn_seat;
+      match.p1_score = ev.p1_score;
+      match.p2_score = ev.p2_score;
+      match.status = ev.status;
+      if (ev.state_hash) match.state_hash = ev.state_hash;
+      if (ev.pdn) match.last_pdn = ev.pdn;
+    }
+
+    if (ev.log) {
+      this.tables.match_events.unshift(ev.log);
+      if (this.tables.match_events.length > 64) this.tables.match_events.length = 64;
+    }
+
+    if (ev.game === 'checkers') {
+      const peers = guests.filter(
+        (g) => g.mpMatchId === matchId && g.exports && g.exports.app_checkers_apply_rx,
+      );
+      for (const peer of peers) {
+        peer.exports.app_checkers_apply_rx(ev.seq, ev.seat, ev.action, ev.lo, ev.hi);
+        peer.render();
+        updateGuestBanner(peer);
+      }
+    } else {
+      const peers = guests.filter(
+        (g) => g.mpMatchId === matchId && g.exports && g.exports.app_mines_apply_rx,
+      );
+      for (const peer of peers) {
+        peer.exports.app_mines_apply_rx(ev.seq, ev.seat, ev.action, ev.cell, ev.seed, ev.max_strikes);
+        peer.render();
+        updateGuestBanner(peer);
+      }
+    }
+
+    this.renderDrawer();
+    updateHostStats();
+  }
+
+  /* Dual-mode fetch: POST/GET to network relay server or fallback to local in-memory */
   async fetch(method, path, body = {}) {
+    body.source_client_id = this.clientId;
+
+    if (this.mode === 'network') {
+      try {
+        const res = await window.fetch(`${this.relayUrl}${path}`, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: method === 'GET' ? undefined : JSON.stringify(body),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (path === '/api/matches' && method === 'POST') {
+            const idx = this.tables.matches.findIndex((m) => m.id === json.id);
+            if (idx >= 0) this.tables.matches[idx] = json;
+            else this.tables.matches.unshift(json);
+            this.activeMatchId = json.id;
+            this.renderDrawer();
+            updateHostStats();
+          } else if (path.includes('/moves') && method === 'POST') {
+            const idx = this.tables.matches.findIndex((m) => m.id === json.id);
+            if (idx >= 0) this.tables.matches[idx] = json;
+            this.renderDrawer();
+          }
+          return { status: res.status, json };
+        }
+      } catch (err) {
+        console.warn('[Broker Network Relay error, falling back to local]', err);
+      }
+    }
+
+    // Local in-memory implementation
     if (method === 'POST' && path === '/api/matches') {
       const id = this.nextMatchId++;
       const game = body.game || 'mines';
@@ -990,11 +1138,21 @@ const snapDrawer = document.getElementById('snapshots-drawer');
 const snapList = document.getElementById('snap-list');
 const snapCountEl = document.getElementById('snap-count');
 const clearSnapsBtn = document.getElementById('clear-snaps');
+const fullscreenBtn = document.getElementById('fullscreen-btn');
+const fullscreenOverlay = document.getElementById('fullscreen-overlay');
+const fullscreenContainer = document.getElementById('fullscreen-canvas-container');
+const fullscreenHud = document.getElementById('fullscreen-hud');
+const fsHudTitle = document.getElementById('fs-hud-title');
+const fsHudPill = document.getElementById('fs-hud-pill');
+const fsHudRes = document.getElementById('fs-hud-res');
+const fsExitBtn = document.getElementById('fs-exit-btn');
 
 const guests = [];
 const snapshots = [];
 let activeId = null;
 let splitViewEnabled = false;
+let fullscreenGuest = null;
+let hudFadeTimer = null;
 let nextId = 1;
 let totalBlits = 0;
 let moduleBytes = 0;
@@ -1478,7 +1636,10 @@ const buildPanelHtml = (vm) => {
   return `
   <div class="panel-banner">
     <span><b>${vm.name}</b> · ${gameEngines} (<a class="commit-link" href="${b.githubUrl}" target="_blank" rel="noopener noreferrer" title="${b.notes}">↗ ${b.gitCommit}</a>)</span>
-    <span class="seat-pill" data-stat="seat-pill">Solo · ${vm.width}×${vm.height}</span>
+    <div style="display:flex; align-items:center; gap:6px;">
+      <span class="seat-pill" data-stat="seat-pill">Solo · ${vm.width}×${vm.height}</span>
+      <button class="panel-banner-btn" data-action="fullscreen" type="button" title="Full Screen (Zen overlay)">⤢ full screen</button>
+    </div>
   </div>
   <div class="screen"><canvas tabindex="0" width="${vm.width}" height="${vm.height}"></canvas></div>
   <dl class="vm-stats">
@@ -1495,21 +1656,25 @@ const buildPanelHtml = (vm) => {
 
 function updateGuestBanner(guest) {
   const pill = guest?.panel?.querySelector('[data-stat="seat-pill"]');
-  if (!pill) return;
+  let infoText = '';
   if (guest.mpSeat && guest.mpMatchId) {
     if (guest.mpGame === 'checkers' && guest.exports?.app_checkers_turn) {
       const turn = guest.exports.app_checkers_turn();
       const red = guest.exports.app_checkers_red_count ? guest.exports.app_checkers_red_count() : 12;
       const blk = guest.exports.app_checkers_black_count ? guest.exports.app_checkers_black_count() : 12;
-      pill.textContent = `Match #${guest.mpMatchId} · Checkers Seat P${guest.mpSeat} · Turn P${turn} (${red}R:${blk}B)`;
-      return;
+      infoText = `Match #${guest.mpMatchId} · Checkers Seat P${guest.mpSeat} · Turn P${turn} (${red}R:${blk}B)`;
+    } else {
+      const turn = guest.exports?.app_mines_turn ? guest.exports.app_mines_turn() : 1;
+      const p1 = guest.exports?.app_mines_p1_score ? guest.exports.app_mines_p1_score() : 0;
+      const p2 = guest.exports?.app_mines_p2_score ? guest.exports.app_mines_p2_score() : 0;
+      infoText = `Match #${guest.mpMatchId} · Seat P${guest.mpSeat} · Turn P${turn} (${p1}:${p2})`;
     }
-    const turn = guest.exports?.app_mines_turn ? guest.exports.app_mines_turn() : 1;
-    const p1 = guest.exports?.app_mines_p1_score ? guest.exports.app_mines_p1_score() : 0;
-    const p2 = guest.exports?.app_mines_p2_score ? guest.exports.app_mines_p2_score() : 0;
-    pill.textContent = `Match #${guest.mpMatchId} · Seat P${guest.mpSeat} · Turn P${turn} (${p1}:${p2})`;
   } else {
-    pill.textContent = `${guest.buildInfo.version} · ${guest.width}×${guest.height}`;
+    infoText = `${guest.buildInfo.version} · ${guest.width}×${guest.height}`;
+  }
+  if (pill) pill.textContent = infoText;
+  if (fullscreenGuest === guest) {
+    updateFullscreenHud(guest);
   }
 }
 
@@ -1589,6 +1754,9 @@ function markFault(guest, message) {
 }
 
 function destroyGuest(guest) {
+  if (fullscreenGuest === guest) {
+    exitFullscreen();
+  }
   const index = guests.indexOf(guest);
   if (index < 0) return;
   if (guest.id === activeId) stopClock();
@@ -1683,6 +1851,135 @@ function parseSelectedResolution() {
   return { width: DEFAULT_W, height: DEFAULT_H };
 }
 
+/* --------------------------------------------------------------------------
+ * Focused Fullscreen Overlay & Dynamic Viewport
+ * -------------------------------------------------------------------------- */
+function updateFullscreenHud(guest) {
+  if (!guest || !fullscreenOverlay || fullscreenOverlay.hidden) return;
+  if (fsHudTitle) {
+    fsHudTitle.textContent = guest.name;
+  }
+  if (fsHudRes) {
+    fsHudRes.textContent = `${guest.width}×${guest.height}`;
+  }
+  if (fsHudPill) {
+    if (guest.mpSeat && guest.mpMatchId) {
+      if (guest.mpGame === 'checkers' && guest.exports?.app_checkers_turn) {
+        const turn = guest.exports.app_checkers_turn();
+        const red = guest.exports.app_checkers_red_count ? guest.exports.app_checkers_red_count() : 12;
+        const blk = guest.exports.app_checkers_black_count ? guest.exports.app_checkers_black_count() : 12;
+        const turnBadge = guest.mpSeat === turn ? '🟢 Your Turn' : '⏳ Opponent Turn';
+        fsHudPill.textContent = `Match #${guest.mpMatchId} · Checkers Seat P${guest.mpSeat} · Turn P${turn} (${red}R:${blk}B) · ${turnBadge}`;
+      } else {
+        const turn = guest.exports?.app_mines_turn ? guest.exports.app_mines_turn() : 1;
+        const p1 = guest.exports?.app_mines_p1_score ? guest.exports.app_mines_p1_score() : 0;
+        const p2 = guest.exports?.app_mines_p2_score ? guest.exports.app_mines_p2_score() : 0;
+        const turnBadge = guest.mpSeat === turn ? '🟢 Your Turn' : '⏳ Opponent Turn';
+        fsHudPill.textContent = `Match #${guest.mpMatchId} · Mines Seat P${guest.mpSeat} · Turn P${turn} (${p1}:${p2}) · ${turnBadge}`;
+      }
+    } else {
+      fsHudPill.textContent = `${guest.buildInfo.shortLabel} · ${selectionLabel(guest)}`;
+    }
+  }
+}
+
+function showFullscreenHud() {
+  if (!fullscreenHud) return;
+  fullscreenHud.classList.remove('hud-hidden');
+  if (hudFadeTimer !== null) {
+    clearTimeout(hudFadeTimer);
+  }
+  hudFadeTimer = setTimeout(() => {
+    if (fullscreenOverlay && !fullscreenOverlay.hidden) {
+      fullscreenHud.classList.add('hud-hidden');
+    }
+  }, 3000);
+}
+
+function enterFullscreen(guest) {
+  if (!guest || !guest.canvas) return;
+  if (fullscreenGuest && fullscreenGuest !== guest) {
+    exitFullscreen();
+  }
+  fullscreenGuest = guest;
+  activeId = guest.id;
+
+  // Move canvas into overlay container
+  if (fullscreenContainer && guest.canvas) {
+    fullscreenContainer.replaceChildren(guest.canvas);
+  }
+  if (fullscreenOverlay) {
+    fullscreenOverlay.hidden = false;
+    fullscreenOverlay.removeAttribute('aria-hidden');
+  }
+
+  updateFullscreenHud(guest);
+  showFullscreenHud();
+  guest.canvas.focus({ preventScroll: true });
+
+  // Native fullscreen if available and not already in fullscreen
+  if (!document.fullscreenElement) {
+    try {
+      const docEl = document.documentElement;
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      }
+    } catch (_) {}
+  }
+
+  setStatus(`${guest.name} · entered focused fullscreen overlay`, true);
+}
+
+function exitFullscreen() {
+  if (!fullscreenGuest) return;
+  const guest = fullscreenGuest;
+  fullscreenGuest = null;
+
+  // Restore canvas to guest's panel .screen
+  const screenEl = guest.panel?.querySelector('.screen');
+  if (screenEl && guest.canvas) {
+    screenEl.replaceChildren(guest.canvas);
+  }
+
+  if (fullscreenOverlay) {
+    fullscreenOverlay.hidden = true;
+    fullscreenOverlay.setAttribute('aria-hidden', 'true');
+  }
+
+  if (hudFadeTimer !== null) {
+    clearTimeout(hudFadeTimer);
+    hudFadeTimer = null;
+  }
+
+  // Exit native fullscreen if active
+  if (document.fullscreenElement) {
+    try {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    } catch (_) {}
+  }
+
+  if (guest.canvas) {
+    guest.canvas.focus({ preventScroll: true });
+  }
+  setStatus(`${guest.name} · exited fullscreen`, true);
+}
+
+function toggleFullscreen(guest) {
+  const target = guest || guests.find((candidate) => candidate.id === activeId) || guests[0];
+  if (!target) return;
+  if (fullscreenGuest === target) {
+    exitFullscreen();
+  } else {
+    enterFullscreen(target);
+  }
+}
+
 async function createGuest(opts = {}) {
   const chosen = parseSelectedResolution();
   const width = opts.width || chosen.width;
@@ -1726,6 +2023,13 @@ async function createGuest(opts = {}) {
   panelsEl.append(vm.panel);
 
   vm.canvas = vm.panel.querySelector('canvas');
+  const bannerFsBtn = vm.panel.querySelector('[data-action="fullscreen"]');
+  if (bannerFsBtn) {
+    bannerFsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFullscreen(vm);
+    });
+  }
   guests.push(vm);
   emptyState.hidden = true;
   activate(id);
@@ -2090,6 +2394,130 @@ async function startAbComparison() {
   return { build03: b3.name, build02: b2.name, build01: b2.name };
 }
 
+/* Join an existing Network Match as Seat P1 or Seat P2 */
+async function joinNetworkMatch(matchId, seat = 2) {
+  let targetMatch = broker.tables.matches.find((m) => m.id === matchId);
+  if (!targetMatch) {
+    try {
+      const res = await window.fetch(`${broker.relayUrl}/api/matches/${matchId}`);
+      if (res.ok) {
+        targetMatch = await res.json();
+        const idx = broker.tables.matches.findIndex((m) => m.id === targetMatch.id);
+        if (idx >= 0) broker.tables.matches[idx] = targetMatch;
+        else broker.tables.matches.unshift(targetMatch);
+      }
+    } catch (err) {
+      console.warn('Could not fetch match from relay:', err);
+    }
+  }
+
+  if (!targetMatch) {
+    setStatus(`Failed to join network match #${matchId}: match not found on relay`);
+    return null;
+  }
+
+  const game = targetMatch.game || 'mines';
+  let g = guests[0];
+  if (!g) {
+    g = await createGuest({ buildId: 'build-03' });
+  }
+
+  g.mpGame = game;
+  g.mpMatchId = matchId;
+  g.mpSeat = seat;
+
+  if (game === 'checkers' && g.exports?.app_checkers_set_mp) {
+    g.exports.app_checkers_set_mp(1, matchId, seat);
+    launchCheckersInGuest(g);
+  } else if (g.exports?.app_mines_set_mp) {
+    g.exports.app_mines_set_mp(1, matchId, seat, targetMatch.seed ?? 42, targetMatch.max_strikes ?? 1);
+    launchMinesInGuest(g);
+  }
+
+  broker.connectSse(matchId);
+  updateGuestBanner(g);
+  brokerDrawer.hidden = false;
+  broker.renderDrawer();
+  updateHostStats();
+
+  // Show room link
+  const linkBox = document.getElementById('net-room-info');
+  const linkEl = document.getElementById('net-room-link');
+  if (linkBox && linkEl) {
+    const oppSeat = seat === 1 ? 2 : 1;
+    const url = new URL(window.location.href);
+    url.searchParams.set('match', matchId);
+    url.searchParams.set('seat', oppSeat);
+    linkEl.textContent = url.toString();
+    linkBox.style.display = 'flex';
+  }
+
+  setStatus(
+    `Joined Network Match #${matchId} (${game}) as Seat P${seat} · Turn P${targetMatch.turn_seat || 1}`,
+    true,
+  );
+  return targetMatch;
+}
+
+/* Create a new Network Match as Seat P1 and subscribe to relay SSE */
+async function createNetworkMatch(game = 'checkers') {
+  let g = guests[0];
+  if (!g) {
+    g = await createGuest({ buildId: 'build-03' });
+  }
+
+  broker.setNetworkMode(true);
+  const initHash =
+    game === 'checkers' && g.exports?.app_checkers_state_hash
+      ? fmtHex32(g.exports.app_checkers_state_hash() >>> 0)
+      : '0x00000000';
+  const seed = Math.floor(100 + Math.random() * 900);
+
+  const { json: match } = await broker.fetch('POST', '/api/matches', {
+    game,
+    seed,
+    state_hash: initHash,
+    p1_vm: 'Browser 1 (P1)',
+    p2_vm: 'Remote Player (P2)',
+    p1_id: 1,
+    p2_id: 2,
+  });
+
+  g.mpGame = game;
+  g.mpMatchId = match.id;
+  g.mpSeat = 1;
+
+  if (game === 'checkers' && g.exports?.app_checkers_set_mp) {
+    g.exports.app_checkers_set_mp(1, match.id, 1);
+    launchCheckersInGuest(g);
+  } else if (g.exports?.app_mines_set_mp) {
+    g.exports.app_mines_set_mp(1, match.id, 1, seed, 1);
+    launchMinesInGuest(g);
+  }
+
+  broker.connectSse(match.id);
+  updateGuestBanner(g);
+  brokerDrawer.hidden = false;
+  broker.renderDrawer();
+  updateHostStats();
+
+  const linkBox = document.getElementById('net-room-info');
+  const linkEl = document.getElementById('net-room-link');
+  if (linkBox && linkEl) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('match', match.id);
+    url.searchParams.set('seat', '2');
+    linkEl.textContent = url.toString();
+    linkBox.style.display = 'flex';
+  }
+
+  setStatus(
+    `Network Match #${match.id} (${game}) created! Joined as Seat P1. Share link for Seat P2.`,
+    true,
+  );
+  return match;
+}
+
 /* ------------------------------------------------------------------ boot -- */
 
 const emptyState = document.createElement('div');
@@ -2157,6 +2585,117 @@ clearSnapsBtn.addEventListener('click', () => {
   snapList.replaceChildren();
   snapDrawer.hidden = true;
   updateHostStats();
+});
+
+// Network Match UI handlers
+const netMatchBtn = document.getElementById('net-match-btn');
+const netCreateChkBtn = document.getElementById('net-create-chk');
+const netCreateMinesBtn = document.getElementById('net-create-mines');
+const netJoinIdInput = document.getElementById('net-join-id');
+const netJoinP1Btn = document.getElementById('net-join-p1-btn');
+const netJoinP2Btn = document.getElementById('net-join-p2-btn');
+const netCopyLinkBtn = document.getElementById('net-copy-link-btn');
+const netRoomLinkEl = document.getElementById('net-room-link');
+
+if (netMatchBtn) {
+  netMatchBtn.addEventListener('click', () => {
+    brokerDrawer.hidden = false;
+    const panel = document.getElementById('net-broker-panel');
+    if (panel) {
+      panel.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+}
+
+if (netCreateChkBtn) {
+  netCreateChkBtn.addEventListener('click', () => {
+    createNetworkMatch('checkers').catch((err) => console.error(err));
+  });
+}
+
+if (netCreateMinesBtn) {
+  netCreateMinesBtn.addEventListener('click', () => {
+    createNetworkMatch('mines').catch((err) => console.error(err));
+  });
+}
+
+if (netJoinP1Btn && netJoinIdInput) {
+  netJoinP1Btn.addEventListener('click', () => {
+    const matchId = parseInt(netJoinIdInput.value.trim(), 10);
+    if (matchId) joinNetworkMatch(matchId, 1).catch((err) => console.error(err));
+  });
+}
+
+if (netJoinP2Btn && netJoinIdInput) {
+  netJoinP2Btn.addEventListener('click', () => {
+    const matchId = parseInt(netJoinIdInput.value.trim(), 10);
+    if (matchId) joinNetworkMatch(matchId, 2).catch((err) => console.error(err));
+  });
+}
+
+if (netCopyLinkBtn && netRoomLinkEl) {
+  netCopyLinkBtn.addEventListener('click', () => {
+    const text = netRoomLinkEl.textContent;
+    if (text && text !== '—') {
+      navigator.clipboard.writeText(text).then(() => {
+        netCopyLinkBtn.textContent = '✅ Copied!';
+        setTimeout(() => { netCopyLinkBtn.textContent = '📋 Copy Link'; }, 2000);
+      }).catch((err) => console.warn('Clipboard write failed:', err));
+    }
+  });
+}
+
+if (fullscreenBtn) {
+  fullscreenBtn.addEventListener('click', () => {
+    toggleFullscreen();
+  });
+}
+
+if (fsExitBtn) {
+  fsExitBtn.addEventListener('click', () => {
+    exitFullscreen();
+  });
+}
+
+if (fullscreenOverlay) {
+  fullscreenOverlay.addEventListener('mousemove', () => {
+    showFullscreenHud();
+  });
+  fullscreenOverlay.addEventListener('touchstart', () => {
+    showFullscreenHud();
+  }, { passive: true });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && fullscreenGuest) {
+    e.preventDefault();
+    exitFullscreen();
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && fullscreenGuest) {
+    // User exited browser native fullscreen (e.g. via browser Esc)
+    exitFullscreen();
+  }
+});
+
+document.addEventListener('webkitfullscreenchange', () => {
+  if (!document.webkitFullscreenElement && fullscreenGuest) {
+    exitFullscreen();
+  }
+});
+
+window.addEventListener('resize', () => {
+  if (fullscreenGuest) {
+    updateFullscreenHud(fullscreenGuest);
+  }
+});
+
+window.addEventListener('orientationchange', () => {
+  if (fullscreenGuest) {
+    updateFullscreenHud(fullscreenGuest);
+  }
 });
 
 patternToggle.addEventListener('change', () => {
@@ -2239,15 +2778,45 @@ window.__appliance = {
   },
   startMatch: (opts) => startTwoPlayerMatch(opts),
   startCheckersMatch: (opts) => startCheckersMatch(opts),
+  createNetworkMatch: (game) => createNetworkMatch(game),
+  joinNetworkMatch: (matchId, seat) => joinNetworkMatch(matchId, seat),
+  toggleFullscreen: (guest) => toggleFullscreen(guest),
+  enterFullscreen: (guest) => enterFullscreen(guest),
+  exitFullscreen: () => exitFullscreen(),
+  isFullscreen: () => Boolean(fullscreenGuest),
   compareBuilds: () => startAbComparison(),
   setSplitView: (on) => setSplitView(on),
   snapshots: () => snapshots.slice(),
   add: (opts) => createGuest(opts),
 };
 
-setStatus('booting v3 rust appliance & registry…', true);
+setStatus('booting Test Appliance Orchestration Console…', true);
 loadRegistry()
-  .then(() => createGuest())
+  .then(() => {
+    // Check URL parameters for match join: ?match=101&seat=2 and ?fullscreen=1
+    const params = new URLSearchParams(window.location.search);
+    const matchParam = params.get('match');
+    const seatParam = parseInt(params.get('seat') || '2', 10);
+    const fullscreenParam = params.get('fullscreen') === '1' || params.get('fs') === '1';
+    const isMobile = window.innerWidth < 800;
+
+    let initPromise;
+    if (matchParam) {
+      const matchId = parseInt(matchParam, 10);
+      initPromise = joinNetworkMatch(matchId, seatParam);
+    } else {
+      initPromise = createGuest();
+    }
+
+    return initPromise.then(() => {
+      if (fullscreenParam || (matchParam && isMobile)) {
+        const guest = guests[0];
+        if (guest) {
+          enterFullscreen(guest);
+        }
+      }
+    });
+  })
   .catch((error) => {
     console.error(error);
     setStatus('failed to start: see console');

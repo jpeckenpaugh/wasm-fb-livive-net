@@ -1,6 +1,6 @@
-# Wasm Framebuffer Media Browser & Appliance
+# Test Appliance Orchestration Console
 
-A WebAssembly application that owns its entire UI. Every pixel is drawn into an RGBA8888 framebuffer in Wasm linear memory; the page only forwards input and blits raw bytes into an HTML5 Canvas.
+A WebAssembly hypervisor orchestration shell and deterministic framebuffer environment (historically evolved from the *Wasm Framebuffer Media Browser & Appliance* experiment). Every pixel is drawn into an RGBA8888 framebuffer in Wasm linear memory; the orchestration console forwards input, manages live multi-client matchmaking, facilitates side-by-side A/B build provenance comparisons, and blits raw bytes into HTML5 Canvas viewports.
 
 The point is the host/guest boundary, not a browser: no DOM in the guest, no external UI frameworks, no fonts, no networking, no OS emulation.
 
