@@ -1,18 +1,33 @@
 {
-  "defaultBuild": "build-02",
+  "defaultBuild": "build-03",
   "repository": "https://github.com/jpeckenpaugh/wasm-fb-livive-net",
   "builds": [
     {
-      "id": "build-02",
-      "label": "Build #2 · v3.0 (2P Mines + Registry)",
-      "shortLabel": "build-02 · v3.0",
-      "version": "v3.0",
+      "id": "build-03",
+      "label": "Build #3 · v3.1 (Checkers + AI + 2P Broker)",
+      "shortLabel": "build-03 · v3.1",
+      "version": "v3.1",
       "wasmUrl": "./build/appliance.wasm",
       "gitCommit": "HEAD",
       "githubUrl": "https://github.com/jpeckenpaugh/wasm-fb-livive-net/commits/main",
       "minesBuild": "Mines Build #2 (2P Turn-Based + Scoring)",
+      "checkersBuild": "Checkers Build #1 (English Draughts + Minimax AI + 2P Broker)",
       "supportsMultiplayer": true,
-      "notes": "Adds 2-player turn-based Minesweeper wrapper, Wasm MP mailbox ABI, and v3 registry"
+      "supportsCheckers": true,
+      "notes": "Adds English Draughts (Checkers) app + Minimax AI + 2P Checkers broker + chk-livive-net mount"
+    },
+    {
+      "id": "build-02",
+      "label": "Build #2 · v3.0 (aea4b4b · 2P Mines + Registry)",
+      "shortLabel": "build-02 · aea4b4b",
+      "version": "v3.0",
+      "wasmUrl": "./builds/appliance-v3.0-aea4b4b.wasm",
+      "gitCommit": "aea4b4b",
+      "githubUrl": "https://github.com/jpeckenpaugh/wasm-fb-livive-net/commit/aea4b4b",
+      "minesBuild": "Mines Build #2 (2P Turn-Based + Scoring)",
+      "supportsMultiplayer": true,
+      "supportsCheckers": false,
+      "notes": "Frozen v3.0 baseline with 2-player turn-based Minesweeper wrapper, Wasm MP mailbox ABI, and v3 registry"
     },
     {
       "id": "build-01",
@@ -24,6 +39,7 @@
       "githubUrl": "https://github.com/jpeckenpaugh/wasm-fb-livive-net/commit/7ac8a67",
       "minesBuild": "Mines Build #1 (1P Bitboard)",
       "supportsMultiplayer": false,
+      "supportsCheckers": false,
       "notes": "Frozen v2 baseline with single-player Minesweeper, right-pane Files activation, and simplified menus"
     }
   ]

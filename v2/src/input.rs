@@ -51,6 +51,7 @@ pub enum Key {
     MenuBar = 61,
     Refresh = 62,
     Open = 63,
+    Difficulty = 64,
 }
 
 impl Key {
@@ -98,6 +99,7 @@ impl Key {
             61 => Some(Key::MenuBar),
             62 => Some(Key::Refresh),
             63 => Some(Key::Open),
+            64 => Some(Key::Difficulty),
             _ => None,
         }
     }

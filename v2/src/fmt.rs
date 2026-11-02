@@ -63,6 +63,58 @@ pub fn mp_score_str(buf: &mut [u8; 32], p1: i32, p2: i32) -> &str {
     core::str::from_utf8(&buf[..pos]).unwrap_or("")
 }
 
+/// `Red: r  Blk: b`
+pub fn checkers_pieces_str(buf: &mut [u8; 32], red: u8, black: u8) -> &str {
+    let mut pos = 0;
+    push_bytes(buf, &mut pos, b"Red: ");
+    pos = write_u32(buf, pos, red as u32);
+    push_bytes(buf, &mut pos, b"  Blk: ");
+    pos = write_u32(buf, pos, black as u32);
+    core::str::from_utf8(&buf[..pos]).unwrap_or("")
+}
+
+/// Write a 32-bit hex string `0xXXXXXXXX` into `buf` at `pos`.
+pub fn write_hex32(buf: &mut [u8], mut pos: usize, val: u32) -> usize {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    push_bytes(buf, &mut pos, b"0x");
+    let mut shift = 28i32;
+    while shift >= 0 {
+        let nib = ((val >> (shift as u32)) & 0xF) as usize;
+        push(buf, &mut pos, HEX[nib]);
+        shift -= 4;
+    }
+    pos
+}
+
+/// `#m · 0xhhhhhhhh`
+pub fn checkers_moves_hash_str(buf: &mut [u8; 32], moves: u32, hash: u32) -> &str {
+    let mut pos = 0;
+    push(buf, &mut pos, b'#');
+    pos = write_u32(buf, pos, moves);
+    push_bytes(buf, &mut pos, b" \xC2\xB7 ");
+    pos = write_hex32(buf, pos, hash);
+    core::str::from_utf8(&buf[..pos]).unwrap_or("")
+}
+
+/// Format PDN move notation (`11-15` or `15x22x31`) into `buf`, returning byte length.
+pub fn format_pdn_hops(buf: &mut [u8; 32], hops: &[u8], hop_len: usize, is_jump: bool) -> usize {
+    if hop_len < 2 {
+        buf[0] = b'-';
+        return 1;
+    }
+    let sep = if is_jump { b'x' } else { b'-' };
+    let mut pos = 0;
+    let count = hop_len.min(hops.len());
+    for (i, &sq) in hops[..count].iter().enumerate() {
+        if i > 0 {
+            push(buf, &mut pos, sep);
+        }
+        let pdn = (sq & 31) as u32 + 1;
+        pos = write_u32(buf, pos, pdn);
+    }
+    pos
+}
+
 /// `0-999 B`, `1-1023 K`, `1-1023 M`, then `G`.
 pub fn size_str(buf: &mut [u8; 16], bytes: u32) -> &str {
     let (value, suffix) = if bytes < 1024 {

@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Client-side English Draughts (Checkers) with client-side WebLLM in-browser AI, dedicated Web Worker, and spectator arena.">
+  <title>Classic Checkers & AI Arena</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="alternate icon" href="favicon.ico">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- ====================================================================
+         1. TITLE / SETUP SCREEN
+         ==================================================================== -->
+    <div id="screen-title" class="screen-view">
+      <div class="title-card">
+        <div class="title-hero">
+          <div class="title-badge">⚡ WebGPU 60fps Web Worker Architecture</div>
+          <h1 class="title-heading">Classic Checkers</h1>
+          <p class="title-tagline">English Draughts with Client-Side WebLLM Neural Intelligence</p>
+          <a href="/godot/" class="switch-client-banner" title="Launch the 3D Edition in Godot 4">
+            <span class="switch-badge">3D</span>
+            <span>🎲 Switch to 3D Client (Godot 4) →</span>
+          </a>
+        </div>
+
+        <!-- Mode Selection Grid -->
+        <div class="mode-select-grid" role="radiogroup" aria-label="Match Mode Selection">
+          <button type="button" class="mode-card active" data-mode="minimax" id="title-card-minimax">
+            <span class="mode-icon">👤</span>
+            <div class="mode-info">
+              <span class="mode-title">Player vs Minimax</span>
+              <span class="mode-desc">Instant play, alpha-beta search, zero download</span>
+            </div>
+          </button>
+
+          <button type="button" class="mode-card" data-mode="llm" id="title-card-llm">
+            <span class="mode-icon">🤖</span>
+            <div class="mode-info">
+              <span class="mode-title">Player vs LLM AI</span>
+              <span class="mode-desc">Live streaming banter & neural move selection</span>
+            </div>
+          </button>
+
+          <button type="button" class="mode-card" data-mode="arena" id="title-card-arena">
+            <span class="mode-icon">⚔️</span>
+            <div class="mode-info">
+              <span class="mode-title">AI vs AI Arena</span>
+              <span class="mode-desc">Spectate model vs model or LLM vs Minimax</span>
+            </div>
+          </button>
+
+          <button type="button" class="mode-card" data-mode="pvp" id="title-card-pvp">
+            <span class="mode-icon">👥</span>
+            <div class="mode-info">
+              <span class="mode-title">Pass & Play</span>
+              <span class="mode-desc">Local 2-player on the same board</span>
+            </div>
+          </button>
+        </div>
+
+        <!-- Mode Dynamic Customization Panels -->
+        <div class="setup-customization-container">
+          <!-- Minimax Options -->
+          <div id="panel-setup-minimax" class="setup-panel-section">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="title-minimax-difficulty">Minimax Search Depth:</label>
+                <select id="title-minimax-difficulty" class="select-control full-width">
+                  <option value="easy">Easy (Depth 2)</option>
+                  <option value="medium" selected>Medium (Depth 4)</option>
+                  <option value="hard">Hard (Depth 6 - Minimax Master)</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label for="title-minimax-color">Play As:</label>
+                <select id="title-minimax-color" class="select-control full-width">
+                  <option value="red" selected>Red (Moves First)</option>
+                  <option value="black">Black (Moves Second)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Player vs LLM Options -->
+          <div id="panel-setup-llm" class="setup-panel-section hidden">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="title-llm-color">Play As:</label>
+                <select id="title-llm-color" class="select-control full-width">
+                  <option value="red" selected>Red (Moves First)</option>
+                  <option value="black">Black (Moves Second)</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label for="title-llm-persona">Opponent Persona:</label>
+                <select id="title-llm-persona" class="select-control full-width">
+                  <option value="pirate">🏴‍☠️ Captain Redbeard (Pirate Corsair)</option>
+                  <option value="victorian" selected>🧐 Lord Worthington (Victorian Grandmaster)</option>
+                  <option value="cyber">🤖 Unit 734 (Synthetic Logic Core)</option>
+                  <option value="anime">⚡ Kenji (Anime Rival)</option>
+                  <option value="coach">🧢 Coach Dan (Sports Coach)</option>
+                  <option value="grandma">👵 Granny Edna (Warm Baker)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Arena AI vs AI Options -->
+          <div id="panel-setup-arena" class="setup-panel-section hidden">
+            <div class="arena-matchup-grid">
+              <div class="arena-player-box box-red">
+                <h4><span class="color-dot dot-red"></span> Red Player</h4>
+                <div class="form-group">
+                  <label for="title-arena-red-type">Controller:</label>
+                  <select id="title-arena-red-type" class="select-control full-width">
+                    <option value="llm" selected>WebLLM Neural Agent</option>
+                    <option value="minimax">Minimax Search Engine</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="title-arena-red-persona">Personality:</label>
+                  <select id="title-arena-red-persona" class="select-control full-width">
+                    <option value="pirate" selected>🏴‍☠️ Captain Redbeard (Pirate)</option>
+                    <option value="victorian">🧐 Lord Worthington (Victorian)</option>
+                    <option value="cyber">🤖 Unit 734 (Synthetic Core)</option>
+                    <option value="anime">⚡ Kenji (Anime Rival)</option>
+                    <option value="coach">🧢 Coach Dan (Coach)</option>
+                    <option value="grandma">👵 Granny Edna (Baker)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="arena-player-box box-black">
+                <h4><span class="color-dot dot-black"></span> Black Player</h4>
+                <div class="form-group">
+                  <label for="title-arena-black-type">Controller:</label>
+                  <select id="title-arena-black-type" class="select-control full-width">
+                    <option value="llm" selected>WebLLM Neural Agent</option>
+                    <option value="minimax">Minimax Search Engine</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="title-arena-black-persona">Personality:</label>
+                  <select id="title-arena-black-persona" class="select-control full-width">
+                    <option value="victorian" selected>🧐 Lord Worthington (Victorian)</option>
+                    <option value="pirate">🏴‍☠️ Captain Redbeard (Pirate)</option>
+                    <option value="cyber">🤖 Unit 734 (Synthetic Core)</option>
+                    <option value="anime">⚡ Kenji (Anime Rival)</option>
+                    <option value="coach">🧢 Coach Dan (Coach)</option>
+                    <option value="grandma">👵 Granny Edna (Baker)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pass & Play Options -->
+          <div id="panel-setup-pvp" class="setup-panel-section hidden">
+            <p class="setup-note">Local 2-Player match. Red moves first, taking turns on the same board.</p>
+          </div>
+
+          <!-- Neural Engine Global Config (Shown for LLM & Arena) -->
+          <div id="panel-setup-neural-global" class="neural-global-box hidden">
+            <div class="form-row">
+              <div class="form-group flex-2">
+                <label for="title-model-select">WebGPU LLM Model:</label>
+                <select id="title-model-select" class="select-control full-width">
+                  <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC" selected>Llama 3.2 1B (Recommended, ~880MB)</option>
+                  <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2 1.7B (Balanced, ~950MB)</option>
+                  <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2 360M (Ultra Fast, ~190MB)</option>
+                  <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B (Grandmaster, ~1.9GB)</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label for="title-tactical-mode">Tactical Mode:</label>
+                <select id="title-tactical-mode" class="select-control full-width">
+                  <option value="wild" selected>Wild LLM (Autonomous)</option>
+                  <option value="grandmaster">Grandmaster (Augmented)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Launch Actions -->
+        <div class="title-actions">
+          <button id="btn-launch-match" class="btn btn-primary btn-large btn-hero">
+            <span class="btn-icon-symbol">⚔️</span>
+            <span class="btn-text">Launch Match</span>
+          </button>
+        </div>
+
+        <div class="title-footer-links">
+          <button id="btn-title-llm-dashboard" class="btn btn-subtle btn-xs">🧠 Hardware Status & Model Manager</button>
+          <button id="btn-title-debug" class="btn btn-subtle btn-xs">🔍 Debug Inspector</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         2. PRE-LOAD / STAGING SCREEN (LLM Initialization Gate)
+         ==================================================================== -->
+    <div id="screen-preload" class="screen-view hidden">
+      <div class="preload-card">
+        <div class="preload-header">
+          <span class="preload-icon">🧠</span>
+          <h2 class="preload-title">Preparing Neural Engine</h2>
+          <p class="preload-subtitle">Loading weights into WebGPU memory and compiling shaders in dedicated Web Worker...</p>
+        </div>
+
+        <!-- Staging Pipeline Checklist -->
+        <div class="preload-pipeline">
+          <div class="pipeline-item" id="pipeline-gpu">
+            <span class="pipeline-status-icon">⏳</span>
+            <div class="pipeline-item-text">
+              <span class="pipeline-name">WebGPU Hardware Check</span>
+              <span class="pipeline-desc" id="pipeline-gpu-desc">Detecting compatible GPU adapter...</span>
+            </div>
+          </div>
+
+          <div class="pipeline-item" id="pipeline-download">
+            <span class="pipeline-status-icon">⏳</span>
+            <div class="pipeline-item-text">
+              <span class="pipeline-name">Model Weights Download</span>
+              <span class="pipeline-desc" id="pipeline-download-desc">Checking browser Cache API & IndexedDB...</span>
+            </div>
+          </div>
+
+          <div class="pipeline-item" id="pipeline-compile">
+            <span class="pipeline-status-icon">⏳</span>
+            <div class="pipeline-item-text">
+              <span class="pipeline-name">WebGPU Shader Compilation</span>
+              <span class="pipeline-desc" id="pipeline-compile-desc">Generating graphics pipeline shaders...</span>
+            </div>
+          </div>
+
+          <div class="pipeline-item" id="pipeline-sanity">
+            <span class="pipeline-status-icon">⏳</span>
+            <div class="pipeline-item-text">
+              <span class="pipeline-name">Neural Verification & Warm-up</span>
+              <span class="pipeline-desc" id="pipeline-sanity-desc">Running inference sanity test...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Progress Bar -->
+        <div class="preload-progress-wrap">
+          <div class="progress-bar-header">
+            <span id="preload-progress-label" class="progress-label">Initializing WebLLM...</span>
+            <span id="preload-progress-percent" class="progress-percent">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="preload-progress-fill" class="progress-fill" style="width: 0%;"></div>
+          </div>
+          <p id="preload-status-detail" class="preload-status-detail">Model weights are cached permanently across visits.</p>
+        </div>
+
+        <!-- Preload Error Box (Shown only on failure) -->
+        <div id="preload-error-box" class="preload-error-box hidden" role="alert">
+          <div class="error-badge">⚠️ Initialization Error</div>
+          <p id="preload-error-desc" class="error-desc">WebGPU not supported or model loading failed.</p>
+          <div class="error-actions">
+            <button id="btn-preload-fallback-minimax" class="btn btn-primary btn-sm">Switch to Minimax (Classic AI)</button>
+            <button id="btn-preload-retry" class="btn btn-secondary btn-sm">Retry Loading</button>
+            <button id="btn-preload-return-title" class="btn btn-subtle btn-sm">Return to Title</button>
+          </div>
+        </div>
+
+        <div class="preload-cancel-wrap">
+          <button id="btn-preload-cancel" class="btn btn-subtle btn-xs">✕ Cancel & Return to Menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         3. PLAYING SCREEN (Board, Scoreboard, Spectator, Live Feed)
+         ==================================================================== -->
+    <div id="screen-game" class="screen-view hidden">
+      <header class="game-header">
+        <div class="brand-group">
+          <h1 class="game-title">Classic Checkers</h1>
+          <span class="arena-tag">⚔️ WebGPU AI Arena</span>
+        </div>
+        <div class="header-controls">
+          <a href="/godot/" class="btn btn-godot-switch" title="Switch to 3D Client" aria-label="Switch to 3D Client">
+            <span class="btn-icon-symbol">🎲</span>
+            <span class="btn-text">Play 3D</span>
+          </a>
+          <button id="btn-exit-to-title" class="btn btn-secondary" title="Return to Title / Setup Screen" aria-label="Main Menu">
+            <span class="btn-icon-symbol">🏠</span>
+            <span class="btn-text">Menu</span>
+          </button>
+          <div class="control-group">
+            <select id="select-game-mode" class="select-control" aria-label="Game Mode" title="Game Mode">
+              <option value="llm">Play vs LLM AI</option>
+              <option value="minimax" selected>Play vs Minimax</option>
+              <option value="pvp">Pass & Play</option>
+              <option value="arena">AI vs AI Arena</option>
+            </select>
+            <select id="select-difficulty" class="select-control" aria-label="AI Difficulty" title="AI Difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+          <button id="btn-debug-inspector" class="btn btn-secondary" title="Inspect Raw Prompts & Latency" aria-label="Debug Inspector">
+            <span class="btn-icon-symbol">🔍</span>
+            <span class="btn-text">Debug</span>
+          </button>
+          <button id="btn-open-llm-dashboard" class="btn btn-secondary" title="WebGPU Hardware Status & LLM Manager" aria-label="LLM Dashboard">
+            <span class="btn-icon-symbol">🧠</span>
+            <span class="btn-text">LLM</span>
+          </button>
+          <button id="btn-arena-setup" class="btn btn-secondary" title="Configure Players & Personas" aria-label="Arena Setup">
+            <span class="btn-icon-symbol">⚔️</span>
+            <span class="btn-text">Matchup</span>
+          </button>
+          <button id="btn-rotate" class="btn btn-icon" title="Rotate Board" aria-label="Rotate Board">
+            <svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            <span class="btn-text">Rotate</span>
+          </button>
+          <button id="btn-notation" class="btn btn-icon" title="Toggle Square Notation (1-32)" aria-label="Toggle Notation">
+            <svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <path d="M8 8h8M8 12h8M8 16h5"/>
+            </svg>
+            <span class="btn-text">Numbers</span>
+          </button>
+          <button id="btn-mute" class="btn btn-icon" title="Toggle Sound" aria-label="Toggle Sound">
+            <svg id="icon-sound-on" class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+            <svg id="icon-sound-off" class="icon hidden" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <line x1="23" y1="9" x2="17" y2="15"/>
+              <line x1="17" y1="9" x2="23" y2="15"/>
+            </svg>
+            <span class="btn-text" id="sound-label">Sound</span>
+          </button>
+          <button id="btn-new-game" class="btn btn-primary" title="Start a New Game">
+            New Game
+          </button>
+        </div>
+      </header>
+
+      <!-- WebLLM Download & Initialization Progress Bar (Header inline) -->
+      <div id="webllm-progress-container" class="webllm-progress-container hidden" role="status" aria-live="polite">
+        <div class="progress-bar-header">
+          <span id="webllm-progress-label" class="progress-label">Downloading Model...</span>
+          <span id="webllm-progress-percent" class="progress-percent">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="webllm-progress-fill" class="progress-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Spectator Toolbar (Active during Model vs Model) -->
+      <div id="spectator-controls" class="spectator-controls hidden" role="region" aria-label="Spectator Controls">
+        <div class="spectator-badge">👁️ Spectator Mode</div>
+        <div class="spectator-actions">
+          <button id="btn-spectator-play" class="btn btn-icon btn-sm" title="Play / Pause">
+            <span id="spectator-play-icon">❚❚</span>
+            <span id="spectator-play-text" class="btn-text">Pause</span>
+          </button>
+          <button id="btn-spectator-step" class="btn btn-icon btn-sm" title="Step 1 Move">
+            <span>⏭</span>
+            <span class="btn-text">Step</span>
+          </button>
+          <div class="spectator-speed-group">
+            <label for="select-spectator-speed" class="speed-label">Pacing:</label>
+            <select id="select-spectator-speed" class="select-control select-sm">
+              <option value="800">Fast (0.8s)</option>
+              <option value="1600" selected>Normal (1.6s)</option>
+              <option value="3200">Theatrical (3.2s)</option>
+            </select>
+          </div>
+          <button id="btn-spectator-debug" class="btn btn-icon btn-sm" title="Open Debug Inspector">
+            <span>🔍</span>
+            <span class="btn-text">Debug</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Scoreboard, Personas, and Banter Speech Bubbles -->
+      <section class="game-info-card">
+        <div class="player-card player-black" id="player-black-card">
+          <div class="player-badge">
+            <span class="piece-avatar black-avatar" id="player-black-avatar">⚫</span>
+            <span class="player-name" id="player-black-name">Black</span>
+          </div>
+          <div class="player-stats">
+            <span class="stat-item"><strong id="black-pieces-count">12</strong> pieces</span>
+            <span class="stat-item kings-count"><strong id="black-kings-count">0</strong> <span class="crown-symbol">♔</span></span>
+          </div>
+          <!-- Black Speech Bubble for In-Game Banter -->
+          <div class="speech-bubble hidden" id="speech-bubble-black" aria-live="polite">
+            <span class="bubble-text">...</span>
+          </div>
+        </div>
+
+        <div class="turn-status-container">
+          <div class="turn-badge" id="turn-badge">
+            <span class="turn-dot" id="turn-dot"></span>
+            <span class="turn-text" id="turn-text">Red's Turn</span>
+          </div>
+          <div class="turn-message" id="turn-message">Select a piece to move.</div>
+        </div>
+
+        <div class="player-card player-red active-turn" id="player-red-card">
+          <div class="player-badge">
+            <span class="piece-avatar red-avatar" id="player-red-avatar">🔴</span>
+            <span class="player-name" id="player-red-name">Red</span>
+          </div>
+          <div class="player-stats">
+            <span class="stat-item"><strong id="red-pieces-count">12</strong> pieces</span>
+            <span class="stat-item kings-count"><strong id="red-kings-count">0</strong> <span class="crown-symbol">♔</span></span>
+          </div>
+          <!-- Red Speech Bubble for In-Game Banter -->
+          <div class="speech-bubble hidden" id="speech-bubble-red" aria-live="polite">
+            <span class="bubble-text">...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Multi-Jump Dynamic Callout Banner -->
+      <div id="multijump-banner" class="multijump-banner hidden" role="status" aria-live="polite">
+        <span class="multijump-pill">⚡ Multi-Jump</span>
+        <span id="multijump-text" class="multijump-text">Capture chain in progress! Complete the jump.</span>
+      </div>
+
+      <!-- Arena Dual-Column Main Area: Board & Live Banter Feed -->
+      <div class="main-layout-container">
+        <!-- Checkers Board Area -->
+        <main class="board-wrapper">
+          <div id="board" class="board" role="grid" aria-label="Checkers Board"></div>
+        </main>
+
+        <!-- Arena Live Banter Chat Log -->
+        <aside class="arena-feed-section" id="arena-feed-section">
+          <div class="arena-feed-header">
+            <div class="feed-title-wrap">
+              <span class="feed-icon">💬</span>
+              <span class="arena-feed-title">Arena Live Banter</span>
+            </div>
+            <button id="btn-clear-feed" class="btn btn-subtle btn-xs" title="Clear Chat Log">Clear</button>
+          </div>
+          <div id="arena-feed-list" class="arena-feed-list" role="log" aria-live="polite">
+            <div class="arena-msg arena-welcome-msg">
+              <div class="msg-body">⚔️ Welcome to the Checkers Arena! In-character taunts and move reactions will stream here in real time.</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Floating Re-open Recap Pill (when reviewing board) -->
+      <button id="btn-reopen-modal" class="reopen-modal-pill hidden" title="View Match Recap">
+        🏆 View Match Recap
+      </button>
+
+      <!-- Keyboard Shortcuts Legend Footer -->
+      <footer class="keyboard-legend" aria-label="Keyboard Shortcuts">
+        <span class="legend-item"><kbd>Space</kbd> Play/Pause</span>
+        <span class="legend-item"><kbd>Esc</kbd> Deselect</span>
+        <span class="legend-item"><kbd>R</kbd> New Game</span>
+        <span class="legend-item"><kbd>M</kbd> Mute</span>
+        <span class="legend-item"><kbd>N</kbd> Numbers</span>
+        <span class="legend-item"><kbd>F</kbd> Flip</span>
+      </footer>
+    </div>
+
+    <!-- ====================================================================
+         4. MODALS & DRAWERS
+         ==================================================================== -->
+
+    <!-- Prompt & Engine Debugger Modal / Drawer -->
+    <div id="modal-debug-inspector" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="debug-inspector-title">
+      <div class="modal-card modal-debug-card">
+        <div class="modal-header-row">
+          <div class="brand-group">
+            <h2 id="debug-inspector-title" class="modal-title">🔍 Prompt & Engine Debugger</h2>
+            <span class="arena-tag">Telemetry & Telemetry Logs</span>
+          </div>
+          <div class="debug-header-actions">
+            <button id="btn-debug-copy-prompt" class="btn btn-secondary btn-sm" title="Copy Current Prompt to Clipboard">📋 Copy Prompt</button>
+            <button id="btn-debug-export-logs" class="btn btn-secondary btn-sm" title="Export Telemetry to JSON">💾 Export Logs</button>
+            <button id="btn-debug-clear-logs" class="btn btn-subtle btn-sm" title="Clear History">Clear</button>
+            <button id="btn-close-debug-inspector" class="btn btn-icon btn-sm" aria-label="Close" title="Close">✕</button>
+          </div>
+        </div>
+
+        <!-- Metrics summary bar -->
+        <div id="debug-metrics-bar" class="debug-metrics-bar">
+          <span class="debug-metric-item">No turns logged yet.</span>
+        </div>
+
+        <div class="debug-workspace-grid">
+          <!-- Left: Turn-by-Turn History List -->
+          <aside class="debug-turns-sidebar">
+            <h4 class="debug-sidebar-heading">Turns History</h4>
+            <div id="debug-turn-list" class="debug-turn-list">
+              <div class="debug-empty-note">No LLM moves recorded yet.</div>
+            </div>
+          </aside>
+
+          <!-- Right: Detailed Prompts, Outputs, and Banter -->
+          <main class="debug-details-pane">
+            <div class="debug-tab-headers">
+              <span class="debug-tab active">Session A: Tactical Move</span>
+            </div>
+            <div id="debug-session-a" class="debug-session-content">
+              <div class="debug-empty-panel">Select a turn from the sidebar to inspect prompt details.</div>
+            </div>
+
+            <div class="debug-tab-headers" style="margin-top: 14px;">
+              <span class="debug-tab active">Session B: Banter Stream</span>
+            </div>
+            <div id="debug-session-b" class="debug-session-content">
+              <div class="debug-empty-panel">No banter recorded for this turn.</div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arena Setup Modal Overlay -->
+    <div id="modal-arena-setup" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="arena-setup-title">
+      <div class="modal-card modal-card-wide">
+        <div class="modal-header-row">
+          <h2 id="arena-setup-title" class="modal-title">⚔️ Matchup & AI Arena Setup</h2>
+          <button id="btn-close-arena" class="modal-close-btn" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="setup-grid">
+          <!-- Red Player Setup -->
+          <div class="setup-panel panel-red">
+            <h3 class="panel-heading"><span class="color-dot dot-red"></span> Red Player</h3>
+            <div class="form-group">
+              <label for="arena-red-type">Player Controller:</label>
+              <select id="arena-red-type" class="select-control full-width">
+                <option value="human" selected>Human (Interactive)</option>
+                <option value="minimax">Minimax Search Engine</option>
+                <option value="llm">WebLLM Neural Agent</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="arena-red-persona">Personality Profile:</label>
+              <select id="arena-red-persona" class="select-control full-width">
+                <option value="pirate" selected>🏴‍☠️ Captain Redbeard (Pirate)</option>
+                <option value="victorian">🧐 Lord Worthington (Victorian)</option>
+                <option value="cyber">🤖 Unit 734 (Synthetic Core)</option>
+                <option value="anime">⚡ Kenji (Anime Rival)</option>
+                <option value="coach">🧢 Coach Dan (Sports Coach)</option>
+                <option value="grandma">👵 Granny Edna (Sweet Baker)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Black Player Setup -->
+          <div class="setup-panel panel-black">
+            <h3 class="panel-heading"><span class="color-dot dot-black"></span> Black Player</h3>
+            <div class="form-group">
+              <label for="arena-black-type">Player Controller:</label>
+              <select id="arena-black-type" class="select-control full-width">
+                <option value="human">Human (Interactive)</option>
+                <option value="minimax" selected>Minimax Search Engine</option>
+                <option value="llm">WebLLM Neural Agent</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="arena-black-persona">Personality Profile:</label>
+              <select id="arena-black-persona" class="select-control full-width">
+                <option value="pirate">🏴‍☠️ Captain Redbeard (Pirate)</option>
+                <option value="victorian" selected>🧐 Lord Worthington (Victorian)</option>
+                <option value="cyber">🤖 Unit 734 (Synthetic Core)</option>
+                <option value="anime">⚡ Kenji (Anime Rival)</option>
+                <option value="coach">🧢 Coach Dan (Sports Coach)</option>
+                <option value="grandma">👵 Granny Edna (Sweet Baker)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Global Engine & Model Settings -->
+        <div class="setup-global-settings">
+          <div class="form-group">
+            <label for="arena-model">In-Browser LLM (WebGPU):</label>
+            <select id="arena-model" class="select-control full-width">
+              <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC" selected>Llama 3.2 1B (Recommended, ~880MB download)</option>
+              <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2 1.7B (Balanced, ~950MB cached)</option>
+              <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2 360M (Ultra Fast, ~190MB download)</option>
+              <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B (Grandmaster, ~1.9GB download)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="arena-tactical-mode">Tactical Move Engine:</label>
+            <select id="arena-tactical-mode" class="select-control full-width">
+              <option value="wild" selected>Wild LLM (Autonomous move selection)</option>
+              <option value="grandmaster">Grandmaster LLM (Minimax-augmented advice)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-apply-arena" class="btn btn-primary btn-large">Start Match</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over Modal Overlay -->
+    <div id="game-over-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-card">
+        <div id="modal-trophy" class="modal-trophy">🏆</div>
+        <h2 id="modal-title" class="modal-title">Victory!</h2>
+        <div id="modal-reason-badge" class="modal-reason-badge">Elimination</div>
+        <p id="modal-message" class="modal-message">Red has captured all opposing pieces!</p>
+
+        <!-- Match Stats Recap Grid -->
+        <div class="modal-stats-grid">
+          <div class="modal-stat-card">
+            <span class="stat-label">Total Turns</span>
+            <span class="stat-value" id="modal-stat-turns">0</span>
+          </div>
+          <div class="modal-stat-card">
+            <span class="stat-label">Match Time</span>
+            <span class="stat-value" id="modal-stat-time">0:00</span>
+          </div>
+          <div class="modal-stat-card">
+            <span class="stat-label">Red Captures</span>
+            <span class="stat-value" id="modal-stat-red-captures">0</span>
+          </div>
+          <div class="modal-stat-card">
+            <span class="stat-label">Black Captures</span>
+            <span class="stat-value" id="modal-stat-black-captures">0</span>
+          </div>
+          <div class="modal-stat-card stat-card-wide">
+            <span class="stat-label">Kings Crowned</span>
+            <span class="stat-value" id="modal-stat-kings">0</span>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-modal-restart" class="btn btn-primary btn-large">Play Again</button>
+          <button id="btn-modal-review" class="btn btn-secondary btn-large">Review Board</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LLM Dashboard Modal Overlay -->
+    <div id="modal-llm-dashboard" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="llm-dashboard-title">
+      <div class="modal-card modal-dashboard-card">
+        <div class="modal-header-row">
+          <div class="brand-group">
+            <h2 id="llm-dashboard-title" class="modal-title">🧠 LLM Dashboard</h2>
+            <span class="arena-tag">Engine & Diagnostics</span>
+          </div>
+          <button id="btn-close-llm-dashboard" class="btn btn-icon btn-sm" aria-label="Close Dashboard" title="Close">✕</button>
+        </div>
+
+        <div class="dashboard-grid">
+          <!-- 1. Hardware & WebGPU Status Card -->
+          <div class="dashboard-card" id="card-hardware-status">
+            <div class="dashboard-card-header">
+              <span class="card-icon">⚡</span>
+              <h3 class="card-title">Hardware & WebGPU Status</h3>
+              <span id="llm-gpu-badge" class="status-badge status-badge-pending">Checking...</span>
+            </div>
+            <div class="dashboard-card-body">
+              <div class="info-row">
+                <span class="info-label">Active Adapter:</span>
+                <span id="llm-gpu-adapter-name" class="info-val font-mono">Scanning...</span>
+              </div>
+              <p id="llm-gpu-notes" class="info-notes">Detecting WebGPU hardware acceleration...</p>
+            </div>
+          </div>
+
+          <!-- 2. Model Manager Card -->
+          <div class="dashboard-card" id="card-model-manager">
+            <div class="dashboard-card-header">
+              <span class="card-icon">📦</span>
+              <h3 class="card-title">Model Manager</h3>
+            </div>
+            <div class="dashboard-card-body">
+              <div class="form-group">
+                <label for="llm-select-model">Model Repository:</label>
+                <select id="llm-select-model" class="select-control full-width">
+                  <!-- Populated via model_registry.js -->
+                </select>
+              </div>
+
+              <div class="model-meta-badges">
+                <span id="llm-model-vram" class="meta-badge">VRAM: ~1.1 GB</span>
+                <span id="llm-model-download" class="meta-badge">Size: ~950 MB</span>
+              </div>
+              <p id="llm-model-desc" class="info-notes">Great tactical move reasoning and sharp, lively banter.</p>
+
+              <div class="model-actions-row">
+                <button id="btn-llm-load-model" class="btn btn-primary btn-sm">⬇ Load Model</button>
+                <button id="btn-llm-clear-cache" class="btn btn-secondary btn-sm" title="Clear Cache API & IndexedDB">🗑 Clear Cache</button>
+              </div>
+
+              <!-- Real-time Loading Progress -->
+              <div id="llm-load-progress-container" class="dashboard-progress-container hidden">
+                <div class="progress-bar-header">
+                  <span id="llm-load-progress-label" class="progress-label">Downloading weights...</span>
+                </div>
+                <div class="progress-track">
+                  <div id="llm-load-progress-fill" class="progress-fill" style="width: 0%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Interactive Test Bench -->
+          <div class="dashboard-card dashboard-card-wide" id="card-test-bench">
+            <div class="dashboard-card-header">
+              <span class="card-icon">🧪</span>
+              <h3 class="card-title">Interactive Test Bench</h3>
+              <span id="llm-testbench-metrics" class="testbench-metrics">Ready</span>
+            </div>
+            <div class="dashboard-card-body">
+              <div class="testbench-actions">
+                <button id="btn-llm-test-chat" class="btn btn-secondary btn-sm">💬 Test Chat & Banter</button>
+                <button id="btn-llm-test-move" class="btn btn-secondary btn-sm">♟️ Test Tactical Move</button>
+              </div>
+              <div class="console-box">
+                <pre id="llm-testbench-output" class="console-output">Load a model above or click test buttons to inspect real-time outputs.</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Live Activity & Diagnostics Log -->
+          <div class="dashboard-card dashboard-card-wide" id="card-activity-log">
+            <div class="dashboard-card-header">
+              <span class="card-icon">📜</span>
+              <h3 class="card-title">Live Activity Log</h3>
+              <button id="btn-llm-clear-log" class="btn btn-sm btn-icon" title="Clear Log">Clear</button>
+            </div>
+            <div class="dashboard-card-body">
+              <div id="llm-activity-log" class="console-box console-log-box">
+                <div class="log-entry log-entry-info"><span class="log-time">[System]</span> LLM Dashboard initialized.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<context-index scope="gh://jpeckenpaugh/chk-livive-net" ref="main" generator="deepseek-v4.1-flash">
+  <file name="README.md" runtime="Markdown" role="Project overview &amp; architecture guide">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>Match modes, 2D/3D client overview, developer CLI workflow</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Overview of Classic Checkers &amp; WebGPU AI Arena (chk.livive.net) featuring Alpha-Beta Minimax, WebLLM personas, and Godot 4 3D client.</summary>
+    <architecture>Documents the dual-client (2D HTML5 + 3D Godot 4 WebGL) architecture sharing a zero-dependency English Draughts engine.</architecture>
+  </file>
+  <file name="index.html" runtime="HTML5" role="2D Web client &amp; Arena UI shell">
+    <graph>
+      <imports>styles.css, src/main.js</imports>
+      <exports>Title setup, WebLLM preload gate, 8x8 board grid, Arena live banter feed</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Main 2D web application shell hosting the setup screen, WebGPU model loader, interactive 8x8 draughts board, and prompt debugger.</summary>
+    <architecture>Binds DOM views for Title, Preload, Playing, and Debug Inspector states driven by CheckersController.</architecture>
+  </file>
+  <file name="state.js" runtime="JavaScript (ES Module)" role="32-square draughts state model &amp; coordinate mapping">
+    <graph>
+      <imports>Zero external dependencies</imports>
+      <exports>EMPTY, RED_MAN, RED_KING, BLACK_MAN, BLACK_KING, PLAYER_RED, PLAYER_BLACK, indexToCoord, coordToIndex, indexToNotation, createInitialBoard, createInitialState</exports>
+      <dependents>src/rules.js, src/ai.js, src/controller.js, src/renderer.js, v2/src/checkers_sm.rs</dependents>
+      <invariants>32 playable dark squares (0..31) where (row + col) % 2 === 1; PDN notation 1..32</invariants>
+    </graph>
+    <summary>Defines piece constants, player identifiers, 32-square to 8x8 coordinate transforms, PDN 1..32 notation helpers, and initial board layout.</summary>
+    <architecture>Foundation state representation shared across the rules engine, Alpha-Beta Minimax AI, and the Rust v2/src/checkers_sm.rs port.</architecture>
+  </file>
+  <file name="rules.js" runtime="JavaScript (ES Module)" role="English Draughts rules engine">
+    <graph>
+      <imports>./state.js</imports>
+      <exports>getPieceJumps, getPieceSteps, getLegalMoves, applyMove, applyMoveInPlace, undoMoveInPlace, checkGameOver, getGameOverReason, DRAW_RULE_HALF_MOVES</exports>
+      <dependents>src/ai.js, src/controller.js, v2/src/checkers_sm.rs</dependents>
+      <invariants>Mandatory capture rule; multi-jump chains via mustContinueJumpFrom; crowning immediately terminates turn; 80 half-move draw rule</invariants>
+    </graph>
+    <summary>Pure English Draughts rules engine enforcing mandatory captures, multi-jump continuations, king row promotions, and win/draw detection.</summary>
+    <architecture>Precomputes 32-square diagonal step and jump lookup tables and provides both immutable applyMove and zero-allocation applyMoveInPlace/undoMoveInPlace for search trees.</architecture>
+  </file>
+  <file name="ai.js" runtime="JavaScript (ES Module)" role="Alpha-Beta Minimax search &amp; positional heuristics">
+    <graph>
+      <imports>./state.js, ./rules.js</imports>
+      <exports>WEIGHT_MAN, WEIGHT_KING, BONUS_BACK_RANK, BONUS_CENTER, BONUS_ADVANCED_RANK, PENALTY_EDGE, DIFFICULTY_PRESETS, evaluateBoard, minimax, CheckersAI</exports>
+      <dependents>src/controller.js, v2/src/checkers_sm.rs</dependents>
+      <invariants>Depth 2 (Easy), Depth 4 (Medium), Depth 6 + Quiescence (Hard); multi-jump continuations searched without decrementing depth</invariants>
+    </graph>
+    <summary>High-performance Alpha-Beta Minimax engine with center/back-rank/edge positional evaluation, move ordering, and capture quiescence search.</summary>
+    <architecture>Evaluates 32-square boards in-place and powers both the browser Minimax player and the #![no_std] Rust port in v2/src/checkers_sm.rs.</architecture>
+  </file>
+  <file name="controller.js" runtime="JavaScript (ES Module)" role="Game lifecycle &amp; turn orchestrator">
+    <graph>
+      <imports>./state.js, ./rules.js, ./ai.js, ./players/*, ./llm/*, ./workers/llm_bridge.js</imports>
+      <exports>LIFECYCLE, CheckersController</exports>
+      <dependents>src/main.js, src/godot_adapter.js</dependents>
+      <invariants>Manages TITLE, PRELOAD, PLAYING, and GAMEOVER states; enforces multi-jump selection lock</invariants>
+    </graph>
+    <summary>Coordinates human input, Minimax/WebLLM turns, multi-jump continuation chains, spectator pacing, and match telemetry.</summary>
+    <architecture>Decouples game rules and AI scheduling from presentation so both 2D DOM and 3D Godot renderers share identical turn logic.</architecture>
+  </file>
+  <file name="renderer.js" runtime="JavaScript (ES Module)" role="2D DOM board renderer &amp; Web Audio synth">
+    <graph>
+      <imports>./state.js</imports>
+      <exports>CheckersRenderer</exports>
+      <dependents>src/main.js, src/controller.js</dependents>
+      <invariants>32 dark square DOM cache; zero-dependency Web Audio oscillator effects</invariants>
+    </graph>
+    <summary>Builds the 8x8 DOM checkerboard, renders pieces and king crowns, animates hops/slides, and synthesizes sound effects via Web Audio API.</summary>
+    <architecture>Implements the renderer contract consumed by CheckersController for the 2D browser frontend.</architecture>
+  </file>
+  <file name="godot_adapter.js" runtime="JavaScript (ES Module)" role="Godot 4 3D WebAssembly bridge adapter">
+    <graph>
+      <imports>./state.js</imports>
+      <exports>GodotAdapter, SoundEffects</exports>
+      <dependents>Godot 4 WebGL client (/godot/)</dependents>
+      <invariants>Bidirectional window.GodotCheckersBridge JSON protocol with 1500ms animation watchdog</invariants>
+    </graph>
+    <summary>Implements the CheckersRenderer interface over window.GodotCheckersBridge to drive the Godot 4 3D client from the shared JS rules engine.</summary>
+    <architecture>Serializes board state, legal move masks, and move animations to GDScript callbacks while forwarding 3D raycast square clicks back to CheckersController.</architecture>
+  </file>
+  <file name="godot_plan.md" runtime="Markdown" role="Godot 4.7 3D client integration plan">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>5-section milestone architecture &amp; JavaScriptBridge specification</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Architectural blueprint for the Godot 4.7 WebGL2 3D frontend and its JavaScriptBridge event bus.</summary>
+    <architecture>Details the 5 work sections covering WebGL2 export, bridge contracts, 3D raycast board, HUD banter bubbles, and verification.</architecture>
+  </file>
+</context-index>

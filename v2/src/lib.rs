@@ -1,6 +1,8 @@
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
 pub mod calc;
+pub mod checkers;
+pub mod checkers_sm;
 pub mod code;
 pub mod fb;
 pub mod files;
@@ -549,6 +551,7 @@ pub extern "C" fn app_active_page() -> i32 {
             AppSlot::Calc => 0,
             AppSlot::Files => wm.files.active_file_idx().map(|i| i as i32).unwrap_or(-1),
             AppSlot::Mines => wm.mines.board.seed as i32,
+            AppSlot::Checkers => wm.checkers.state.move_count as i32,
         }
     }
 }
@@ -725,6 +728,116 @@ pub extern "C" fn app_mines_apply_rx(
     })
 }
 
+// --- Checkers AI & 2-Player Match Broker Host Mailbox ABI ---
+
+#[no_mangle]
+pub extern "C" fn app_checkers_set_mp(enabled: i32, match_id: u32, seat: i32, difficulty: i32) {
+    with_state(|wm, fb, st, txt, ctx| {
+        wm.checkers.configure_mp(
+            enabled != 0,
+            match_id,
+            seat.clamp(1, 2) as u8,
+            checkers_sm::Difficulty::from_i32(difficulty),
+        );
+        wm.active_app = AppSlot::Checkers;
+        wm.focus = wm::Focus::Client;
+        if wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_ai_pending() -> i32 {
+    unsafe { i32::from((*GUEST.wm.get()).checkers.ai_pending) }
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_step_ai() -> i32 {
+    with_state(|wm, fb, st, txt, ctx| {
+        if wm.checkers.step_ai() {
+            if wm.ready {
+                wm.render(fb, st, txt, ctx);
+            }
+            1
+        } else {
+            0
+        }
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_tx_pending() -> i32 {
+    unsafe { i32::from((*GUEST.wm.get()).checkers.tx_pending) }
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_take_tx_lo() -> u32 {
+    unsafe { (*GUEST.wm.get()).checkers.tx_lo }
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_take_tx_hi() -> u32 {
+    unsafe {
+        let c = &mut (*GUEST.wm.get()).checkers;
+        c.tx_pending = false;
+        c.tx_hi
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_apply_rx(
+    seq: u32,
+    seat: i32,
+    action: i32,
+    lo: u32,
+    hi: u32,
+) -> i32 {
+    with_state(|wm, fb, st, txt, ctx| {
+        let ok = wm.checkers.apply_rx(
+            seq,
+            seat.clamp(1, 2) as u8,
+            action.clamp(0, 2) as u8,
+            lo,
+            hi,
+        );
+        if ok && wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+        i32::from(ok)
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_turn() -> i32 {
+    unsafe { (*GUEST.wm.get()).checkers.active_turn_seat() as i32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_winner() -> i32 {
+    unsafe { (*GUEST.wm.get()).checkers.state.winner as i32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_seq() -> u32 {
+    unsafe { (*GUEST.wm.get()).checkers.mp_seq }
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_state_hash() -> u32 {
+    unsafe { (*GUEST.wm.get()).checkers.state.state_hash() }
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_red_count() -> i32 {
+    unsafe { (*GUEST.wm.get()).checkers.state.piece_counts().0 as i32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_checkers_black_count() -> i32 {
+    unsafe { (*GUEST.wm.get()).checkers.state.piece_counts().1 as i32 }
+}
+
 #[no_mangle]
 pub extern "C" fn app_destroy() {
     unsafe {
@@ -845,9 +958,9 @@ mod tests {
         assert_ne!(snap_hash, 0);
         assert_eq!(app_snapshot_count(), 1);
 
-        // Open Home drawer and click item 4 ("Test Pattern")
+        // Open Home drawer and click item 5 ("Test Pattern")
         assert_eq!(app_click(16, 16), CLICK_CHANGED);
-        assert_eq!(app_click(icon_x, dock_icon_y(4) + 14), CLICK_CHANGED);
+        assert_eq!(app_click(icon_x, dock_icon_y(5) + 14), CLICK_CHANGED);
 
         // 7. Verify diagnostic test pattern channel & orientation contract
         let ptr = app_framebuffer();
@@ -1159,5 +1272,73 @@ mod tests {
         assert_eq!(app_mines_seq(), 1);
         assert_eq!(app_mines_turn(), 2);
         assert_eq!(app_mines_p1_score(), p1_after_move1);
+    }
+
+    #[test]
+    fn checkers_multiplayer_and_ai_abi_roundtrip() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(app_init(1280, 720), 1);
+
+        // 1. Configure Checkers in 1P vs AI mode (enabled = 0, difficulty = 1 Medium)
+        app_checkers_set_mp(0, 1, 1, 1);
+        assert_eq!(app_selected(), AppSlot::Checkers as i32);
+        assert_eq!(app_checkers_turn(), 1);
+        assert_eq!(app_checkers_red_count(), 12);
+        assert_eq!(app_checkers_black_count(), 12);
+        assert_eq!(app_checkers_ai_pending(), 0);
+
+        // At 1280x688 client area:
+        // max_board_h = 644, max_board_w = 724 -> avail = 644 -> cell = 74, grid_px = 592
+        // info_w = 360, total_w = 1000 -> board_x = 140, board_y = 48
+        // Square 20 is row 5, col 0 -> x = 140 + 37, y = 48 + 5*74 + 37
+        // Square 16 is row 4, col 1 -> x = 140 + 74 + 37, y = 48 + 4*74 + 37
+        let sq20_x = 140 + 37;
+        let sq20_y = TITLE_H + 48 + 5 * 74 + 37;
+        let sq16_x = 140 + 74 + 37;
+        let sq16_y = TITLE_H + 48 + 4 * 74 + 37;
+
+        assert_eq!(app_click(sq20_x, sq20_y), CLICK_CHANGED);
+        assert_eq!(app_click(sq16_x, sq16_y), CLICK_CHANGED);
+        assert_eq!(app_checkers_turn(), 2);
+        assert_eq!(app_checkers_ai_pending(), 1);
+
+        // Step AI
+        assert_eq!(app_checkers_step_ai(), 1);
+        assert_eq!(app_checkers_ai_pending(), 0);
+        assert_eq!(app_checkers_turn(), 1);
+
+        // 2. Configure Checkers in 2P Broker mode on Seat 1 (Red)
+        app_checkers_set_mp(1, 77, 1, 1);
+        assert_eq!(app_checkers_turn(), 1);
+        assert_eq!(app_checkers_seq(), 0);
+        let initial_hash = app_checkers_state_hash();
+
+        // Click Red piece at square 20 -> destination square 16
+        assert_eq!(app_click(sq20_x, sq20_y), CLICK_CHANGED);
+        assert_eq!(app_click(sq16_x, sq16_y), CLICK_CHANGED);
+        assert_eq!(app_checkers_tx_pending(), 1);
+        let lo = app_checkers_take_tx_lo();
+        let hi = app_checkers_take_tx_hi();
+        assert_eq!(app_checkers_tx_pending(), 0);
+        assert_eq!(app_checkers_turn(), 2);
+        let p1_hash_after = app_checkers_state_hash();
+        assert_ne!(p1_hash_after, initial_hash);
+
+        // Out-of-turn click on Seat 1 is rejected
+        let sq21_x = 140 + 2 * 74 + 37;
+        let sq21_y = TITLE_H + 48 + 5 * 74 + 37;
+        assert_eq!(app_click(sq21_x, sq21_y), CLICK_NOOP);
+
+        // Simulate Seat 2 receiving P1's move via app_checkers_apply_rx
+        app_checkers_set_mp(1, 77, 2, 1);
+        assert_eq!(app_checkers_state_hash(), initial_hash);
+        let tx_action = (lo & 0xF) as i32;
+        let tx_seat = ((lo >> 4) & 0xF) as i32;
+        assert_eq!(tx_action, 1);
+        assert_eq!(tx_seat, 1);
+        assert_eq!(app_checkers_apply_rx(1, tx_seat, tx_action, lo, hi), 1);
+        assert_eq!(app_checkers_seq(), 1);
+        assert_eq!(app_checkers_turn(), 2);
+        assert_eq!(app_checkers_state_hash(), p1_hash_after);
     }
 }

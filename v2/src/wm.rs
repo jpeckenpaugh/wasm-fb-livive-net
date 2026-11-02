@@ -15,6 +15,7 @@
 //! always goes through the same command path.
 
 use crate::calc::{self, CalcApp};
+use crate::checkers::{self, CheckersApp};
 use crate::fb::{rgb, Framebuffer};
 use crate::files::{self, FilesApp};
 use crate::fmt as f;
@@ -42,7 +43,7 @@ pub const DOCK_Y: i32 = TITLE_H + 10;
 // Menu Bar geometry (Home + App).
 pub const MENU_COUNT: usize = 2;
 pub const MENU_X0: i32 = HOME_BTN_W + 4;
-pub const MENU_HEADER_W: i32 = 104;
+pub const MENU_HEADER_W: i32 = 120;
 pub const MENU_DROP_W: i32 = 224;
 pub const MENU_ITEM_H: i32 = 30;
 
@@ -71,7 +72,7 @@ pub const fn menu_header_w(_fb_w: i32) -> i32 {
 }
 
 /// App surfaces. `Desktop` is a real surface (wallpaper or backdrop), not a
-/// null state; the four drawer apps are the `APP_COUNT` launched surfaces.
+/// null state; the five drawer apps are the `APP_COUNT` launched surfaces.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AppSlot {
     Desktop = 0,
@@ -79,16 +80,18 @@ pub enum AppSlot {
     Calc = 2,
     Files = 3,
     Mines = 4,
+    Checkers = 5,
 }
 
 impl AppSlot {
     /// Number of docked applications (excludes the desktop surface).
-    pub const APP_COUNT: usize = 4;
-    pub const DOCK_APPS: [AppSlot; 4] = [
+    pub const APP_COUNT: usize = 5;
+    pub const DOCK_APPS: [AppSlot; 5] = [
         AppSlot::System,
         AppSlot::Calc,
         AppSlot::Files,
         AppSlot::Mines,
+        AppSlot::Checkers,
     ];
 
     pub const fn dock_index(self) -> Option<usize> {
@@ -97,6 +100,7 @@ impl AppSlot {
             AppSlot::Calc => Some(1),
             AppSlot::Files => Some(2),
             AppSlot::Mines => Some(3),
+            AppSlot::Checkers => Some(4),
             AppSlot::Desktop => None,
         }
     }
@@ -107,6 +111,7 @@ impl AppSlot {
             1 => Some(AppSlot::Calc),
             2 => Some(AppSlot::Files),
             3 => Some(AppSlot::Mines),
+            4 => Some(AppSlot::Checkers),
             _ => None,
         }
     }
@@ -118,6 +123,7 @@ impl AppSlot {
             AppSlot::Calc => "Calc",
             AppSlot::Files => "Files",
             AppSlot::Mines => "Mines",
+            AppSlot::Checkers => "Checkers",
         }
     }
 }
@@ -195,6 +201,10 @@ pub enum Command {
     MinesToggleFlag,
     MinesToggleRules,
     MinesToggleMp,
+    CheckersNewGame,
+    CheckersCycleMode,
+    CheckersCycleDifficulty,
+    CheckersFlipBoard,
     TestPattern,
     Snapshot,
 }
@@ -221,6 +231,10 @@ const MENU_HOME: &[MenuItem] = &[
     MenuItem {
         label: "Mines",
         command: Command::Launch(AppSlot::Mines),
+    },
+    MenuItem {
+        label: "Checkers",
+        command: Command::Launch(AppSlot::Checkers),
     },
     MenuItem {
         label: "Test Pattern",
@@ -337,6 +351,28 @@ const MENU_MINES: &[MenuItem] = &[
         command: Command::CloseWindow,
     },
 ];
+const MENU_CHECKERS: &[MenuItem] = &[
+    MenuItem {
+        label: "New Game (N)",
+        command: Command::CheckersNewGame,
+    },
+    MenuItem {
+        label: "Cycle Mode (M)",
+        command: Command::CheckersCycleMode,
+    },
+    MenuItem {
+        label: "AI Difficulty (D)",
+        command: Command::CheckersCycleDifficulty,
+    },
+    MenuItem {
+        label: "Flip Board (F)",
+        command: Command::CheckersFlipBoard,
+    },
+    MenuItem {
+        label: "Close Window",
+        command: Command::CloseWindow,
+    },
+];
 
 /// Title-bar / dropdown geometry derived once per frame from the session width.
 #[derive(Clone, Copy, Debug)]
@@ -423,6 +459,7 @@ pub struct WmState {
     pub calc: CalcApp,
     pub files: FilesApp,
     pub mines: MinesApp,
+    pub checkers: CheckersApp,
 }
 
 impl WmState {
@@ -448,6 +485,7 @@ impl WmState {
             calc: CalcApp::new(),
             files: FilesApp::new(),
             mines: MinesApp::new_const(),
+            checkers: CheckersApp::new_const(),
         }
     }
 
@@ -465,6 +503,7 @@ impl WmState {
         self.calc = CalcApp::new();
         self.files = FilesApp::new();
         self.mines.init_default();
+        self.checkers.init_default();
         self.ready = true;
     }
 
@@ -495,6 +534,7 @@ impl WmState {
                 AppSlot::Calc => MENU_CALC,
                 AppSlot::Files => MENU_FILES,
                 AppSlot::Mines => MENU_MINES,
+                AppSlot::Checkers => MENU_CHECKERS,
             },
         }
     }
@@ -562,6 +602,7 @@ impl WmState {
                     )
                 }
                 AppSlot::Mines => mines::draw_window(&mut client_fb, &self.mines),
+                AppSlot::Checkers => checkers::draw_window(&mut client_fb, &self.checkers),
             }
         }
 
@@ -712,6 +753,15 @@ impl WmState {
                     AppSlot::Mines => {
                         mines::draw_dock_tile(fb, &self.mines, tr.x, tr.y, tr.w, tr.h, active)
                     }
+                    AppSlot::Checkers => checkers::draw_dock_tile(
+                        fb,
+                        &self.checkers,
+                        tr.x,
+                        tr.y,
+                        tr.w,
+                        tr.h,
+                        active,
+                    ),
                     AppSlot::Desktop => {}
                 }
             } else {
@@ -876,6 +926,9 @@ impl WmState {
             AppSlot::Calc => calc::click_window(&mut self.calc, cx, cy, client_w, client_h),
             AppSlot::Files => files::click_window(&mut self.files, cx, cy, client_w, client_h),
             AppSlot::Mines => mines::click_window(&mut self.mines, cx, cy, client_w, client_h),
+            AppSlot::Checkers => {
+                checkers::click_window(&mut self.checkers, cx, cy, client_w, client_h)
+            }
         }
     }
 
@@ -1058,6 +1111,22 @@ impl WmState {
                 self.mines.toggle_mp();
                 InputResult::Changed
             }
+            Command::CheckersNewGame => {
+                self.checkers.new_game();
+                InputResult::Changed
+            }
+            Command::CheckersCycleMode => {
+                self.checkers.cycle_mode();
+                InputResult::Changed
+            }
+            Command::CheckersCycleDifficulty => {
+                self.checkers.cycle_difficulty();
+                InputResult::Changed
+            }
+            Command::CheckersFlipBoard => {
+                self.checkers.toggle_flip();
+                InputResult::Changed
+            }
             Command::TestPattern => {
                 self.test_pattern = !self.test_pattern;
                 self.focus = Focus::Client;
@@ -1084,13 +1153,14 @@ impl WmState {
             return InputResult::Noop;
         }
 
-        // Ctrl/Cmd + 1..4 launches an app without opening the Home drawer.
+        // Ctrl/Cmd + 1..5 launches an app without opening the Home drawer.
         if mods.command() {
             if let Some(slot) = match key {
                 Key::Digit1 => Some(AppSlot::System),
                 Key::Digit2 => Some(AppSlot::Calc),
                 Key::Digit3 => Some(AppSlot::Files),
                 Key::Digit4 => Some(AppSlot::Mines),
+                Key::Digit5 => Some(AppSlot::Checkers),
                 _ => None,
             } {
                 let rc = self.launch_app(slot);
@@ -1284,6 +1354,7 @@ impl WmState {
             AppSlot::Calc => calc::key_window(&mut self.calc, key),
             AppSlot::Files => files::key_window(&mut self.files, key, mods),
             AppSlot::Mines => mines::key_window(&mut self.mines, key),
+            AppSlot::Checkers => checkers::key_window(&mut self.checkers, key),
         };
         if key == Key::Space && !rc.is_consumed() {
             // Avoid page-scrolling while a client surface has focus.
@@ -1454,8 +1525,9 @@ mod tests {
             Command::CloseWindow
         );
         let home_items = WmState::new().menu_items(MenuId::Home);
-        assert_eq!(home_items.len(), 5);
-        assert_eq!(home_items[4].command, Command::TestPattern);
+        assert_eq!(home_items.len(), 6);
+        assert_eq!(home_items[4].command, Command::Launch(AppSlot::Checkers));
+        assert_eq!(home_items[5].command, Command::TestPattern);
     }
 
     #[test]
@@ -1521,6 +1593,7 @@ mod tests {
                 AppSlot::Calc,
                 AppSlot::Files,
                 AppSlot::Mines,
+                AppSlot::Checkers,
             ] {
                 let tw = text_width_prop(slot.title(), l.menu_scale);
                 assert!(10 + tw + 6 <= app_r.w, "{} in {}", slot.title(), w);

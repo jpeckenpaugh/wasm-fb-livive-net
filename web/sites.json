@@ -24,6 +24,12 @@
       "label": "gm.livive.net",
       "url": "https://gm.livive.net/",
       "maxAgeMinutes": 15
+    },
+    {
+      "id": "chk.livive.net",
+      "label": "chk.livive.net",
+      "url": "https://chk.livive.net/",
+      "maxAgeMinutes": 15
     }
   ]
 }

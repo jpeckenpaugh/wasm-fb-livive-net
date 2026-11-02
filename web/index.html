@@ -339,7 +339,7 @@
       <a class="nav-link" href="./v1/">v1 gallery →</a>
     </div>
     <div class="host-stats" aria-label="host statistics">
-      <div class="hstat"><span>builds</span><b id="h-builds">2</b></div>
+      <div class="hstat"><span>builds</span><b id="h-builds">3</b></div>
       <div class="hstat"><span>module</span><b id="h-module">—</b></div>
       <div class="hstat"><span>guests</span><b id="h-guests">0</b></div>
       <div class="hstat"><span>matches</span><b id="h-matches">0</b></div>
@@ -354,7 +354,8 @@
     <div class="tabbar">
       <div class="tabs" id="tabs" role="tablist" aria-label="guest instances"></div>
       <select class="res-select" id="vm-build" aria-label="Appliance build version for new guest" title="Select immutable appliance build from registry.json">
-        <option value="build-02" selected>Build #2 · v3.0 (2P Mines + Registry)</option>
+        <option value="build-03" selected>Build #3 · v3.1 (Checkers + AI + 2P Broker)</option>
+        <option value="build-02">Build #2 · v3.0 (aea4b4b · 2P Mines + Registry)</option>
         <option value="build-01">Build #1 · v2.0 (7ac8a67 · 1P Baseline)</option>
       </select>
       <select class="res-select" id="vm-res" aria-label="New guest framebuffer resolution" title="Framebuffer resolution for + new guest (locked per session)">
@@ -377,8 +378,9 @@
       </select>
       <button class="btn-bar" id="new-vm" type="button">+ new guest</button>
       <div class="controls-right">
+        <button class="btn-bar primary" id="chk-match-btn" type="button" title="Start a 2-Player English Draughts (Checkers) match across two v3.1 guests via the in-browser FastAPI + SQLite broker">♟️ 2P checkers match</button>
         <button class="btn-bar primary" id="mp-match-btn" type="button" title="Start a 2-Player Turn-Based Minesweeper match across two v3 guests via the in-browser FastAPI + SQLite broker">🎮 2P mines match</button>
-        <button class="btn-bar" id="ab-btn" type="button" title="Compare Build #1 (7ac8a67, 1P Mines) vs Build #2 (v3.0, 2P Mines) side-by-side">⇄ A/B builds</button>
+        <button class="btn-bar" id="ab-btn" type="button" title="Compare Build #3 (v3.1, Checkers + 2P Mines) vs Build #2 (aea4b4b, v3.0) side-by-side">⇄ A/B builds</button>
         <button class="btn-bar" id="split-btn" type="button" title="Toggle side-by-side split view of guest framebuffers">⧉ split view</button>
         <button class="btn-bar" id="step1-btn" type="button" title="Run automated Step 1 pipeline: Open Home [≡] -> Launch System -> Capture Snapshot">▶ step 1</button>
         <button class="btn-bar" id="snap-btn" type="button" title="Capture framebuffer snapshot of active guest">📷 snapshot</button>
@@ -387,7 +389,7 @@
     </div>
     <div class="panels" id="panels"></div>
     <div class="statusbar">
-      <span id="sb-left"><span class="ok">ready</span> · click 🎮 2P mines match or ⇄ A/B builds to compare side-by-side</span>
+      <span id="sb-left"><span class="ok">ready</span> · click ♟️ 2P checkers match, 🎮 2P mines match, or ⇄ A/B builds to compare side-by-side</span>
       <span>rgba8888 · <b id="sb-res">1280×720</b> · rust wasm32 · <b id="sb-copies">0</b> framebuffer copies</span>
     </div>
   </main>
@@ -396,7 +398,7 @@
     <div class="drawer-head">
       <span>⚡ in-browser FastAPI + SQLite match broker (<b id="broker-status">idle</b>)</span>
       <div>
-        <button class="btn-bar" id="broker-reset-btn" type="button">↻ new match seed</button>
+        <button class="btn-bar" id="broker-reset-btn" type="button">↻ new match</button>
         <button class="btn-bar" id="broker-hide-btn" type="button">hide</button>
       </div>
     </div>
@@ -405,7 +407,7 @@
         <h4>sqlite table · matches</h4>
         <table class="sql-table">
           <thead>
-            <tr><th>id</th><th>seed</th><th>seats</th><th>turn</th><th>score (p1:p2)</th><th>seq</th><th>status</th></tr>
+            <tr><th>id</th><th>game</th><th>seats</th><th>turn</th><th>state / score</th><th>hash / seed</th><th>seq</th><th>status</th></tr>
           </thead>
           <tbody id="broker-matches-tbody"></tbody>
         </table>
@@ -426,8 +428,8 @@
   </section>
 
   <footer class="page">
-    <span>shortcuts: home <kbd>[≡]</kbd> · calc <kbd>0-9 + - * / = Esc</kbd> · mines <kbd>F (flag)</kbd> <kbd>N (new)</kbd> <kbd>M (2P mode)</kbd> · files <kbd>Tab / I</kbd> (context) · <kbd>[ / ]</kbd> (page).</span>
-    <span>v3 features: select any historical build in the dropdown, click <kbd>⇄ A/B builds</kbd> to compare Build #1 (`7ac8a67`) vs Build #2 (`v3.0`), or click <kbd>🎮 2P mines match</kbd> for turn-based Minesweeper.</span>
+    <span>shortcuts: home <kbd>[≡]</kbd> · calc <kbd>0-9 + - * / = Esc</kbd> · checkers <kbd>N (new)</kbd> <kbd>M (mode)</kbd> <kbd>D (AI diff)</kbd> <kbd>F (flip)</kbd> · mines <kbd>F (flag)</kbd> <kbd>N (new)</kbd> <kbd>M (2P mode)</kbd> · files <kbd>Tab / I</kbd> (context) · <kbd>[ / ]</kbd> (page).</span>
+    <span>v3.1 features: select any historical build in the dropdown (`build-03`, `build-02`, `build-01`), click <kbd>♟️ 2P checkers match</kbd> for English Draughts, <kbd>🎮 2P mines match</kbd> for turn-based Minesweeper, or <kbd>⇄ A/B builds</kbd> to compare side-by-side.</span>
   </footer>
 
   <script type="module" src="./host.js"></script>

@@ -41,7 +41,7 @@ jobs:
           cp -R web/. site/
           cp assets/*.png assets/.context.xml site/assets/
           cp demo/* demo/.context.xml site/demo/
-          cp -R gh/mines-sm gh/mines-livive-net gh/gm-livive-net site/gh/
+          cp -R gh/mines-sm gh/mines-livive-net gh/gm-livive-net gh/chk-livive-net site/gh/
           cp wasm-out/media_browser.mjs wasm-out/media_browser.wasm site/build/
           cp wasm-out/media_browser.mjs wasm-out/media_browser.wasm site/v1/build/
           cp wasm-out/v2/appliance.wasm site/build/
@@ -49,6 +49,7 @@ jobs:
           printf 'wasm-fb.livive.net\n' > site/CNAME
           touch site/.nojekyll
           test -s site/build/appliance.wasm
+          test -s site/builds/appliance-v3.0-aea4b4b.wasm
           test -s site/builds/appliance-v2-7ac8a67.wasm
           test -s site/registry.json
           test -s site/v1/build/media_browser.wasm
@@ -58,6 +59,8 @@ jobs:
           test -s site/gh/mines-sm/.context.xml
           test -s site/gh/mines-livive-net/src/app.js
           test -s site/gh/gm-livive-net/minesweeper_3d.gd
+          test -s site/gh/chk-livive-net/src/rules.js
+          test -s site/gh/chk-livive-net/.context.xml
           test -s site/assets/.context.xml
           test -s site/demo/.context.xml
           find site -type f | sort
