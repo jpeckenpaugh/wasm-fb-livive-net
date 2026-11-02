@@ -196,7 +196,7 @@ pub fn derive_metrics(rows: &[u8; 7]) -> (u8, u8) {
 
 /// Real Unicode symbols that render with an Icons32 glyph when FiveSeven has no
 /// glyph of its own. Sorted by codepoint for binary search.
-static ICON_ALIASES: [(u32, u16); 32] = [
+static ICON_ALIASES: [(u32, u16); 55] = [
     (0x2139, 29),  // ℹ info
     (0x2190, 1),   // ← back
     (0x2191, 3),   // ↑ up
@@ -206,7 +206,22 @@ static ICON_ALIASES: [(u32, u16); 32] = [
     (0x23F8, 25),  // ⏸ pause
     (0x23F9, 26),  // ⏹ stop
     (0x25B6, 24),  // ▶ play
+    (0x2605, 45),  // ★ star black
+    (0x2606, 45),  // ☆ star white
     (0x2630, 6),   // ☰ menu
+    (0x2654, 37),  // ♔ white king
+    (0x2655, 36),  // ♕ white queen
+    (0x2656, 35),  // ♖ white rook
+    (0x2657, 34),  // ♗ white bishop
+    (0x2658, 33),  // ♘ white knight
+    (0x2659, 32),  // ♙ white pawn
+    (0x265A, 37),  // ♚ black king
+    (0x265B, 36),  // ♛ black queen
+    (0x265C, 35),  // ♜ black rook
+    (0x265D, 34),  // ♝ black bishop
+    (0x265E, 33),  // ♞ black knight
+    (0x265F, 32),  // ♟ black pawn
+    (0x2691, 39),  // ⚑ black flag
     (0x2699, 12),  // ⚙ settings
     (0x26A0, 30),  // ⚠ warning
     (0x270E, 14),  // ✎ edit
@@ -214,7 +229,14 @@ static ICON_ALIASES: [(u32, u16); 32] = [
     (0x2715, 4),   // ✕ close
     (0x2795, 8),   // ➕ plus
     (0x2796, 9),   // ➖ minus
+    (0x2B50, 45),  // ⭐ star
     (0x1F3AE, 21), // 🎮 games
+    (0x1F3C6, 40), // 🏆 trophy
+    (0x1F3F3, 39), // 🏳 flag
+    (0x1F44D, 41), // 👍 thumbs up
+    (0x1F44E, 42), // 👎 thumbs down
+    (0x1F451, 38), // 👑 crown
+    (0x1F464, 43), // 👤 user
     (0x1F4BE, 15), // 💾 save
     (0x1F4C1, 17), // 📁 folder
     (0x1F4C4, 18), // 📄 document
@@ -229,6 +251,7 @@ static ICON_ALIASES: [(u32, u16); 32] = [
     (0x1F5BC, 19), // 🖼 image
     (0x1F5C2, 16), // 🗂 files
     (0x1F5D1, 13), // 🗑 trash
+    (0x1F916, 44), // 🤖 robot
 ];
 
 pub fn icon_index_for_cp(cp: u32) -> Option<u16> {

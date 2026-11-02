@@ -245,7 +245,7 @@ fn draw_icons(fb: &mut Framebuffer) {
             fb,
             x0 + 320,
             y + 7,
-            "32x32 2-bit  U+E000..U+E01F",
+            "32x32 2-bit  U+E000..U+E02D",
             1,
             label_col,
         );

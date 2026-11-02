@@ -560,13 +560,28 @@ fn checkers_geom(client_w: i32, client_h: i32) -> CheckersGeom {
     }
 }
 
-fn draw_disc(fb: &mut Framebuffer, cx: i32, cy: i32, radius: i32, fill_col: u32, rim_col: u32) {
+fn draw_disc(
+    fb: &mut Framebuffer,
+    cx: i32,
+    cy: i32,
+    radius: i32,
+    fill_col: u32,
+    rim_col: u32,
+    spec_col: u32,
+    shadow_col: u32,
+) {
     let r2 = radius * radius;
     let inner_r = (radius - 2).max(1);
     let inner_r2 = inner_r * inner_r;
-    let ring_r = (radius * 68 / 100).max(2);
+    let ring_r = (radius * 64 / 100).max(2);
     let ring_outer2 = ring_r * ring_r;
     let ring_inner2 = (ring_r - 1).max(1) * (ring_r - 1).max(1);
+
+    // Specular highlight center (top-left offset)
+    let spec_ox = -radius / 3;
+    let spec_oy = -radius / 3;
+    let spec_r = (radius / 3).max(2);
+    let spec_r2 = spec_r * spec_r;
 
     for dy in -radius..=radius {
         let py = cy + dy;
@@ -574,7 +589,19 @@ fn draw_disc(fb: &mut Framebuffer, cx: i32, cy: i32, radius: i32, fill_col: u32,
             let d2 = dx * dx + dy * dy;
             if d2 <= r2 {
                 let px = cx + dx;
-                let col = if d2 > inner_r2 || (d2 >= ring_inner2 && d2 <= ring_outer2) {
+                let sdx = dx - spec_ox;
+                let sdy = dy - spec_oy;
+                let sd2 = sdx * sdx + sdy * sdy;
+
+                let col = if d2 > inner_r2 {
+                    if dy > radius / 4 {
+                        shadow_col
+                    } else {
+                        rim_col
+                    }
+                } else if sd2 <= spec_r2 {
+                    spec_col
+                } else if d2 >= ring_inner2 && d2 <= ring_outer2 {
                     rim_col
                 } else {
                     fill_col
@@ -585,15 +612,18 @@ fn draw_disc(fb: &mut Framebuffer, cx: i32, cy: i32, radius: i32, fill_col: u32,
     }
 }
 
-fn draw_target_ring(fb: &mut Framebuffer, cx: i32, cy: i32, radius: i32, color: u32) {
+fn draw_target_ring(fb: &mut Framebuffer, cx: i32, cy: i32, radius: i32, color: u32, is_jump: bool) {
     let outer2 = radius * radius;
     let inner = (radius - 3).max(1);
     let inner2 = inner * inner;
+    let dot_r = if is_jump { (radius / 2).max(2) } else { 2 };
+    let dot_r2 = dot_r * dot_r;
+
     for dy in -radius..=radius {
         let py = cy + dy;
         for dx in -radius..=radius {
             let d2 = dx * dx + dy * dy;
-            if d2 <= outer2 && d2 >= inner2 {
+            if (d2 <= outer2 && d2 >= inner2) || d2 <= dot_r2 {
                 fb.fill(cx + dx, py, 1, 1, color);
             }
         }
@@ -605,19 +635,19 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CheckersApp) {
     let g = checkers_geom(fb.w, fb.h);
     let s = &app.state;
 
-    // Outer board frame
+    // Outer board frame with elevation bevel
     fb.fill(
-        g.board_x - 4,
-        g.board_y - 4,
-        g.grid_px + 8,
-        g.grid_px + 8,
+        g.board_x - 5,
+        g.board_y - 5,
+        g.grid_px + 10,
+        g.grid_px + 10,
         t::SURFACE_RAISED,
     );
     fb.border(
-        g.board_x - 4,
-        g.board_y - 4,
-        g.grid_px + 8,
-        g.grid_px + 8,
+        g.board_x - 5,
+        g.board_y - 5,
+        g.grid_px + 10,
+        g.grid_px + 10,
         2,
         t::BORDER_STRONG,
     );
@@ -626,10 +656,17 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CheckersApp) {
     let active_sel = s.must_continue_from.or(app.selected_sq);
 
     // --- 1. Draw the 8×8 Checkerboard Grid & Pieces ---
-    let light_sq_col = rgb(0x28, 0x35, 0x44);
-    let dark_sq_col = rgb(0x11, 0x18, 0x22);
-    let last_sq_col = rgb(0x18, 0x2c, 0x38);
-    let sel_sq_col = rgb(0x16, 0x3b, 0x3d);
+    // Warm slate / cream for light squares, deep walnut / obsidian for playable dark squares
+    let light_sq_col = rgb(0x2d, 0x37, 0x48);
+    let light_hi_col = rgb(0x3a, 0x48, 0x5d);
+    let light_sh_col = rgb(0x21, 0x29, 0x36);
+
+    let dark_sq_col = rgb(0x0f, 0x17, 0x24);
+    let dark_hi_col = rgb(0x19, 0x25, 0x39);
+    let dark_sh_col = rgb(0x09, 0x0e, 0x16);
+
+    let last_sq_col = rgb(0x26, 0x23, 0x4b); // Deep indigo
+    let sel_sq_col = rgb(0x15, 0x36, 0x45);  // Deep slate cyan
 
     for v_row in 0..8i32 {
         for v_col in 0..8i32 {
@@ -639,18 +676,32 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CheckersApp) {
             let y = g.board_y + v_row * g.cell;
 
             if !is_dark_square(row, col) {
+                // Light square with subtle inset bevel
                 fb.fill(x, y, g.cell, g.cell, light_sq_col);
+                fb.fill(x, y, g.cell, 1, light_hi_col);
+                fb.fill(x, y, 1, g.cell, light_hi_col);
+                fb.fill(x, y + g.cell - 1, g.cell, 1, light_sh_col);
+                fb.fill(x + g.cell - 1, y, 1, g.cell, light_sh_col);
                 continue;
             }
 
             let sq = coord_to_index(row, col).unwrap_or(0);
             let is_selected = active_sel == Some(sq);
             let is_last = app.last_from == Some(sq) || app.last_to == Some(sq);
-            let is_dest = if let Some(sel) = active_sel {
-                legal.as_slice().iter().any(|m| m.from == sel && m.to == sq)
-            } else {
-                false
-            };
+            
+            // Check if this square is a legal destination from active_sel, and whether it's a jump
+            let mut is_dest = false;
+            let mut is_dest_jump = false;
+            if let Some(sel) = active_sel {
+                for m in legal.as_slice().iter() {
+                    if m.from == sel && m.to == sq {
+                        is_dest = true;
+                        if m.is_jump {
+                            is_dest_jump = true;
+                        }
+                    }
+                }
+            }
 
             let bg = if is_selected {
                 sel_sq_col
@@ -661,40 +712,86 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CheckersApp) {
             };
             fb.fill(x, y, g.cell, g.cell, bg);
 
+            // 1px beveled edge on dark playable squares
+            if !is_selected && !is_last {
+                fb.fill(x, y, g.cell, 1, dark_hi_col);
+                fb.fill(x, y, 1, g.cell, dark_hi_col);
+                fb.fill(x, y + g.cell - 1, g.cell, 1, dark_sh_col);
+                fb.fill(x + g.cell - 1, y, 1, g.cell, dark_sh_col);
+            }
+
             if is_selected {
-                fb.border(x, y, g.cell, g.cell, 2, t::ACCENT);
+                // Vibrant amber / cyan glow border
+                fb.border(x, y, g.cell, g.cell, 2, rgb(0x38, 0xbd, 0xf8));
             } else if is_last {
-                fb.border(x, y, g.cell, g.cell, 1, t::ACCENT_DIM);
+                // Indigo / lilac last-move border
+                fb.border(x, y, g.cell, g.cell, 2, rgb(0x63, 0x66, 0xf1));
             }
 
             // Subtle PDN square number (1..32) in top-left of dark square
             if g.cell >= 44 {
                 let mut pdn_buf = [0u8; 8];
                 let pdn_str = f::line_no(&mut pdn_buf, (sq as u32) + 1);
-                draw_str(fb, x + 3, y + 3, pdn_str, 1, t::TEXT_DIM);
+                draw_str(fb, x + 3, y + 3, pdn_str, 1, rgb(0x64, 0x74, 0x8b));
             }
 
-            // Legal destination highlight ring
+            // Legal destination highlight: Emerald for slide, Ruby/Amber for capture
             let center_x = x + g.cell / 2;
             let center_y = y + g.cell / 2;
             if is_dest {
                 let ring_r = (g.cell / 4).max(5);
-                draw_target_ring(fb, center_x, center_y, ring_r, t::ACCENT);
+                let target_col = if is_dest_jump {
+                    rgb(0xf4, 0x3f, 0x5e) // Ruby / Rose for capture jump
+                } else {
+                    rgb(0x10, 0xb9, 0x81) // Emerald for normal slide
+                };
+                draw_target_ring(fb, center_x, center_y, ring_r, target_col, is_dest_jump);
             }
 
-            // Draughts piece
+            // Draughts piece with 3D specular highlight, shaded rim, and gleaming King crown
             let piece = s.board[sq as usize];
             if piece != EMPTY {
                 let radius = (g.cell * 38 / 100).max(8);
-                let (fill_col, rim_col) = if is_red(piece) {
-                    (rgb(0xdc, 0x26, 0x26), rgb(0xfc, 0xa5, 0xa5))
+                let (fill_col, rim_col, spec_col, shadow_col) = if is_red(piece) {
+                    (
+                        rgb(0xbe, 0x12, 0x3c), // Rich crimson fill
+                        rgb(0xfb, 0x71, 0x85), // Warm coral rim
+                        rgb(0xfd, 0xba, 0x74), // Sunlit highlight dot
+                        rgb(0x88, 0x0e, 0x27), // Deep shadow edge
+                    )
                 } else {
-                    (rgb(0x1e, 0x29, 0x3b), rgb(0x94, 0xa3, 0xb8))
+                    (
+                        rgb(0x18, 0x1e, 0x24), // Obsidian dark charcoal fill
+                        rgb(0x38, 0xbd, 0xf8), // Electric cyan / ice rim
+                        rgb(0x93, 0xc5, 0xfd), // Specular blue-white dot
+                        rgb(0x0a, 0x0d, 0x10), // Pitch dark shadow edge
+                    )
                 };
-                draw_disc(fb, center_x, center_y, radius, fill_col, rim_col);
+                draw_disc(
+                    fb, center_x, center_y, radius, fill_col, rim_col, spec_col,
+                    shadow_col,
+                );
 
                 if is_king(piece) {
+                    // Double gold ring crown marker + "K" glyph
+                    let gold = rgb(0xfb, 0xbf, 0x24);
+                    let gold_hi = rgb(0xfe, 0xf0, 0x8a);
                     let k_sc = if g.cell >= 52 { 2 } else { 1 };
+
+                    // Inner crown gold ring
+                    let crown_r = (radius * 50 / 100).max(4);
+                    let c_r2 = crown_r * crown_r;
+                    let c_in2 = (crown_r - 2).max(1) * (crown_r - 2).max(1);
+                    for dy in -crown_r..=crown_r {
+                        let py = center_y + dy;
+                        for dx in -crown_r..=crown_r {
+                            let d2 = dx * dx + dy * dy;
+                            if d2 <= c_r2 && d2 >= c_in2 {
+                                fb.fill(center_x + dx, py, 1, 1, gold_hi);
+                            }
+                        }
+                    }
+
                     draw_str_centered(
                         fb,
                         x,
@@ -703,66 +800,114 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CheckersApp) {
                         g.cell,
                         "K",
                         k_sc,
-                        rgb(0xfb, 0xbf, 0x24),
+                        gold,
                     );
                 }
             }
         }
     }
 
-    // --- 2. Draw Telemetry & Controls ---
+    // --- 2. Draw Telemetry & Elevated Status HUD Panel ---
     let compact_info = g.info_w < 260 || fb.h < 500;
     let head_sc = if compact_info { 2 } else { 3 };
     let row_sc = 2;
+
+    // Outer card container for telemetry
+    let card_top = g.info_y - 4;
+    let card_h = (g.btn_new.y - 10 - card_top).max(150);
+    let card_rect = Rect::new(g.info_x - 6, card_top, g.info_w + 12, card_h);
+    ui::panel(fb, card_rect, t::SURFACE_RAISED, t::BORDER_STRONG);
 
     let title_str = match app.mode {
         CheckersMode::VsAi => "Checkers vs AI",
         CheckersMode::PassAndPlay => "Checkers 8x8",
         CheckersMode::Broker2P => "Checkers 2P Match",
     };
-    draw_str(fb, g.info_x, g.info_y, title_str, head_sc, t::TEXT);
+    draw_str(fb, g.info_x, g.info_y + 2, title_str, head_sc, t::TEXT);
 
-    let bar_col = match s.winner {
-        1 | 2 => t::SUCCESS,
-        3 => t::WARNING,
+    // Turn indicator pill / badge
+    let turn_pill_h = 24;
+    let turn_pill_y = g.info_y + line_height(head_sc) + 6;
+    let (pill_bg, pill_border, pill_text, pill_text_col) = match s.winner {
+        1 => (rgb(0x88, 0x13, 0x37), rgb(0xf4, 0x3f, 0x5e), "VICTORY: RED WINS!", rgb(0xff, 0xff, 0xff)),
+        2 => (rgb(0x0f, 0x17, 0x2a), rgb(0x38, 0xbd, 0xf8), "VICTORY: BLACK WINS!", rgb(0x38, 0xbd, 0xf8)),
+        3 => (rgb(0x45, 0x1a, 0x03), rgb(0xf5, 0x9e, 0x0b), "DRAW GAME", rgb(0xfb, 0xbf, 0x24)),
         _ => {
-            if app.mode == CheckersMode::Broker2P && app.active_turn_seat() != app.local_seat {
-                t::WARNING
+            if s.turn == PLAYER_RED {
+                (rgb(0x4c, 0x05, 0x19), rgb(0xf4, 0x3f, 0x5e), "[*] RED'S TURN", rgb(0xfd, 0xba, 0x74))
             } else {
-                t::ACCENT
+                if app.mode == CheckersMode::VsAi {
+                    (rgb(0x0b, 0x1b, 0x2b), rgb(0x38, 0xbd, 0xf8), "[AI] THINKING...", rgb(0x7d, 0xd3, 0xfc))
+                } else {
+                    (rgb(0x0b, 0x1b, 0x2b), rgb(0x38, 0xbd, 0xf8), "[*] BLACK'S TURN", rgb(0x7d, 0xd3, 0xfc))
+                }
             }
         }
     };
-    fb.fill(
+    fb.fill(g.info_x, turn_pill_y, g.info_w, turn_pill_h, pill_bg);
+    fb.border(g.info_x, turn_pill_y, g.info_w, turn_pill_h, 1, pill_border);
+    draw_str_centered(
+        fb,
         g.info_x,
-        g.info_y + line_height(head_sc) + 2,
+        turn_pill_y,
         g.info_w,
-        2,
-        bar_col,
+        turn_pill_h,
+        pill_text,
+        1,
+        pill_text_col,
     );
 
     let (red_cnt, blk_cnt) = s.piece_counts();
-    let mut y = g.info_y + line_height(head_sc) + 12;
-    let step_y = if compact_info { 20 } else { 26 };
+    let (red_kings, blk_kings) = s.king_counts();
+    let red_caps = (12 - blk_cnt as i32).max(0);
+    let blk_caps = (12 - red_cnt as i32).max(0);
+
+    // 2-Column Piece Scoreboard
+    let score_y = turn_pill_y + turn_pill_h + 8;
+    let col_w = (g.info_w - 6) / 2;
+    let col2_x = g.info_x + col_w + 6;
+
+    // Column 1: Red Header
+    fb.fill(g.info_x, score_y, col_w, 16, rgb(0x3b, 0x07, 0x12));
+    draw_str(fb, g.info_x + 4, score_y + 3, "RED", 1, rgb(0xfb, 0x71, 0x85));
+
+    // Column 2: Black Header
+    let blk_hdr_label = if app.mode == CheckersMode::VsAi { "BLACK (AI)" } else { "BLACK" };
+    fb.fill(col2_x, score_y, col_w, 16, rgb(0x0a, 0x1e, 0x2f));
+    draw_str(fb, col2_x + 4, score_y + 3, blk_hdr_label, 1, rgb(0x38, 0xbd, 0xf8));
+
+    // Row: Discs & Kings count
+    let mut num_buf = [0u8; 32];
+    let row1_y = score_y + 19;
+    
+    // Red stats: "D: {red_cnt}  K: {red_kings}"
+    let r_discs_str = f::checkers_pieces_str(&mut num_buf, red_cnt, red_kings);
+    draw_str(fb, g.info_x + 4, row1_y, r_discs_str, 1, t::TEXT);
+
+    // Black stats: "D: {blk_cnt}  K: {blk_kings}"
+    let mut num_buf2 = [0u8; 32];
+    let b_discs_str = f::checkers_pieces_str(&mut num_buf2, blk_cnt, blk_kings);
+    draw_str(fb, col2_x + 4, row1_y, b_discs_str, 1, t::TEXT);
+
+    // Row: Captures
+    let row2_y = row1_y + 13;
+    let mut cap_buf1 = [0u8; 8];
+    let r_cap_str = f::line_no(&mut cap_buf1, red_caps as u32);
+    draw_str(fb, g.info_x + 4, row2_y, "Captures:", 1, t::TEXT_DIM);
+    draw_str(fb, g.info_x + 60, row2_y, r_cap_str, 1, rgb(0xfd, 0xba, 0x74));
+
+    let mut cap_buf2 = [0u8; 8];
+    let b_cap_str = f::line_no(&mut cap_buf2, blk_caps as u32);
+    draw_str(fb, col2_x + 4, row2_y, "Captures:", 1, t::TEXT_DIM);
+    draw_str(fb, col2_x + 60, row2_y, b_cap_str, 1, rgb(0x93, 0xc5, 0xfd));
+
+    // Divider line
+    let mut y = row2_y + 18;
+    fb.fill(g.info_x, y, g.info_w, 1, t::BORDER);
+    y += 6;
+
+    let step_y = if compact_info { 18 } else { 22 };
     let row = |ry: i32| Rect::new(g.info_x, ry, g.info_w, step_y);
-
-    ui::kv_row(
-        fb,
-        row(y),
-        "State",
-        app.status_str(),
-        row_sc,
-        t::TEXT_DIM,
-        bar_col,
-    );
-    y += step_y;
-
-    if y + step_y <= g.btn_new.y {
-        let mut p_buf = [0u8; 32];
-        let p_str = f::checkers_pieces_str(&mut p_buf, red_cnt, blk_cnt);
-        ui::kv_row(fb, row(y), "Pieces", p_str, row_sc, t::TEXT_DIM, t::TEXT_BODY);
-        y += step_y;
-    }
 
     if y + step_y <= g.btn_new.y {
         ui::kv_row(
@@ -772,7 +917,7 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CheckersApp) {
             app.last_move_str(),
             row_sc,
             t::TEXT_DIM,
-            t::ACCENT,
+            rgb(0x81, 0x8c, 0xf8),
         );
         y += step_y;
     }

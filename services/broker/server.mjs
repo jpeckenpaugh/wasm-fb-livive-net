@@ -239,9 +239,9 @@ const server = http.createServer(async (req, res) => {
         p2_vm: body.p2_vm || 'Player 2',
         p1_id: body.p1_id || 1,
         p2_id: body.p2_id || 2,
-        p1_score: game === 'checkers' ? 12 : 0,
-        p2_score: game === 'checkers' ? 12 : 0,
-        state_hash: body.state_hash || (game === 'checkers' ? '0x00000000' : `seed:${seed}`),
+        p1_score: game === 'chess' ? 16 : game === 'checkers' ? 12 : 0,
+        p2_score: game === 'chess' ? 16 : game === 'checkers' ? 12 : 0,
+        state_hash: body.state_hash || (game === 'chess' || game === 'checkers' ? '0x00000000' : `seed:${seed}`),
         last_pdn: '—',
         winner_seat: 0,
         seq: 0,
@@ -274,6 +274,76 @@ const server = http.createServer(async (req, res) => {
       const body = await parseJsonBody(req);
       const game = body.game || match.game || 'mines';
       match.game = game;
+
+      if (game === 'chess') {
+        const actionCode = body.action ?? 1;
+        const actionName = actionCode === 2 ? 'NEW_GAME' : 'MOVE';
+        const seat = body.seat ?? 1;
+        const from = body.from ?? 0;
+        const to = body.to ?? 0;
+        const promo = body.promo ?? 0;
+        const uci = body.uci || body.pdn || (actionCode === 2 ? 'reset' : 'move');
+
+        match.seq += 1;
+        const seq = match.seq;
+        match.last_pdn = uci;
+        if (body.state_hash) {
+          match.state_hash = body.state_hash;
+        }
+        if (body.turn_seat !== undefined) {
+          match.turn_seat = body.turn_seat;
+        }
+        if (body.p1_score !== undefined) {
+          match.p1_score = body.p1_score;
+          match.p2_score = body.p2_score;
+        }
+        if (body.winner_seat !== undefined) {
+          match.winner_seat = body.winner_seat;
+          match.status =
+            match.winner_seat === 1
+              ? 'WHITE_WON'
+              : match.winner_seat === 2
+                ? 'BLACK_WON'
+                : match.winner_seat === 3
+                  ? 'DRAW'
+                  : 'PLAYING';
+        }
+
+        const ev = logEvent(
+          matchId,
+          seq,
+          body.vm_name || `P${seat}`,
+          seat,
+          actionName,
+          uci,
+          `POST /api/matches/${matchId}/moves · seq=${seq} seat=P${seat} ${actionName} (${uci}) hash=${match.state_hash} → 200 OK`,
+        );
+
+        const eventData = {
+          type: 'move',
+          game: 'chess',
+          matchId,
+          seq,
+          seat,
+          action: actionCode,
+          from,
+          to,
+          promo,
+          uci,
+          state_hash: match.state_hash,
+          turn_seat: match.turn_seat,
+          p1_score: match.p1_score,
+          p2_score: match.p2_score,
+          winner_seat: match.winner_seat,
+          status: match.status,
+          source_vm_id: body.source_vm_id,
+          source_client_id: body.source_client_id,
+          log: ev,
+        };
+        broadcastEvent(matchId, 'move', eventData);
+
+        return sendJson(res, 200, match);
+      }
 
       if (game === 'checkers') {
         const actionCode = body.action ?? 1;

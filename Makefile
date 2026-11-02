@@ -71,7 +71,7 @@ $(V2_WASM_OUT): $(wildcard v2/Cargo.toml v2/build.rs v2/src/*.rs v2/glyphs/*/*.t
 	fi
 	@cp assets/*.png assets/.context.xml web/assets/
 	@cp demo/* demo/.context.xml web/demo/
-	@cp -R gh/mines-sm gh/mines-livive-net gh/gm-livive-net gh/chk-livive-net web/gh/
+	@cp -R gh/mines-sm gh/mines-livive-net gh/gm-livive-net gh/chk-livive-net gh/chs-livive-net web/gh/
 	@ls -l $@ | awk '{printf "v2 wasm: %d bytes\n", $$5}'
 
 test-v2:

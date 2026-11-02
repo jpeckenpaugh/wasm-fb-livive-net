@@ -3,6 +3,8 @@
 pub mod calc;
 pub mod checkers;
 pub mod checkers_sm;
+pub mod chess;
+pub mod chess_sm;
 pub mod code;
 pub mod fb;
 pub mod files;
@@ -552,6 +554,7 @@ pub extern "C" fn app_active_page() -> i32 {
             AppSlot::Files => wm.files.active_file_idx().map(|i| i as i32).unwrap_or(-1),
             AppSlot::Mines => wm.mines.board.seed as i32,
             AppSlot::Checkers => wm.checkers.state.move_count as i32,
+            AppSlot::Chess => wm.chess.state.fullmove_number as i32,
         }
     }
 }
@@ -838,6 +841,112 @@ pub extern "C" fn app_checkers_black_count() -> i32 {
     unsafe { (*GUEST.wm.get()).checkers.state.piece_counts().1 as i32 }
 }
 
+// --- Chess AI & 2-Player Match Broker Host Mailbox ABI ---
+
+#[no_mangle]
+pub extern "C" fn app_chess_set_mp(enabled: i32, match_id: u32, seat: i32, difficulty: i32) {
+    with_state(|wm, fb, st, txt, ctx| {
+        wm.chess.configure_mp(
+            enabled != 0,
+            match_id,
+            seat.clamp(1, 2) as u8,
+            checkers_sm::Difficulty::from_i32(difficulty),
+        );
+        wm.active_app = AppSlot::Chess;
+        wm.focus = wm::Focus::Client;
+        if wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_turn() -> i32 {
+    unsafe { (*GUEST.wm.get()).chess.active_turn_seat() as i32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_status() -> i32 {
+    unsafe {
+        match (*GUEST.wm.get()).chess.state.status {
+            chess_sm::GameStatus::InPlay => 0,
+            chess_sm::GameStatus::Check => 1,
+            chess_sm::GameStatus::Checkmate => 2,
+            chess_sm::GameStatus::Stalemate => 3,
+            chess_sm::GameStatus::Draw50Move => 4,
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_white_count() -> i32 {
+    unsafe { (*GUEST.wm.get()).chess.piece_counts().0 as i32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_black_count() -> i32 {
+    unsafe { (*GUEST.wm.get()).chess.piece_counts().1 as i32 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_state_hash() -> u32 {
+    unsafe { (*GUEST.wm.get()).chess.state.state_hash() }
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_tx_pending() -> i32 {
+    unsafe { i32::from((*GUEST.wm.get()).chess.tx_pending) }
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_take_tx() -> u32 {
+    unsafe { (*GUEST.wm.get()).chess.take_tx_word() }
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_apply_rx(
+    seq: u32,
+    seat: i32,
+    action: i32,
+    from: i32,
+    to: i32,
+    promo: i32,
+) -> i32 {
+    with_state(|wm, fb, st, txt, ctx| {
+        let ok = wm.chess.apply_rx(
+            seq,
+            seat.clamp(1, 2) as u8,
+            action.clamp(0, 2) as u8,
+            from.clamp(0, 63) as u8,
+            to.clamp(0, 63) as u8,
+            promo.clamp(0, 7) as u8,
+        );
+        if ok && wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+        i32::from(ok)
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_ai_pending() -> i32 {
+    unsafe { i32::from((*GUEST.wm.get()).chess.ai_pending) }
+}
+
+#[no_mangle]
+pub extern "C" fn app_chess_step_ai() -> i32 {
+    with_state(|wm, fb, st, txt, ctx| {
+        if wm.chess.step_ai() {
+            if wm.ready {
+                wm.render(fb, st, txt, ctx);
+            }
+            1
+        } else {
+            0
+        }
+    })
+}
+
 #[no_mangle]
 pub extern "C" fn app_destroy() {
     unsafe {
@@ -958,9 +1067,9 @@ mod tests {
         assert_ne!(snap_hash, 0);
         assert_eq!(app_snapshot_count(), 1);
 
-        // Open Home drawer and click item 5 ("Test Pattern")
+        // Open Home drawer and click item 6 ("Test Pattern")
         assert_eq!(app_click(16, 16), CLICK_CHANGED);
-        assert_eq!(app_click(icon_x, dock_icon_y(5) + 14), CLICK_CHANGED);
+        assert_eq!(app_click(icon_x, dock_icon_y(6) + 14), CLICK_CHANGED);
 
         // 7. Verify diagnostic test pattern channel & orientation contract
         let ptr = app_framebuffer();
@@ -1340,5 +1449,78 @@ mod tests {
         assert_eq!(app_checkers_seq(), 1);
         assert_eq!(app_checkers_turn(), 2);
         assert_eq!(app_checkers_state_hash(), p1_hash_after);
+    }
+
+    #[test]
+    fn chess_multiplayer_and_ai_abi_roundtrip() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(app_init(1280, 720), 1);
+
+        // 1. Configure Chess in 1P vs AI mode (enabled = 0, difficulty = 0 Easy)
+        app_chess_set_mp(0, 1, 1, 0);
+        assert_eq!(app_selected(), AppSlot::Chess as i32);
+        assert_eq!(app_chess_turn(), 1);
+        assert_eq!(app_chess_status(), 0); // InPlay
+        assert_eq!(app_chess_white_count(), 16);
+        assert_eq!(app_chess_black_count(), 16);
+        assert_eq!(app_chess_ai_pending(), 0);
+
+        // Board layout at 1280x688:
+        // max_board_h = 644, max_board_w = 724 -> cell = 74, grid_px = 592
+        // info_w = 360, total_w = 1000 -> board_x = 140, board_y = 48
+        // Square e2: file 4, rank 1 -> col 4, row 6 (since row 0 is rank 7 at top, row 7 is rank 0 at bottom)
+        // v_col = 4, v_row = 7 - 1 = 6
+        // Square e4: file 4, rank 3 -> col 4, row 4
+        // v_col = 4, v_row = 7 - 3 = 4
+        let sq_e2_x = 140 + 4 * 74 + 37;
+        let sq_e2_y = TITLE_H + 48 + 6 * 74 + 37;
+        let sq_e4_x = 140 + 4 * 74 + 37;
+        let sq_e4_y = TITLE_H + 48 + 4 * 74 + 37;
+
+        assert_eq!(app_click(sq_e2_x, sq_e2_y), CLICK_CHANGED);
+        assert_eq!(app_click(sq_e4_x, sq_e4_y), CLICK_CHANGED);
+        assert_eq!(app_chess_turn(), 2);
+        assert_eq!(app_chess_ai_pending(), 1);
+
+        // Step AI
+        assert_eq!(app_chess_step_ai(), 1);
+        assert_eq!(app_chess_ai_pending(), 0);
+        assert_eq!(app_chess_turn(), 1);
+
+        // 2. Configure Chess in 2P Broker mode on Seat 1 (White)
+        app_chess_set_mp(1, 88, 1, 0);
+        assert_eq!(app_chess_turn(), 1);
+        let initial_hash = app_chess_state_hash();
+
+        // White plays e2 -> e4
+        assert_eq!(app_click(sq_e2_x, sq_e2_y), CLICK_CHANGED);
+        assert_eq!(app_click(sq_e4_x, sq_e4_y), CLICK_CHANGED);
+        assert_eq!(app_chess_tx_pending(), 1);
+        let word = app_chess_take_tx();
+        assert_eq!(app_chess_tx_pending(), 0);
+        assert_eq!(app_chess_turn(), 2);
+
+        let action = (word & 0xFF) as i32;
+        let seat = ((word >> 8) & 0xFF) as i32;
+        let from = ((word >> 16) & 0xFF) as i32;
+        let to = ((word >> 24) & 0xFF) as i32;
+        let promo = ((word >> 4) & 0x07) as i32;
+
+        assert_eq!(action, 1);
+        assert_eq!(seat, 1);
+        assert_eq!(from, 12); // e2
+        assert_eq!(to, 28);   // e4
+        let p1_hash_after = app_chess_state_hash();
+        assert_ne!(p1_hash_after, initial_hash);
+
+        // Out-of-turn click on Seat 1 is rejected
+        assert_eq!(app_click(sq_e4_x, sq_e4_y), CLICK_NOOP);
+
+        // Simulate Seat 2 receiving P1's move via app_chess_apply_rx
+        app_chess_set_mp(1, 88, 2, 0);
+        assert_eq!(app_chess_state_hash(), initial_hash);
+        assert_eq!(app_chess_apply_rx(1, seat, action, from, to, promo), 1);
+        assert_eq!(app_chess_turn(), 2);
+        assert_eq!(app_chess_state_hash(), p1_hash_after);
     }
 }

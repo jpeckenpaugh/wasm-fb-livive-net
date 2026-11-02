@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<context-index scope="gh://jpeckenpaugh/chs-livive-net" ref="main" generator="wasm-fb-agent">
+  <file name="README.md" runtime="Markdown" role="Project overview &amp; architecture guide">
+    <graph>
+      <imports>See repository README</imports>
+      <exports>Match modes, standalone client overview, developer CLI workflow</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Read-only vendored source</invariants>
+    </graph>
+    <summary>Overview of Classic Chess &amp; WebGPU AI Arena (chs.livive.net) featuring Alpha-Beta Minimax, standalone HTML5 board, and Wasm appliance integration.</summary>
+    <architecture>Documents the standalone HTML5 web client sharing rule specifications with the #![no_std] Rust engine in v2/src/chess_sm.rs.</architecture>
+  </file>
+  <file name="index.html" runtime="HTML5" role="2D Web client &amp; Arena UI shell">
+    <graph>
+      <imports>Zero external dependencies</imports>
+      <exports>Standalone 8x8 chessboard, Minimax AI, move history, PGN/UCI export</exports>
+      <dependents>wasm-fb Files gh:// mount</dependents>
+      <invariants>Self-contained HTML5 + CSS + JavaScript single-file application</invariants>
+    </graph>
+    <summary>Standalone single-page web client providing full Chess rules, interactive drag/click moves, AI opponent, and PGN export.</summary>
+    <architecture>Hosts a lightweight browser Chess engine with castling, en passant, promotion, and alpha-beta minimax search.</architecture>
+  </file>
+</context-index>

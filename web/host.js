@@ -1,17 +1,40 @@
 /* v3 Host Controller: Immutable Build Registry + Side-by-Side Split View +
  * Zero-Setup In-Browser FastAPI / SQLite Turn-Based Match Broker.
- *
- * Responsibilities:
- * - Load `registry.json` and cache compiled `WebAssembly.Module` binaries per build ID
- *   (`build-02` v3.0 2P Mines + Registry, `build-01` v2.0 7ac8a67 1P Baseline).
- * - Instantiate isolated guests (`vm-01`, `vm-02`, ...), each bound to its chosen
- *   immutable build with clickable GitHub commit provenance links.
- * - Support side-by-side Split View (`⧉ split view`) and one-click `⇄ A/B builds`
- *   comparison between Build #1 (`7ac8a67`) and Build #2 (`v3.0`).
- * - Provide an in-browser FastAPI + SQLite Emulator (`window.__broker`) with
- *   `matches` and `match_events` tables to broker 2-Player Turn-Based Minesweeper
- *   games (`🎮 2P mines match`) across two guests in real time.
  */
+
+import { FastApiSqliteBroker, updateRoomLink, initNetworkCopyHandler } from './broker.js';
+import {
+  configureFullscreenDeps,
+  enterFullscreen,
+  exitFullscreen,
+  toggleFullscreen,
+  updateFullscreenHud,
+  showFullscreenHud,
+  initFullscreenListeners,
+  isFullscreen,
+  getFullscreenGuest,
+} from './fullscreen.js';
+import {
+  configureCheckersDeps,
+  serviceCheckers,
+  serviceCheckersAi,
+  serviceCheckersMultiplayer,
+  launchCheckersInGuest,
+  startCheckersMatch,
+} from './adapters/checkers.js';
+import {
+  configureChessDeps,
+  serviceChessMultiplayer,
+  serviceChessAi,
+  launchChessInGuest,
+  startChessMatch,
+} from './adapters/chess.js';
+import {
+  configureMinesDeps,
+  serviceMinesMultiplayer,
+  launchMinesInGuest,
+  startTwoPlayerMatch,
+} from './adapters/mines.js';
 
 const DEFAULT_W = 1280;
 const DEFAULT_H = 720;
@@ -67,6 +90,8 @@ const DEFAULT_MOUNTS = [
   { name: 'gh/jpeckenpaugh/chk-livive-net/src/renderer.js', url: './gh/chk-livive-net/src/renderer.js', bytes: 25476, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
   { name: 'gh/jpeckenpaugh/chk-livive-net/src/godot_adapter.js', url: './gh/chk-livive-net/src/godot_adapter.js', bytes: 20395, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
   { name: 'gh/jpeckenpaugh/chk-livive-net/docs/godot_plan.md', url: './gh/chk-livive-net/docs/godot_plan.md', bytes: 8762, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/chs-livive-net/README.md', url: './gh/chs-livive-net/README.md', bytes: 1316, kind: 'code', contextUrl: './gh/chs-livive-net/.context.xml' },
+  { name: 'gh/jpeckenpaugh/chs-livive-net/index.html', url: './gh/chs-livive-net/index.html', bytes: 26202, kind: 'code', contextUrl: './gh/chs-livive-net/.context.xml' },
 ];
 
 /* Fallback build registry if `registry.json` hasn't loaded yet */
@@ -76,17 +101,19 @@ const DEFAULT_REGISTRY = {
   builds: [
     {
       id: 'build-03',
-      label: 'Build #3 · v3.1 (Checkers + AI + 2P Broker)',
-      shortLabel: 'build-03 · v3.1',
-      version: 'v3.1',
+      label: 'Build #3 · v3.2 (Chess + Checkers + 2P Broker)',
+      shortLabel: 'build-03 · v3.2',
+      version: 'v3.2',
       wasmUrl: './build/appliance.wasm',
       gitCommit: 'HEAD',
       githubUrl: 'https://github.com/jpeckenpaugh/wasm-fb-livive-net/commits/main',
       minesBuild: 'Mines Build #2 (2P Turn-Based + Scoring)',
       checkersBuild: 'Checkers Build #1 (English Draughts + Minimax AI + 2P Broker)',
+      chessBuild: 'Chess Build #1 (Classic Chess + Minimax AI + 2P Broker)',
       supportsMultiplayer: true,
       supportsCheckers: true,
-      notes: 'Adds English Draughts (Checkers) app + Minimax AI + 2P Checkers broker + chk-livive-net mount',
+      supportsChess: true,
+      notes: 'Adds Classic Chess + English Draughts (Checkers) + Minimax AI + 2P Broker + chs-livive-net & chk-livive-net mounts',
     },
     {
       id: 'build-02',
@@ -144,422 +171,50 @@ function getBuildInfo(buildId) {
   );
 }
 
-/* --------------------------------------------------------------------------
- * Theme 2: Zero-Setup FastAPI + SQLite Match Broker & SSE Network Relay
- * -------------------------------------------------------------------------- */
-class FastApiSqliteBroker {
-  constructor() {
-    this.tables = {
-      matches: [],
-      match_events: [],
-    };
-    this.nextMatchId = 1;
-    this.nextEventId = 1;
-    this.activeMatchId = null;
-    this.mode = 'local'; // 'local' or 'network'
-    this.relayUrl = window.location.origin;
-    this.clientId = 'client-' + Math.random().toString(36).slice(2, 9);
-    this.sseSource = null;
-  }
-
-  nowIso() {
-    return new Date().toISOString().slice(11, 19);
-  }
-
-  setNetworkMode(enabled) {
-    this.mode = enabled ? 'network' : 'local';
-    const badge = document.getElementById('net-relay-status');
-    if (badge) {
-      badge.textContent = enabled ? 'Mode: Network Relay (Live SSE)' : 'Mode: Local Memory';
-      badge.style.color = enabled ? '#34d399' : '#38bdf8';
-      badge.style.borderColor = enabled ? '#34d399' : '#38bdf8';
-    }
-  }
-
-  logEvent(matchId, seq, vmName, seat, action, cell, httpLine) {
-    const row = {
-      id: this.nextEventId++,
-      match_id: matchId,
-      seq,
-      vm_name: vmName,
-      seat,
-      action,
-      cell,
-      http: httpLine,
-      created_at: this.nowIso(),
-    };
-    this.tables.match_events.unshift(row);
-    if (this.tables.match_events.length > 64) {
-      this.tables.match_events.length = 64;
-    }
-    this.renderDrawer();
-    return row;
-  }
-
-  connectSse(matchId) {
-    if (this.sseSource) {
-      this.sseSource.close();
-      this.sseSource = null;
-    }
-    this.activeMatchId = matchId;
-    this.setNetworkMode(true);
-
-    try {
-      const url = `${this.relayUrl}/api/matches/${matchId}/events`;
-      const sse = new EventSource(url);
-      this.sseSource = sse;
-
-      sse.addEventListener('init', (e) => {
-        try {
-          const matchData = JSON.parse(e.data);
-          const idx = this.tables.matches.findIndex((m) => m.id === matchData.id);
-          if (idx >= 0) {
-            this.tables.matches[idx] = matchData;
-          } else {
-            this.tables.matches.unshift(matchData);
-          }
-          this.renderDrawer();
-          updateHostStats();
-        } catch (err) {
-          console.error('[SSE init error]', err);
-        }
-      });
-
-      sse.addEventListener('move', (e) => {
-        try {
-          const ev = JSON.parse(e.data);
-          if (ev.source_client_id === this.clientId) {
-            return; // ignore echo of our own move
-          }
-          this.applyIncomingMove(ev);
-        } catch (err) {
-          console.error('[SSE move error]', err);
-        }
-      });
-
-      sse.onerror = (err) => {
-        console.warn('[SSE connection error or closed]', err);
-      };
-    } catch (err) {
-      console.warn('Failed to initialize EventSource:', err);
-    }
-  }
-
-  applyIncomingMove(ev) {
-    const matchId = ev.matchId;
-    let match = this.tables.matches.find((m) => m.id === matchId);
-    if (!match) {
-      match = {
-        id: matchId,
-        game: ev.game,
-        status: ev.status || 'PLAYING',
-        seq: ev.seq,
-        turn_seat: ev.turn_seat,
-        p1_score: ev.p1_score,
-        p2_score: ev.p2_score,
-        state_hash: ev.state_hash,
-      };
-      this.tables.matches.unshift(match);
-    } else {
-      match.seq = ev.seq;
-      match.turn_seat = ev.turn_seat;
-      match.p1_score = ev.p1_score;
-      match.p2_score = ev.p2_score;
-      match.status = ev.status;
-      if (ev.state_hash) match.state_hash = ev.state_hash;
-      if (ev.pdn) match.last_pdn = ev.pdn;
-    }
-
-    if (ev.log) {
-      this.tables.match_events.unshift(ev.log);
-      if (this.tables.match_events.length > 64) this.tables.match_events.length = 64;
-    }
-
-    if (ev.game === 'checkers') {
-      const peers = guests.filter(
-        (g) => g.mpMatchId === matchId && g.exports && g.exports.app_checkers_apply_rx,
-      );
-      for (const peer of peers) {
-        peer.exports.app_checkers_apply_rx(ev.seq, ev.seat, ev.action, ev.lo, ev.hi);
-        peer.render();
-        updateGuestBanner(peer);
-      }
-    } else {
-      const peers = guests.filter(
-        (g) => g.mpMatchId === matchId && g.exports && g.exports.app_mines_apply_rx,
-      );
-      for (const peer of peers) {
-        peer.exports.app_mines_apply_rx(ev.seq, ev.seat, ev.action, ev.cell, ev.seed, ev.max_strikes);
-        peer.render();
-        updateGuestBanner(peer);
-      }
-    }
-
-    this.renderDrawer();
-    updateHostStats();
-  }
-
-  /* Dual-mode fetch: POST/GET to network relay server or fallback to local in-memory */
-  async fetch(method, path, body = {}) {
-    body.source_client_id = this.clientId;
-
-    if (this.mode === 'network') {
-      try {
-        const res = await window.fetch(`${this.relayUrl}${path}`, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: method === 'GET' ? undefined : JSON.stringify(body),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (path === '/api/matches' && method === 'POST') {
-            const idx = this.tables.matches.findIndex((m) => m.id === json.id);
-            if (idx >= 0) this.tables.matches[idx] = json;
-            else this.tables.matches.unshift(json);
-            this.activeMatchId = json.id;
-            this.renderDrawer();
-            updateHostStats();
-          } else if (path.includes('/moves') && method === 'POST') {
-            const idx = this.tables.matches.findIndex((m) => m.id === json.id);
-            if (idx >= 0) this.tables.matches[idx] = json;
-            this.renderDrawer();
-          }
-          return { status: res.status, json };
-        }
-      } catch (err) {
-        console.warn('[Broker Network Relay error, falling back to local]', err);
-      }
-    }
-
-    // Local in-memory implementation
-    if (method === 'POST' && path === '/api/matches') {
-      const id = this.nextMatchId++;
-      const game = body.game || 'mines';
-      const seed = (body.seed ?? 42) >>> 0;
-      const max_strikes = body.max_strikes || 1;
-      const match = {
-        id,
-        game,
-        seed,
-        max_strikes,
-        status: 'PLAYING',
-        turn_seat: 1,
-        p1_vm: body.p1_vm || 'vm-01',
-        p2_vm: body.p2_vm || 'vm-02',
-        p1_id: body.p1_id || 1,
-        p2_id: body.p2_id || 2,
-        p1_score: game === 'checkers' ? 12 : 0,
-        p2_score: game === 'checkers' ? 12 : 0,
-        state_hash: body.state_hash || (game === 'checkers' ? '0x00000000' : `seed:${seed}`),
-        last_pdn: '—',
-        winner_seat: 0,
-        seq: 0,
-        created_at: this.nowIso(),
-      };
-      this.tables.matches.unshift(match);
-      this.activeMatchId = id;
-      this.logEvent(
-        id,
-        0,
-        `${match.p1_vm},${match.p2_vm}`,
-        0,
-        'CREATE',
-        game,
-        `POST /api/matches → 201 Created (match #${id}, game=${game}${game === 'mines' ? `, seed=${seed}` : ''})`,
-      );
-      this.renderDrawer();
-      updateHostStats();
-      return { status: 201, json: match };
-    }
-
-    const moveMatch = path.match(/^\/api\/matches\/(\d+)\/moves$/);
-    if (method === 'POST' && moveMatch) {
-      const matchId = parseInt(moveMatch[1], 10);
-      const match = this.tables.matches.find((m) => m.id === matchId);
-      if (!match) return { status: 404, json: { error: 'match not found' } };
-
-      const game = body.game || match.game || 'mines';
-      match.game = game;
-
-      if (game === 'checkers') {
-        const actionCode = body.action ?? 1;
-        const actionName = actionCode === 2 ? 'NEW_GAME' : 'MOVE';
-        const seat = body.seat ?? 1;
-        const lo = (body.lo ?? 0) >>> 0;
-        const hi = (body.hi ?? 0) >>> 0;
-        const pdn = body.pdn || (actionCode === 2 ? 'reset' : 'move');
-
-        match.seq += 1;
-        const seq = match.seq;
-        match.last_pdn = pdn;
-
-        const peers = guests.filter(
-          (g) => g.mpMatchId === matchId && g.exports && g.exports.app_checkers_apply_rx,
-        );
-        for (const peer of peers) {
-          if (peer.id !== body.source_vm_id) {
-            peer.exports.app_checkers_apply_rx(seq, seat, actionCode, lo, hi);
-            peer.render();
-          }
-        }
-
-        const refGuest = peers[0];
-        if (refGuest && refGuest.exports) {
-          if (refGuest.exports.app_checkers_turn) {
-            match.turn_seat = refGuest.exports.app_checkers_turn();
-          }
-          if (refGuest.exports.app_checkers_red_count) {
-            match.p1_score = refGuest.exports.app_checkers_red_count();
-            match.p2_score = refGuest.exports.app_checkers_black_count();
-          }
-          if (refGuest.exports.app_checkers_state_hash) {
-            match.state_hash = fmtHex32(refGuest.exports.app_checkers_state_hash() >>> 0);
-          }
-          if (refGuest.exports.app_checkers_winner) {
-            match.winner_seat = refGuest.exports.app_checkers_winner();
-            match.status =
-              match.winner_seat === 1
-                ? 'RED_WON'
-                : match.winner_seat === 2
-                  ? 'BLACK_WON'
-                  : match.winner_seat === 3
-                    ? 'DRAW'
-                    : 'PLAYING';
-          }
-        }
-
-        this.logEvent(
-          matchId,
-          seq,
-          body.vm_name || `P${seat}`,
-          seat,
-          actionName,
-          pdn,
-          `POST /api/matches/${matchId}/moves · seq=${seq} seat=P${seat} ${actionName} (${pdn}) hash=${match.state_hash} → 200 OK`,
-        );
-        for (const peer of peers) {
-          updateGuestBanner(peer);
-        }
-        return { status: 200, json: match };
-      }
-
-      const actionCode = body.action ?? 0;
-      const actionName =
-        actionCode === 2 ? 'NEW_SEED' : actionCode === 1 ? 'FLAG' : 'REVEAL';
-      const cell = body.cell ?? 0;
-      const seat = body.seat ?? 1;
-      const seed = (body.seed ?? match.seed) >>> 0;
-      const maxStrikes = body.max_strikes ?? match.max_strikes;
-
-      match.seq += 1;
-      const seq = match.seq;
-      match.seed = seed;
-      match.max_strikes = maxStrikes;
-      match.state_hash = `seed:${seed}`;
-
-      // Deliver move to peer guest(s) in this match
-      const peers = guests.filter(
-        (g) => g.mpMatchId === matchId && g.exports && g.exports.app_mines_apply_rx,
-      );
-      for (const peer of peers) {
-        if (peer.id !== body.source_vm_id) {
-          peer.exports.app_mines_apply_rx(seq, seat, actionCode, cell, seed, maxStrikes);
-          peer.render();
-        }
-      }
-
-      // Sync authoritative scores/turn from the active v3 guest
-      const refGuest = peers[0];
-      if (refGuest && refGuest.exports) {
-        if (refGuest.exports.app_mines_turn) {
-          match.turn_seat = refGuest.exports.app_mines_turn();
-        }
-        if (refGuest.exports.app_mines_p1_score) {
-          match.p1_score = refGuest.exports.app_mines_p1_score();
-          match.p2_score = refGuest.exports.app_mines_p2_score();
-        }
-        if (refGuest.exports.app_mines_winner) {
-          match.winner_seat = refGuest.exports.app_mines_winner();
-          match.status =
-            match.winner_seat === 1
-              ? 'P1_WON'
-              : match.winner_seat === 2
-                ? 'P2_WON'
-                : match.winner_seat === 3
-                  ? 'DRAW'
-                  : 'PLAYING';
-        }
-      }
-
-      this.logEvent(
-        matchId,
-        seq,
-        body.vm_name || `P${seat}`,
-        seat,
-        actionName,
-        cell,
-        `POST /api/matches/${matchId}/moves · seq=${seq} seat=P${seat} ${actionName} cell=${cell} → 200 OK`,
-      );
-      for (const peer of peers) {
-        updateGuestBanner(peer);
-      }
-      return { status: 200, json: match };
-    }
-
-    if (method === 'GET' && path === '/api/matches') {
-      return { status: 200, json: this.tables.matches };
-    }
-
-    return { status: 404, json: { error: 'route not found' } };
-  }
-
-  renderDrawer() {
-    const tbody = document.getElementById('broker-matches-tbody');
-    const logEl = document.getElementById('broker-events-log');
-    const countEl = document.getElementById('broker-events-count');
-    const statusEl = document.getElementById('broker-status');
-    if (!tbody || !logEl) return;
-
-    tbody.replaceChildren();
-    for (const m of this.tables.matches) {
-      const tr = document.createElement('tr');
-      const game = m.game || 'mines';
-      const turnLabel = m.status === 'PLAYING' ? `P${m.turn_seat}` : '—';
-      const scoreLabel =
-        game === 'checkers'
-          ? `${m.p1_score}R : ${m.p2_score}B`
-          : `${m.p1_score} : ${m.p2_score}`;
-      const hashOrSeed = game === 'checkers' ? (m.state_hash || '—') : `seed ${m.seed}`;
-      tr.innerHTML = `
-        <td><b>#${m.id}</b></td>
-        <td>${game}</td>
-        <td>${m.p1_vm} vs ${m.p2_vm}</td>
-        <td><b>${turnLabel}</b></td>
-        <td>${scoreLabel}</td>
-        <td>${hashOrSeed}</td>
-        <td>${m.seq}</td>
-        <td>${m.status}</td>`;
-      tbody.append(tr);
-    }
-
-    logEl.replaceChildren();
-    for (const ev of this.tables.match_events.slice(0, 20)) {
-      const li = document.createElement('li');
-      li.innerHTML = `<span>[${ev.created_at}]</span> <span class="method">SQL INSERT</span> <b>${ev.http}</b>`;
-      logEl.append(li);
-    }
-    if (countEl) countEl.textContent = String(this.tables.match_events.length);
-    if (statusEl) {
-      const active = this.tables.matches[0];
-      statusEl.textContent = active
-        ? `match #${active.id} · ${active.game || 'mines'} · ${active.status}`
-        : 'idle';
-    }
-  }
-}
-
-const broker = new FastApiSqliteBroker();
+const broker = new FastApiSqliteBroker({
+  getGuests: () => guests,
+  updateHostStats: () => updateHostStats(),
+  updateGuestBanner: (g) => updateGuestBanner(g),
+  fmtHex32: (n) => fmtHex32(n),
+});
 window.__broker = broker;
+
+configureFullscreenDeps({
+  getActiveGuest: () => guests.find((candidate) => candidate.id === activeId) || guests[0],
+  setActiveId: (id) => { activeId = id; },
+  setStatus: (msg, ok) => setStatus(msg, ok),
+  selectionLabel: (guest) => selectionLabel(guest),
+});
+
+configureCheckersDeps({
+  getBroker: () => broker,
+  getGuests: () => guests,
+  createGuest: (opts) => createGuest(opts),
+  setSplitView: (on) => setSplitView(on),
+  activate: (id) => activate(id),
+  setStatus: (msg, ok) => setStatus(msg, ok),
+  fmtHex32: (n) => fmtHex32(n),
+});
+
+configureChessDeps({
+  getBroker: () => broker,
+  getGuests: () => guests,
+  createGuest: (opts) => createGuest(opts),
+  setSplitView: (on) => setSplitView(on),
+  activate: (id) => activate(id),
+  setStatus: (msg, ok) => setStatus(msg, ok),
+  fmtHex32: (n) => fmtHex32(n),
+});
+
+configureMinesDeps({
+  getBroker: () => broker,
+  getGuests: () => guests,
+  createGuest: (opts) => createGuest(opts),
+  setSplitView: (on) => setSplitView(on),
+  activate: (id) => activate(id),
+  setStatus: (msg, ok) => setStatus(msg, ok),
+  getDefaultBuild: () => buildRegistry.defaultBuild || 'build-03',
+});
 
 const GH_REPOS = new Set(
   DEFAULT_MOUNTS
@@ -981,92 +636,6 @@ function serviceWebControl(guest) {
   }
 }
 
-/* Service outbound 2P Minesweeper move mailbox (`app_mines_tx_pending`) */
-function serviceMinesMultiplayer(guest) {
-  if (!guest?.exports?.app_mines_tx_pending || !guest.exports.app_mines_take_tx) return;
-  if (guest.exports.app_mines_tx_pending() === 0) return;
-
-  const packed = guest.exports.app_mines_take_tx() >>> 0;
-  const action = packed & 0xff;
-  const cell = (packed >>> 8) & 0xff;
-  const seat = ((packed >>> 16) & 0xff) || guest.mpSeat || 1;
-  const maxStrikes = ((packed >>> 24) & 0xff) || 1;
-  const seed = guest.exports.app_mines_seed ? guest.exports.app_mines_seed() >>> 0 : 42;
-  const matchId = guest.mpMatchId || broker.activeMatchId || 1;
-
-  broker.fetch('POST', `/api/matches/${matchId}/moves`, {
-    game: 'mines',
-    source_vm_id: guest.id,
-    vm_name: guest.name,
-    seat,
-    action,
-    cell,
-    seed,
-    max_strikes: maxStrikes,
-  });
-}
-
-function decodeCheckersPdn(lo, hi, action) {
-  if (action === 2) return 'reset';
-  const hopCount = (lo >>> 8) & 0xf;
-  const isJump = ((lo >>> 12) & 1) !== 0;
-  if (hopCount < 2) return 'move';
-  const sep = isJump ? 'x' : '-';
-  const hops = [];
-  for (let i = 0; i < Math.min(hopCount, 7); i++) {
-    const idx =
-      i < 3
-        ? (lo >>> (16 + i * 5)) & 0x1f
-        : (hi >>> ((i - 3) * 6)) & 0x1f;
-    hops.push(idx + 1);
-  }
-  return hops.join(sep);
-}
-
-/* Service Checkers AI pacing (`app_checkers_ai_pending`) and 2P move mailbox (`app_checkers_tx_pending`) */
-function serviceCheckers(guest) {
-  if (!guest?.exports) return;
-
-  if (guest.exports.app_checkers_ai_pending && guest.exports.app_checkers_ai_pending() !== 0) {
-    if (!guest.chkAiTimer) {
-      guest.chkAiTimer = setTimeout(() => {
-        guest.chkAiTimer = null;
-        if (guest.disposed || !guest.exports?.app_checkers_step_ai) return;
-        const t0 = performance.now();
-        const rc = guest.exports.app_checkers_step_ai();
-        const t1 = performance.now();
-        if (rc !== 0 && guest.blitToCanvas) {
-          guest.blitToCanvas(t0, t1);
-          setStatus(
-            `${guest.name} (${guest.buildInfo.version}) · Checkers AI moved · ${fmtHex32(guest.fbHash)}`,
-            true,
-          );
-        }
-      }, 260);
-    }
-  }
-
-  if (!guest.exports.app_checkers_tx_pending || guest.exports.app_checkers_tx_pending() === 0) return;
-
-  const lo = guest.exports.app_checkers_take_tx_lo ? guest.exports.app_checkers_take_tx_lo() >>> 0 : 0;
-  const hi = guest.exports.app_checkers_take_tx_hi ? guest.exports.app_checkers_take_tx_hi() >>> 0 : 0;
-  const action = lo & 0xf;
-  const seat = ((lo >>> 4) & 0xf) || guest.mpSeat || 1;
-  const pdn = decodeCheckersPdn(lo, hi, action);
-  const matchId = guest.mpMatchId || broker.activeMatchId || 1;
-
-  broker.fetch('POST', `/api/matches/${matchId}/moves`, {
-    game: 'checkers',
-    source_vm_id: guest.id,
-    vm_name: guest.name,
-    seat,
-    action,
-    lo,
-    hi,
-    pdn,
-  });
-}
-
 /* Flat key namespace mirrored by `v2/src/input.rs::Key`. */
 const KEY_CODES = {
   ArrowLeft: 1,
@@ -1113,6 +682,7 @@ const panelsEl = document.getElementById('panels');
 const buildSelect = document.getElementById('vm-build');
 const resSelect = document.getElementById('vm-res');
 const newVmButton = document.getElementById('new-vm');
+const chsMatchBtn = document.getElementById('chs-match-btn');
 const chkMatchBtn = document.getElementById('chk-match-btn');
 const mpMatchBtn = document.getElementById('mp-match-btn');
 const abBtn = document.getElementById('ab-btn');
@@ -1138,26 +708,24 @@ const snapDrawer = document.getElementById('snapshots-drawer');
 const snapList = document.getElementById('snap-list');
 const snapCountEl = document.getElementById('snap-count');
 const clearSnapsBtn = document.getElementById('clear-snaps');
-const fullscreenBtn = document.getElementById('fullscreen-btn');
-const fullscreenOverlay = document.getElementById('fullscreen-overlay');
-const fullscreenContainer = document.getElementById('fullscreen-canvas-container');
-const fullscreenHud = document.getElementById('fullscreen-hud');
-const fsHudTitle = document.getElementById('fs-hud-title');
-const fsHudPill = document.getElementById('fs-hud-pill');
-const fsHudRes = document.getElementById('fs-hud-res');
-const fsExitBtn = document.getElementById('fs-exit-btn');
 
 const guests = [];
 const snapshots = [];
 let activeId = null;
 let splitViewEnabled = false;
-let fullscreenGuest = null;
-let hudFadeTimer = null;
 let nextId = 1;
 let totalBlits = 0;
 let moduleBytes = 0;
 const bootAt = performance.now();
 let clockTimer = null;
+
+// Configure Fullscreen deps
+configureFullscreenDeps({
+  getActiveGuest: () => guests.find((candidate) => candidate.id === activeId) || guests[0],
+  setActiveId: (id) => { activeId = id; },
+  setStatus: (msg, ok) => setStatus(msg, ok),
+  selectionLabel: (guest) => selectionLabel(guest),
+});
 
 function populateBuildSelect() {
   if (!buildSelect) return;
@@ -1316,6 +884,7 @@ const selectionLabel = (guest) => {
   if (sel === 3) return 'Files';
   if (sel === 4) return 'Mines';
   if (sel === 5) return 'Checkers';
+  if (sel === 6) return 'Chess';
   return 'Desktop';
 };
 
@@ -1658,7 +1227,12 @@ function updateGuestBanner(guest) {
   const pill = guest?.panel?.querySelector('[data-stat="seat-pill"]');
   let infoText = '';
   if (guest.mpSeat && guest.mpMatchId) {
-    if (guest.mpGame === 'checkers' && guest.exports?.app_checkers_turn) {
+    if (guest.mpGame === 'chess' && guest.exports?.app_chess_turn) {
+      const turn = guest.exports.app_chess_turn();
+      const white = guest.exports.app_chess_white_count ? guest.exports.app_chess_white_count() : 16;
+      const blk = guest.exports.app_chess_black_count ? guest.exports.app_chess_black_count() : 16;
+      infoText = `Match #${guest.mpMatchId} · Chess Seat P${guest.mpSeat} · Turn P${turn} (${white}W:${blk}B)`;
+    } else if (guest.mpGame === 'checkers' && guest.exports?.app_checkers_turn) {
       const turn = guest.exports.app_checkers_turn();
       const red = guest.exports.app_checkers_red_count ? guest.exports.app_checkers_red_count() : 12;
       const blk = guest.exports.app_checkers_black_count ? guest.exports.app_checkers_black_count() : 12;
@@ -1673,7 +1247,7 @@ function updateGuestBanner(guest) {
     infoText = `${guest.buildInfo.version} · ${guest.width}×${guest.height}`;
   }
   if (pill) pill.textContent = infoText;
-  if (fullscreenGuest === guest) {
+  if (getFullscreenGuest() === guest) {
     updateFullscreenHud(guest);
   }
 }
@@ -1754,7 +1328,7 @@ function markFault(guest, message) {
 }
 
 function destroyGuest(guest) {
-  if (fullscreenGuest === guest) {
+  if (getFullscreenGuest() === guest) {
     exitFullscreen();
   }
   const index = guests.indexOf(guest);
@@ -1849,135 +1423,6 @@ function parseSelectedResolution() {
     return { width: parts[0], height: parts[1] };
   }
   return { width: DEFAULT_W, height: DEFAULT_H };
-}
-
-/* --------------------------------------------------------------------------
- * Focused Fullscreen Overlay & Dynamic Viewport
- * -------------------------------------------------------------------------- */
-function updateFullscreenHud(guest) {
-  if (!guest || !fullscreenOverlay || fullscreenOverlay.hidden) return;
-  if (fsHudTitle) {
-    fsHudTitle.textContent = guest.name;
-  }
-  if (fsHudRes) {
-    fsHudRes.textContent = `${guest.width}×${guest.height}`;
-  }
-  if (fsHudPill) {
-    if (guest.mpSeat && guest.mpMatchId) {
-      if (guest.mpGame === 'checkers' && guest.exports?.app_checkers_turn) {
-        const turn = guest.exports.app_checkers_turn();
-        const red = guest.exports.app_checkers_red_count ? guest.exports.app_checkers_red_count() : 12;
-        const blk = guest.exports.app_checkers_black_count ? guest.exports.app_checkers_black_count() : 12;
-        const turnBadge = guest.mpSeat === turn ? '🟢 Your Turn' : '⏳ Opponent Turn';
-        fsHudPill.textContent = `Match #${guest.mpMatchId} · Checkers Seat P${guest.mpSeat} · Turn P${turn} (${red}R:${blk}B) · ${turnBadge}`;
-      } else {
-        const turn = guest.exports?.app_mines_turn ? guest.exports.app_mines_turn() : 1;
-        const p1 = guest.exports?.app_mines_p1_score ? guest.exports.app_mines_p1_score() : 0;
-        const p2 = guest.exports?.app_mines_p2_score ? guest.exports.app_mines_p2_score() : 0;
-        const turnBadge = guest.mpSeat === turn ? '🟢 Your Turn' : '⏳ Opponent Turn';
-        fsHudPill.textContent = `Match #${guest.mpMatchId} · Mines Seat P${guest.mpSeat} · Turn P${turn} (${p1}:${p2}) · ${turnBadge}`;
-      }
-    } else {
-      fsHudPill.textContent = `${guest.buildInfo.shortLabel} · ${selectionLabel(guest)}`;
-    }
-  }
-}
-
-function showFullscreenHud() {
-  if (!fullscreenHud) return;
-  fullscreenHud.classList.remove('hud-hidden');
-  if (hudFadeTimer !== null) {
-    clearTimeout(hudFadeTimer);
-  }
-  hudFadeTimer = setTimeout(() => {
-    if (fullscreenOverlay && !fullscreenOverlay.hidden) {
-      fullscreenHud.classList.add('hud-hidden');
-    }
-  }, 3000);
-}
-
-function enterFullscreen(guest) {
-  if (!guest || !guest.canvas) return;
-  if (fullscreenGuest && fullscreenGuest !== guest) {
-    exitFullscreen();
-  }
-  fullscreenGuest = guest;
-  activeId = guest.id;
-
-  // Move canvas into overlay container
-  if (fullscreenContainer && guest.canvas) {
-    fullscreenContainer.replaceChildren(guest.canvas);
-  }
-  if (fullscreenOverlay) {
-    fullscreenOverlay.hidden = false;
-    fullscreenOverlay.removeAttribute('aria-hidden');
-  }
-
-  updateFullscreenHud(guest);
-  showFullscreenHud();
-  guest.canvas.focus({ preventScroll: true });
-
-  // Native fullscreen if available and not already in fullscreen
-  if (!document.fullscreenElement) {
-    try {
-      const docEl = document.documentElement;
-      if (docEl.requestFullscreen) {
-        docEl.requestFullscreen().catch(() => {});
-      } else if (docEl.webkitRequestFullscreen) {
-        docEl.webkitRequestFullscreen();
-      }
-    } catch (_) {}
-  }
-
-  setStatus(`${guest.name} · entered focused fullscreen overlay`, true);
-}
-
-function exitFullscreen() {
-  if (!fullscreenGuest) return;
-  const guest = fullscreenGuest;
-  fullscreenGuest = null;
-
-  // Restore canvas to guest's panel .screen
-  const screenEl = guest.panel?.querySelector('.screen');
-  if (screenEl && guest.canvas) {
-    screenEl.replaceChildren(guest.canvas);
-  }
-
-  if (fullscreenOverlay) {
-    fullscreenOverlay.hidden = true;
-    fullscreenOverlay.setAttribute('aria-hidden', 'true');
-  }
-
-  if (hudFadeTimer !== null) {
-    clearTimeout(hudFadeTimer);
-    hudFadeTimer = null;
-  }
-
-  // Exit native fullscreen if active
-  if (document.fullscreenElement) {
-    try {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      }
-    } catch (_) {}
-  }
-
-  if (guest.canvas) {
-    guest.canvas.focus({ preventScroll: true });
-  }
-  setStatus(`${guest.name} · exited fullscreen`, true);
-}
-
-function toggleFullscreen(guest) {
-  const target = guest || guests.find((candidate) => candidate.id === activeId) || guests[0];
-  if (!target) return;
-  if (fullscreenGuest === target) {
-    exitFullscreen();
-  } else {
-    enterFullscreen(target);
-  }
 }
 
 async function createGuest(opts = {}) {
@@ -2094,6 +1539,8 @@ async function createGuest(opts = {}) {
         blitToCanvas(t0, t1);
         serviceMinesMultiplayer(vm);
         serviceCheckers(vm);
+        serviceChessMultiplayer(vm);
+        serviceChessAi(vm);
         if (rc === 5) {
           openExternal(vm);
         } else if (rc === 2) {
@@ -2201,6 +1648,8 @@ async function createGuest(opts = {}) {
         blitToCanvas(t0, t1);
         serviceMinesMultiplayer(vm);
         serviceCheckers(vm);
+        serviceChessMultiplayer(vm);
+        serviceChessAi(vm);
         if (rc === 5) {
           openExternal(vm);
         } else if (rc === 2) {
@@ -2239,138 +1688,6 @@ async function createGuest(opts = {}) {
   }
 }
 
-/* Launch Minesweeper inside a guest via Ctrl+4 shortcut (`app_key_mods(14, 2)`) */
-function launchMinesInGuest(guest) {
-  if (!guest || !guest.exports) return;
-  if (guest.exports.app_key_mods) {
-    guest.exports.app_key_mods(14, MODS.Ctrl);
-  } else {
-    if (guest.exports.app_dock_visible() === 0) guest.clickLogical(16, 16);
-    guest.clickLogical(76, 330);
-  }
-  guest.render();
-}
-
-/* Launch Checkers inside a guest via Ctrl+5 shortcut (`app_key_mods(15, 2)`) */
-function launchCheckersInGuest(guest) {
-  if (!guest || !guest.exports) return;
-  if (guest.exports.app_key_mods) {
-    guest.exports.app_key_mods(15, MODS.Ctrl);
-  } else {
-    if (guest.exports.app_dock_visible() === 0) guest.clickLogical(16, 16);
-    guest.clickLogical(76, 406);
-  }
-  guest.render();
-}
-
-/* Start a 2-Player English Draughts (Checkers) Match across two v3.1 guests */
-async function startCheckersMatch(_opts = {}) {
-  let chkGuests = guests.filter((g) => g.exports && g.exports.app_checkers_set_mp);
-  while (chkGuests.length < 2) {
-    const g = await createGuest({ buildId: 'build-03' });
-    if (g && g.exports && g.exports.app_checkers_set_mp) {
-      chkGuests.push(g);
-    } else {
-      break;
-    }
-  }
-  if (chkGuests.length < 2) {
-    setStatus('Failed to start 2P Checkers match: need two v3.1 guests with Checkers ABI');
-    return null;
-  }
-
-  const [p1, p2] = chkGuests;
-  const initHash = p1.exports.app_checkers_state_hash
-    ? fmtHex32(p1.exports.app_checkers_state_hash() >>> 0)
-    : '0x00000000';
-
-  const { json: match } = await broker.fetch('POST', '/api/matches', {
-    game: 'checkers',
-    state_hash: initHash,
-    p1_vm: p1.name,
-    p2_vm: p2.name,
-    p1_id: p1.id,
-    p2_id: p2.id,
-  });
-
-  p1.mpGame = 'checkers';
-  p1.mpMatchId = match.id;
-  p1.mpSeat = 1;
-  p2.mpGame = 'checkers';
-  p2.mpMatchId = match.id;
-  p2.mpSeat = 2;
-
-  p1.exports.app_checkers_set_mp(1, match.id, 1);
-  p1.render();
-  p2.exports.app_checkers_set_mp(1, match.id, 2);
-  p2.render();
-
-  if (p1.exports.app_checkers_state_hash) {
-    match.state_hash = fmtHex32(p1.exports.app_checkers_state_hash() >>> 0);
-    broker.renderDrawer();
-  }
-
-  setSplitView(true);
-  brokerDrawer.hidden = false;
-  activate(p1.id);
-  setStatus(
-    `2P Checkers Match #${match.id} started · ${p1.name} (Seat P1 Red, Your Turn) vs ${p2.name} (Seat P2 Black)`,
-    true,
-  );
-  return match;
-}
-
-/* Start a 2-Player Turn-Based Minesweeper Match across two v3 guests */
-async function startTwoPlayerMatch(opts = {}) {
-  let v3Guests = guests.filter((g) => g.exports && g.exports.app_mines_set_mp);
-  while (v3Guests.length < 2) {
-    const g = await createGuest({ buildId: buildRegistry.defaultBuild || 'build-03' });
-    if (g && g.exports && g.exports.app_mines_set_mp) {
-      v3Guests.push(g);
-    } else {
-      break;
-    }
-  }
-  if (v3Guests.length < 2) {
-    setStatus('Failed to start 2P match: need two v3 guests with multiplayer ABI');
-    return null;
-  }
-
-  const [p1, p2] = v3Guests;
-  const seed = opts.seed ?? (broker.tables.matches.length === 0 ? 42 : 42 + broker.tables.matches.length);
-  const maxStrikes = opts.maxStrikes ?? 1;
-
-  const { json: match } = await broker.fetch('POST', '/api/matches', {
-    game: 'mines',
-    seed,
-    max_strikes: maxStrikes,
-    p1_vm: p1.name,
-    p2_vm: p2.name,
-    p1_id: p1.id,
-    p2_id: p2.id,
-  });
-
-  p1.mpGame = 'mines';
-  p1.mpMatchId = match.id;
-  p1.mpSeat = 1;
-  p2.mpGame = 'mines';
-  p2.mpMatchId = match.id;
-  p2.mpSeat = 2;
-
-  p1.exports.app_mines_set_mp(1, match.id, 1, seed, maxStrikes);
-  p1.render();
-  p2.exports.app_mines_set_mp(1, match.id, 2, seed, maxStrikes);
-  p2.render();
-
-  setSplitView(true);
-  brokerDrawer.hidden = false;
-  activate(p1.id);
-  setStatus(
-    `2P Match #${match.id} started (Seed ${seed}) · ${p1.name} (Seat P1, Your Turn) vs ${p2.name} (Seat P2)`,
-    true,
-  );
-  return match;
-}
 
 /* One-click A/B Comparison between Build #3 (`v3.1`, Checkers + 2P Mines) and Build #2 (`aea4b4b`, v3.0) */
 async function startAbComparison() {
@@ -2426,7 +1743,10 @@ async function joinNetworkMatch(matchId, seat = 2) {
   g.mpMatchId = matchId;
   g.mpSeat = seat;
 
-  if (game === 'checkers' && g.exports?.app_checkers_set_mp) {
+  if (game === 'chess' && g.exports?.app_chess_set_mp) {
+    g.exports.app_chess_set_mp(1, matchId, seat, 0);
+    launchChessInGuest(g);
+  } else if (game === 'checkers' && g.exports?.app_checkers_set_mp) {
     g.exports.app_checkers_set_mp(1, matchId, seat);
     launchCheckersInGuest(g);
   } else if (g.exports?.app_mines_set_mp) {
@@ -2441,16 +1761,7 @@ async function joinNetworkMatch(matchId, seat = 2) {
   updateHostStats();
 
   // Show room link
-  const linkBox = document.getElementById('net-room-info');
-  const linkEl = document.getElementById('net-room-link');
-  if (linkBox && linkEl) {
-    const oppSeat = seat === 1 ? 2 : 1;
-    const url = new URL(window.location.href);
-    url.searchParams.set('match', matchId);
-    url.searchParams.set('seat', oppSeat);
-    linkEl.textContent = url.toString();
-    linkBox.style.display = 'flex';
-  }
+  updateRoomLink(matchId, seat === 1 ? 2 : 1);
 
   setStatus(
     `Joined Network Match #${matchId} (${game}) as Seat P${seat} · Turn P${targetMatch.turn_seat || 1}`,
@@ -2468,9 +1779,11 @@ async function createNetworkMatch(game = 'checkers') {
 
   broker.setNetworkMode(true);
   const initHash =
-    game === 'checkers' && g.exports?.app_checkers_state_hash
-      ? fmtHex32(g.exports.app_checkers_state_hash() >>> 0)
-      : '0x00000000';
+    game === 'chess' && g.exports?.app_chess_state_hash
+      ? fmtHex32(g.exports.app_chess_state_hash() >>> 0)
+      : game === 'checkers' && g.exports?.app_checkers_state_hash
+        ? fmtHex32(g.exports.app_checkers_state_hash() >>> 0)
+        : '0x00000000';
   const seed = Math.floor(100 + Math.random() * 900);
 
   const { json: match } = await broker.fetch('POST', '/api/matches', {
@@ -2487,7 +1800,10 @@ async function createNetworkMatch(game = 'checkers') {
   g.mpMatchId = match.id;
   g.mpSeat = 1;
 
-  if (game === 'checkers' && g.exports?.app_checkers_set_mp) {
+  if (game === 'chess' && g.exports?.app_chess_set_mp) {
+    g.exports.app_chess_set_mp(1, match.id, 1, 0);
+    launchChessInGuest(g);
+  } else if (game === 'checkers' && g.exports?.app_checkers_set_mp) {
     g.exports.app_checkers_set_mp(1, match.id, 1);
     launchCheckersInGuest(g);
   } else if (g.exports?.app_mines_set_mp) {
@@ -2501,15 +1817,7 @@ async function createNetworkMatch(game = 'checkers') {
   broker.renderDrawer();
   updateHostStats();
 
-  const linkBox = document.getElementById('net-room-info');
-  const linkEl = document.getElementById('net-room-link');
-  if (linkBox && linkEl) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('match', match.id);
-    url.searchParams.set('seat', '2');
-    linkEl.textContent = url.toString();
-    linkBox.style.display = 'flex';
-  }
+  updateRoomLink(match.id, 2);
 
   setStatus(
     `Network Match #${match.id} (${game}) created! Joined as Seat P1. Share link for Seat P2.`,
@@ -2528,6 +1836,12 @@ panelsEl.append(emptyState);
 newVmButton.addEventListener('click', () => {
   createGuest().catch((error) => console.error(error));
 });
+
+if (chsMatchBtn) {
+  chsMatchBtn.addEventListener('click', () => {
+    startChessMatch().catch((error) => console.error(error));
+  });
+}
 
 if (chkMatchBtn) {
   chkMatchBtn.addEventListener('click', () => {
@@ -2550,7 +1864,9 @@ splitBtn.addEventListener('click', () => {
 if (brokerResetBtn) {
   brokerResetBtn.addEventListener('click', () => {
     const activeMatch = broker.tables.matches[0];
-    if (activeMatch && activeMatch.game === 'checkers') {
+    if (activeMatch && activeMatch.game === 'chess') {
+      startChessMatch().catch((error) => console.error(error));
+    } else if (activeMatch && activeMatch.game === 'checkers') {
       startCheckersMatch().catch((error) => console.error(error));
     } else {
       const nextSeed = Math.floor(100 + Math.random() * 900);
@@ -2589,13 +1905,12 @@ clearSnapsBtn.addEventListener('click', () => {
 
 // Network Match UI handlers
 const netMatchBtn = document.getElementById('net-match-btn');
+const netCreateChsBtn = document.getElementById('net-create-chs');
 const netCreateChkBtn = document.getElementById('net-create-chk');
 const netCreateMinesBtn = document.getElementById('net-create-mines');
 const netJoinIdInput = document.getElementById('net-join-id');
 const netJoinP1Btn = document.getElementById('net-join-p1-btn');
 const netJoinP2Btn = document.getElementById('net-join-p2-btn');
-const netCopyLinkBtn = document.getElementById('net-copy-link-btn');
-const netRoomLinkEl = document.getElementById('net-room-link');
 
 if (netMatchBtn) {
   netMatchBtn.addEventListener('click', () => {
@@ -2604,6 +1919,12 @@ if (netMatchBtn) {
     if (panel) {
       panel.scrollIntoView({ behavior: 'smooth' });
     }
+  });
+}
+
+if (netCreateChsBtn) {
+  netCreateChsBtn.addEventListener('click', () => {
+    createNetworkMatch('chess').catch((err) => console.error(err));
   });
 }
 
@@ -2633,70 +1954,9 @@ if (netJoinP2Btn && netJoinIdInput) {
   });
 }
 
-if (netCopyLinkBtn && netRoomLinkEl) {
-  netCopyLinkBtn.addEventListener('click', () => {
-    const text = netRoomLinkEl.textContent;
-    if (text && text !== '—') {
-      navigator.clipboard.writeText(text).then(() => {
-        netCopyLinkBtn.textContent = '✅ Copied!';
-        setTimeout(() => { netCopyLinkBtn.textContent = '📋 Copy Link'; }, 2000);
-      }).catch((err) => console.warn('Clipboard write failed:', err));
-    }
-  });
-}
+initNetworkCopyHandler();
 
-if (fullscreenBtn) {
-  fullscreenBtn.addEventListener('click', () => {
-    toggleFullscreen();
-  });
-}
-
-if (fsExitBtn) {
-  fsExitBtn.addEventListener('click', () => {
-    exitFullscreen();
-  });
-}
-
-if (fullscreenOverlay) {
-  fullscreenOverlay.addEventListener('mousemove', () => {
-    showFullscreenHud();
-  });
-  fullscreenOverlay.addEventListener('touchstart', () => {
-    showFullscreenHud();
-  }, { passive: true });
-}
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && fullscreenGuest) {
-    e.preventDefault();
-    exitFullscreen();
-  }
-});
-
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && fullscreenGuest) {
-    // User exited browser native fullscreen (e.g. via browser Esc)
-    exitFullscreen();
-  }
-});
-
-document.addEventListener('webkitfullscreenchange', () => {
-  if (!document.webkitFullscreenElement && fullscreenGuest) {
-    exitFullscreen();
-  }
-});
-
-window.addEventListener('resize', () => {
-  if (fullscreenGuest) {
-    updateFullscreenHud(fullscreenGuest);
-  }
-});
-
-window.addEventListener('orientationchange', () => {
-  if (fullscreenGuest) {
-    updateFullscreenHud(fullscreenGuest);
-  }
-});
+initFullscreenListeners();
 
 patternToggle.addEventListener('change', () => {
   for (const guest of guests) {
@@ -2778,12 +2038,13 @@ window.__appliance = {
   },
   startMatch: (opts) => startTwoPlayerMatch(opts),
   startCheckersMatch: (opts) => startCheckersMatch(opts),
+  startChessMatch: (opts) => startChessMatch(opts),
   createNetworkMatch: (game) => createNetworkMatch(game),
   joinNetworkMatch: (matchId, seat) => joinNetworkMatch(matchId, seat),
   toggleFullscreen: (guest) => toggleFullscreen(guest),
   enterFullscreen: (guest) => enterFullscreen(guest),
   exitFullscreen: () => exitFullscreen(),
-  isFullscreen: () => Boolean(fullscreenGuest),
+  isFullscreen: () => isFullscreen(),
   compareBuilds: () => startAbComparison(),
   setSplitView: (on) => setSplitView(on),
   snapshots: () => snapshots.slice(),

@@ -4,17 +4,19 @@
   "builds": [
     {
       "id": "build-03",
-      "label": "Build #3 · v3.1 (Checkers + AI + 2P Broker)",
-      "shortLabel": "build-03 · v3.1",
-      "version": "v3.1",
+      "label": "Build #3 · v3.2 (Chess + Checkers + 2P Broker)",
+      "shortLabel": "build-03 · v3.2",
+      "version": "v3.2",
       "wasmUrl": "./build/appliance.wasm",
       "gitCommit": "HEAD",
       "githubUrl": "https://github.com/jpeckenpaugh/wasm-fb-livive-net/commits/main",
       "minesBuild": "Mines Build #2 (2P Turn-Based + Scoring)",
       "checkersBuild": "Checkers Build #1 (English Draughts + Minimax AI + 2P Broker)",
+      "chessBuild": "Chess Build #1 (Classic Chess + Minimax AI + 2P Broker)",
       "supportsMultiplayer": true,
       "supportsCheckers": true,
-      "notes": "Adds English Draughts (Checkers) app + Minimax AI + 2P Checkers broker + chk-livive-net mount"
+      "supportsChess": true,
+      "notes": "Adds Classic Chess + English Draughts (Checkers) + Minimax AI + 2P Broker + chs-livive-net & chk-livive-net mounts"
     },
     {
       "id": "build-02",

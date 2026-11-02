@@ -43,10 +43,24 @@ pub enum Icon {
     Info,
     Warning,
     Lock,
+    Pawn,
+    Knight,
+    Bishop,
+    Rook,
+    Queen,
+    King,
+    Crown,
+    Flag,
+    Trophy,
+    Thumbsup,
+    Thumbsdown,
+    User,
+    Robot,
+    Star,
 }
 
 impl Icon {
-    pub const ALL: [Icon; 32] = [
+    pub const ALL: [Icon; 46] = [
         Icon::Home,
         Icon::Back,
         Icon::Forward,
@@ -79,6 +93,20 @@ impl Icon {
         Icon::Info,
         Icon::Warning,
         Icon::Lock,
+        Icon::Pawn,
+        Icon::Knight,
+        Icon::Bishop,
+        Icon::Rook,
+        Icon::Queen,
+        Icon::King,
+        Icon::Crown,
+        Icon::Flag,
+        Icon::Trophy,
+        Icon::Thumbsup,
+        Icon::Thumbsdown,
+        Icon::User,
+        Icon::Robot,
+        Icon::Star,
     ];
 
     /// Private Use Area codepoint for inline use in text.
@@ -130,6 +158,20 @@ impl Icon {
             Icon::Info => "Info",
             Icon::Warning => "Warning",
             Icon::Lock => "Lock",
+            Icon::Pawn => "Pawn",
+            Icon::Knight => "Knight",
+            Icon::Bishop => "Bishop",
+            Icon::Rook => "Rook",
+            Icon::Queen => "Queen",
+            Icon::King => "King",
+            Icon::Crown => "Crown",
+            Icon::Flag => "Flag",
+            Icon::Trophy => "Trophy",
+            Icon::Thumbsup => "Thumbsup",
+            Icon::Thumbsdown => "Thumbsdown",
+            Icon::User => "User",
+            Icon::Robot => "Robot",
+            Icon::Star => "Star",
         }
     }
 }
