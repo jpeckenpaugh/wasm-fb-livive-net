@@ -469,14 +469,14 @@ export const MISSIONS = [
       {
         action: 'boot',
         targetVm: 'p1',
-        opts: { width: 1280, height: 720 },
-        desc: 'Ensure vm-01 (Seat P1) is initialized at 1280×720',
+        opts: { width: 390, height: 844 },
+        desc: 'Ensure vm-01 (Seat P1) is initialized at 390×844 Mobile Portrait',
       },
       {
         action: 'boot',
         targetVm: 'p2',
-        opts: { width: 1280, height: 720 },
-        desc: 'Ensure vm-02 (Seat P2) is initialized at 1280×720',
+        opts: { width: 390, height: 844 },
+        desc: 'Ensure vm-02 (Seat P2) is initialized at 390×844 Mobile Portrait',
       },
       {
         action: 'assert',
@@ -739,14 +739,14 @@ export const MISSIONS = [
       {
         action: 'boot',
         targetVm: 'p1',
-        opts: { width: 1280, height: 720 },
-        desc: 'Ensure vm-01 (Seat P1) is initialized at 1280×720',
+        opts: { width: 390, height: 844 },
+        desc: 'Ensure vm-01 (Seat P1) is initialized at 390×844 Mobile Portrait',
       },
       {
         action: 'boot',
         targetVm: 'p2',
-        opts: { width: 1280, height: 720 },
-        desc: 'Ensure vm-02 (Seat P2) is initialized at 1280×720',
+        opts: { width: 390, height: 844 },
+        desc: 'Ensure vm-02 (Seat P2) is initialized at 390×844 Mobile Portrait',
       },
       {
         action: 'assert',

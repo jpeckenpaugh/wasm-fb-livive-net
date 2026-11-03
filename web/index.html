@@ -932,6 +932,15 @@
                 <option value="0">Instant (0ms)</option>
                 <option value="800">Slow Observability (800ms)</option>
               </select>
+              <label for="ap-res-select"><b>Resolution:</b></label>
+              <select id="ap-res-select" class="res-select">
+                <option value="default" selected>Mission Default (390×844 Mobile Portrait)</option>
+                <option value="390x844">390×844 · Mobile Portrait (2P Split Preferred)</option>
+                <option value="844x390">844×390 · Mobile Landscape (4P Grid Preferred)</option>
+                <option value="1280x720">1280×720 · 720p HD Desktop</option>
+                <option value="1920x1080">1920×1080 · 1080p Full HD</option>
+                <option value="640x480">640×480 · VGA</option>
+              </select>
               <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:2px;">
                 <button class="btn-bar primary" id="ap-run-btn" type="button" style="color: #a78bfa; border-color: #8b5cf688;">▶ Run</button>
                 <button class="btn-bar" id="ap-pause-btn" type="button" disabled>⏸ Pause</button>

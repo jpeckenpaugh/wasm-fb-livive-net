@@ -2158,6 +2158,7 @@ const autoPilotRunner = new AutoPilotRunner({
   getGuest: () => guests.find((candidate) => candidate.id === activeId) || guests[0],
   getGuests: () => guests,
   createGuest: (opts) => createGuest(opts),
+  destroyGuest: (g) => destroyGuest(g),
   captureSnapshot: (g, alreadyRecorded) => captureSnapshot(g, alreadyRecorded),
   captureSplitSnapshot: (g1, g2, label) => captureSplitSnapshot(g1, g2, label),
   setStatus: (msg, ok) => setStatus(msg, ok),
@@ -2175,6 +2176,7 @@ const autoPilotPanel = document.getElementById('autopilot-panel');
 const apHideBtn = document.getElementById('ap-hide-btn');
 const apMissionSelect = document.getElementById('ap-mission-select');
 const apPacingSelect = document.getElementById('ap-pacing-select');
+const apResSelect = document.getElementById('ap-res-select');
 const apRunBtn = document.getElementById('ap-run-btn');
 const apPauseBtn = document.getElementById('ap-pause-btn');
 const apResumeBtn = document.getElementById('ap-resume-btn');
@@ -2293,6 +2295,13 @@ if (apRunBtn) {
   apRunBtn.addEventListener('click', () => {
     const missionId = apMissionSelect ? apMissionSelect.value : 'system-audit';
     const pacingMs = apPacingSelect ? parseInt(apPacingSelect.value, 10) : 400;
+    let resolution = null;
+    if (apResSelect && apResSelect.value !== 'default') {
+      const parts = apResSelect.value.split('x').map((n) => parseInt(n, 10));
+      if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
+        resolution = { width: parts[0], height: parts[1] };
+      }
+    }
 
     if (apLogList) {
       apLogList.replaceChildren();
@@ -2319,7 +2328,7 @@ if (apRunBtn) {
       }
     }, 100);
 
-    autoPilotRunner.runMission(missionId, { pacingMs }).catch((err) => {
+    autoPilotRunner.runMission(missionId, { pacingMs, resolution }).catch((err) => {
       console.error('Auto Pilot mission failed:', err);
       updateAutoPilotControls('error');
     });

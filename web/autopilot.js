@@ -141,6 +141,7 @@ export class AutoPilotRunner {
     if (typeof opts.pacingMs === 'number') {
       this.pacingMs = opts.pacingMs;
     }
+    this.customResolution = opts.resolution || null;
 
     this.state = 'running';
     const startTime = Date.now();
@@ -278,10 +279,28 @@ export class AutoPilotRunner {
 
     switch (action) {
       case 'boot': {
+        const bootOpts = Object.assign({}, step.opts || {});
+        if (this.customResolution) {
+          bootOpts.width = this.customResolution.width;
+          bootOpts.height = this.customResolution.height;
+        }
+
         if (!guest && this.deps.createGuest) {
-          guest = await this.deps.createGuest(step.opts || {});
-        } else if (guest && step.opts) {
-          // If already booted, guest exists
+          guest = await this.deps.createGuest(bootOpts);
+        } else if (guest && (bootOpts.width || bootOpts.height)) {
+          // If already booted but resolution differs, re-instantiate guest to match resolution
+          if ((bootOpts.width && guest.width !== bootOpts.width) ||
+              (bootOpts.height && guest.height !== bootOpts.height)) {
+            if (this.deps.destroyGuest) {
+              this.deps.destroyGuest(guest);
+            } else if (guest.wrap && guest.panel) {
+              guest.wrap.remove();
+              guest.panel.remove();
+            }
+            if (this.deps.createGuest) {
+              guest = await this.deps.createGuest(bootOpts);
+            }
+          }
         }
         if (!guest) {
           throw new Error('Action boot: failed to acquire or create guest VM');
