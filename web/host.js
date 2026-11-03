@@ -3,6 +3,7 @@
  */
 
 import { FastApiSqliteBroker, updateRoomLink, initNetworkCopyHandler } from './broker.js';
+import { syncPlayerAvatarsToGuest } from './services/avatar.js';
 import {
   configureFullscreenDeps,
   enterFullscreen,
@@ -1960,6 +1961,7 @@ async function createGuest(opts = {}) {
       true,
     );
     pumpClock();
+    syncPlayerAvatarsToGuest(vm, 'tester-01', 'tester-02');
     initWebForGuest(vm).catch((error) => console.error(error));
     return vm;
   } catch (error) {

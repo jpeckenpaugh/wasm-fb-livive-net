@@ -53,6 +53,10 @@ pub struct ChessApp {
     pub tx_from: u8,
     pub tx_to: u8,
     pub tx_promo: u8,
+    pub p1_avatar: [u32; 256],
+    pub p2_avatar: [u32; 256],
+    pub has_p1_avatar: bool,
+    pub has_p2_avatar: bool,
 }
 
 impl ChessApp {
@@ -76,6 +80,10 @@ impl ChessApp {
             tx_from: 0,
             tx_to: 0,
             tx_promo: 0,
+            p1_avatar: [0; 256],
+            p2_avatar: [0; 256],
+            has_p1_avatar: false,
+            has_p2_avatar: false,
         }
     }
 
@@ -839,7 +847,12 @@ pub fn draw_window(fb: &mut Framebuffer, app: &ChessApp) {
     let col2_x = g.info_x + col_w + 6;
 
     fb.fill(g.info_x, score_y, col_w, 16, rgb(0x45, 0x1a, 0x03));
-    draw_str(fb, g.info_x + 4, score_y + 3, "WHITE", 1, rgb(0xfd, 0xba, 0x74));
+    if app.has_p1_avatar {
+        fb.blit(g.info_x, score_y, &app.p1_avatar, 16, 16);
+        draw_str(fb, g.info_x + 20, score_y + 3, "WHITE", 1, rgb(0xfd, 0xba, 0x74));
+    } else {
+        draw_str(fb, g.info_x + 4, score_y + 3, "WHITE", 1, rgb(0xfd, 0xba, 0x74));
+    }
 
     let blk_hdr = if app.mode == ChessMode::VsAi {
         "BLACK (AI)"
@@ -847,7 +860,12 @@ pub fn draw_window(fb: &mut Framebuffer, app: &ChessApp) {
         "BLACK"
     };
     fb.fill(col2_x, score_y, col_w, 16, rgb(0x0a, 0x1e, 0x2f));
-    draw_str(fb, col2_x + 4, score_y + 3, blk_hdr, 1, rgb(0x38, 0xbd, 0xf8));
+    if app.has_p2_avatar {
+        fb.blit(col2_x, score_y, &app.p2_avatar, 16, 16);
+        draw_str(fb, col2_x + 20, score_y + 3, blk_hdr, 1, rgb(0x38, 0xbd, 0xf8));
+    } else {
+        draw_str(fb, col2_x + 4, score_y + 3, blk_hdr, 1, rgb(0x38, 0xbd, 0xf8));
+    }
 
     let (w_count, b_count) = app.piece_counts();
     let row1_y = score_y + 19;

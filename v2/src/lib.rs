@@ -1208,6 +1208,44 @@ pub extern "C" fn app_chess_step_ai() -> i32 {
     })
 }
 
+// --- Player DiceBear Avatar ABI (16x16 RGBA) ---
+
+#[no_mangle]
+pub extern "C" fn app_avatar_staging_ptr() -> *mut u8 {
+    unsafe { staging_base_ptr() as *mut u8 }
+}
+
+#[no_mangle]
+pub extern "C" fn app_set_player_avatar(seat: i32, w: i32, h: i32) -> i32 {
+    if w != 16 || h != 16 {
+        return 0;
+    }
+    with_state(|wm, fb, st, txt, ctx| {
+        let pixels = &st[..256];
+        if seat == 1 {
+            wm.checkers.p1_avatar.copy_from_slice(pixels);
+            wm.checkers.has_p1_avatar = true;
+            wm.chess.p1_avatar.copy_from_slice(pixels);
+            wm.chess.has_p1_avatar = true;
+            wm.mines.p1_avatar.copy_from_slice(pixels);
+            wm.mines.has_p1_avatar = true;
+        } else if seat == 2 {
+            wm.checkers.p2_avatar.copy_from_slice(pixels);
+            wm.checkers.has_p2_avatar = true;
+            wm.chess.p2_avatar.copy_from_slice(pixels);
+            wm.chess.has_p2_avatar = true;
+            wm.mines.p2_avatar.copy_from_slice(pixels);
+            wm.mines.has_p2_avatar = true;
+        } else {
+            return 0;
+        }
+        if wm.ready {
+            wm.render(fb, st, txt, ctx);
+        }
+        1
+    })
+}
+
 #[no_mangle]
 pub extern "C" fn app_destroy() {
     unsafe {

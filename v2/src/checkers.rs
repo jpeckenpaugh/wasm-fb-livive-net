@@ -52,6 +52,10 @@ pub struct CheckersApp {
     pub tx_action: u8,
     pub tx_lo: u32,
     pub tx_hi: u32,
+    pub p1_avatar: [u32; 256],
+    pub p2_avatar: [u32; 256],
+    pub has_p1_avatar: bool,
+    pub has_p2_avatar: bool,
 }
 
 impl CheckersApp {
@@ -77,6 +81,10 @@ impl CheckersApp {
             tx_action: TX_NONE,
             tx_lo: 0,
             tx_hi: 0,
+            p1_avatar: [0; 256],
+            p2_avatar: [0; 256],
+            has_p1_avatar: false,
+            has_p2_avatar: false,
         }
     }
 
@@ -872,12 +880,22 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CheckersApp) {
 
     // Column 1: Red Header
     fb.fill(g.info_x, score_y, col_w, 16, rgb(0x3b, 0x07, 0x12));
-    draw_str(fb, g.info_x + 4, score_y + 3, "RED", 1, rgb(0xfb, 0x71, 0x85));
+    if app.has_p1_avatar {
+        fb.blit(g.info_x, score_y, &app.p1_avatar, 16, 16);
+        draw_str(fb, g.info_x + 20, score_y + 3, "RED", 1, rgb(0xfb, 0x71, 0x85));
+    } else {
+        draw_str(fb, g.info_x + 4, score_y + 3, "RED", 1, rgb(0xfb, 0x71, 0x85));
+    }
 
     // Column 2: Black Header
     let blk_hdr_label = if app.mode == CheckersMode::VsAi { "BLACK (AI)" } else { "BLACK" };
     fb.fill(col2_x, score_y, col_w, 16, rgb(0x0a, 0x1e, 0x2f));
-    draw_str(fb, col2_x + 4, score_y + 3, blk_hdr_label, 1, rgb(0x38, 0xbd, 0xf8));
+    if app.has_p2_avatar {
+        fb.blit(col2_x, score_y, &app.p2_avatar, 16, 16);
+        draw_str(fb, col2_x + 20, score_y + 3, blk_hdr_label, 1, rgb(0x38, 0xbd, 0xf8));
+    } else {
+        draw_str(fb, col2_x + 4, score_y + 3, blk_hdr_label, 1, rgb(0x38, 0xbd, 0xf8));
+    }
 
     // Row: Discs & Kings count
     let mut num_buf = [0u8; 32];

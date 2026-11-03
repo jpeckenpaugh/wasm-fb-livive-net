@@ -1,4 +1,5 @@
 /* Mines adapter: serviceMinesMultiplayer, launchMinesInGuest, startTwoPlayerMatch */
+import { syncPlayerAvatarsToGuest } from '../services/avatar.js';
 
 const MODS = { Shift: 1, Ctrl: 2, Alt: 4, Meta: 8 };
 
@@ -101,8 +102,12 @@ export async function startTwoPlayerMatch(opts = {}) {
   p2.mpSeat = 2;
 
   p1.exports.app_mines_set_mp(1, match.id, 1, seed, maxStrikes);
-  p1.render();
   p2.exports.app_mines_set_mp(1, match.id, 2, seed, maxStrikes);
+
+  syncPlayerAvatarsToGuest(p1, p1.name || 'tester-01', p2.name || 'tester-02');
+  syncPlayerAvatarsToGuest(p2, p1.name || 'tester-01', p2.name || 'tester-02');
+
+  p1.render();
   p2.render();
 
   _setSplitView(true);

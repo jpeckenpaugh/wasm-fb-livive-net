@@ -1,4 +1,5 @@
 /* Checkers adapter: serviceCheckers, serviceCheckersAi, serviceCheckersMultiplayer, launchCheckersInGuest, startCheckersMatch */
+import { syncPlayerAvatarsToGuest } from '../services/avatar.js';
 
 const MODS = { Shift: 1, Ctrl: 2, Alt: 4, Meta: 8 };
 
@@ -145,8 +146,12 @@ export async function startCheckersMatch(_opts = {}) {
   p2.mpSeat = 2;
 
   p1.exports.app_checkers_set_mp(1, match.id, 1);
-  p1.render();
   p2.exports.app_checkers_set_mp(1, match.id, 2);
+
+  syncPlayerAvatarsToGuest(p1, p1.name || 'tester-01', p2.name || 'tester-02');
+  syncPlayerAvatarsToGuest(p2, p1.name || 'tester-01', p2.name || 'tester-02');
+
+  p1.render();
   p2.render();
 
   if (p1.exports.app_checkers_state_hash) {

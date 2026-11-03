@@ -38,6 +38,10 @@ pub struct MinesApp {
     pub tx_pending: bool,
     pub tx_action: u8,
     pub tx_cell: u8,
+    pub p1_avatar: [u32; 256],
+    pub p2_avatar: [u32; 256],
+    pub has_p1_avatar: bool,
+    pub has_p2_avatar: bool,
 }
 
 impl MinesApp {
@@ -69,6 +73,10 @@ impl MinesApp {
             tx_pending: false,
             tx_action: 0,
             tx_cell: 0,
+            p1_avatar: [0; 256],
+            p2_avatar: [0; 256],
+            has_p1_avatar: false,
+            has_p2_avatar: false,
         }
     }
 
@@ -517,6 +525,12 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
         let mut score_buf = [b' '; 32];
         let score_str = f::mp_score_str(&mut score_buf, app.p1_score, app.p2_score);
         ui::kv_row(fb, row(y), "Score", score_str, row_sc, label_col, t::ACCENT);
+        if app.has_p1_avatar {
+            fb.blit(g.info_x + 52, y + (step_y - 16) / 2, &app.p1_avatar, 16, 16);
+        }
+        if app.has_p2_avatar {
+            fb.blit(g.info_x + g.info_w - 20, y + (step_y - 16) / 2, &app.p2_avatar, 16, 16);
+        }
         y += step_y;
     }
 
