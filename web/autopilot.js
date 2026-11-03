@@ -51,7 +51,7 @@ export class AutoPilotRunner {
     return null;
   }
 
-  resolveTargetGuest(targetVm) {
+  resolveTargetGuest(targetVm, forBoot = false) {
     if (!targetVm || targetVm === 'active') {
       return this.getActiveGuest();
     }
@@ -67,7 +67,7 @@ export class AutoPilotRunner {
       return (
         guests.find((g) => g.mpSeat === 1) ||
         guests.find((g) => g.name === 'vm-01' || g.id === 1) ||
-        guests[0] ||
+        (forBoot ? null : guests[0]) ||
         null
       );
     }
@@ -75,12 +75,12 @@ export class AutoPilotRunner {
       return (
         guests.find((g) => g.mpSeat === 2) ||
         guests.find((g) => g.name === 'vm-02' || g.id === 2) ||
-        guests[1] ||
+        (forBoot ? null : guests[1]) ||
         null
       );
     }
 
-    return guests.find((g) => g.name === targetVm || String(g.id) === t) || this.getActiveGuest();
+    return guests.find((g) => g.name === targetVm || String(g.id) === t) || (forBoot ? null : this.getActiveGuest());
   }
 
   listMissions() {
@@ -275,7 +275,7 @@ export class AutoPilotRunner {
 
   async executeStepAction(step) {
     const { action } = step;
-    let guest = step.targetVm ? this.resolveTargetGuest(step.targetVm) : this.getActiveGuest();
+    let guest = step.targetVm ? this.resolveTargetGuest(step.targetVm, action === 'boot') : this.getActiveGuest();
 
     switch (action) {
       case 'boot': {

@@ -1232,9 +1232,9 @@ const buildPanelHtml = (vm) => {
     </div>
     <div class="vm-header-right">
       <span class="seat-pill" data-stat="seat-pill">Solo · ${vm.width}×${vm.height}</span>
-      <button class="vm-action-btn" data-action="fullscreen" type="button" title="Full Screen (Zen overlay)">⤢ Fullscreen</button>
-      <button class="vm-action-btn" data-action="snap" type="button" title="Capture Framebuffer Snapshot">📷 Snapshot</button>
-      <button class="vm-action-btn btn-danger" data-action="destroy" type="button" title="Terminate / Power Off VM">✕ Terminate</button>
+      <button class="vm-action-btn icon-only" data-action="fullscreen" type="button" title="Full Screen (Zen overlay)">⤢</button>
+      <button class="vm-action-btn icon-only" data-action="snap" type="button" title="Capture Framebuffer Snapshot">📷</button>
+      <button class="vm-action-btn btn-danger icon-only" data-action="destroy" type="button" title="Terminate / Power Off VM">✕</button>
     </div>
   </header>
   <div class="screen"><canvas tabindex="0" width="${vm.width}" height="${vm.height}"></canvas></div>
