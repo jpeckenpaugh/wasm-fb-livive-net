@@ -126,21 +126,31 @@
       width: 100vw;
     }
 
-    /* Collapsible Left Sidebar */
+    /* Collapsible Left Sidebar (Overlay on top of central content area) */
     .sidebar {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
       width: 250px;
       flex: none;
-      background: #141417;
+      background: #141417f5;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       border-right: 1px solid var(--line);
+      box-shadow: 8px 0 24px rgba(0, 0, 0, 0.6);
       display: flex;
       flex-direction: column;
       overflow-y: auto;
       overflow-x: hidden;
-      transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 10;
+      transform: translateX(0);
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 50;
     }
     .sidebar.collapsed {
-      margin-left: -250px;
+      transform: translateX(-100%);
+      box-shadow: none;
+      pointer-events: none;
     }
     .sidebar-section {
       padding: 10px 12px;
@@ -373,18 +383,20 @@
 
     /* Virtual Screen Framed Bezel (Inner dark appliance monitor) */
     .screen {
-      flex: 1;
+      flex: 1 1 0%;
       min-height: 0;
+      min-width: 0;
       display: flex; justify-content: center; align-items: center;
       margin: 8px 10px;
       border: 1px solid #27272a; border-radius: 4px; overflow: hidden;
       background: #0b1016; /* Deep blue appliance interior */
       box-shadow: inset 0 0 30px #000000dd, 0 4px 16px rgba(0, 0, 0, 0.6);
+      position: relative;
     }
     .screen canvas {
       display: block;
       max-width: 100%;
-      max-height: calc(100vh - 120px);
+      max-height: 100%;
       width: auto;
       height: auto;
       object-fit: contain;
@@ -442,21 +454,31 @@
     .cell dd.state { color: var(--ok); }
     .cell dd.state::before { content: "● "; font-size: 9px; vertical-align: 1px; }
 
-    /* ------------------------------------------------ collapsible right inspector pane --- */
+    /* ------------------------------------------------ collapsible right inspector pane (Overlay on top of central content area) --- */
     .inspector-pane {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
       width: 380px;
       flex: none;
-      background: #141417;
+      background: #141417f5;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       border-left: 1px solid var(--line);
+      box-shadow: -8px 0 24px rgba(0, 0, 0, 0.6);
       display: flex;
       flex-direction: column;
       overflow-y: auto;
       overflow-x: hidden;
-      transition: margin-right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 10;
+      transform: translateX(0);
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 50;
     }
     .inspector-pane.collapsed {
-      margin-right: -380px;
+      transform: translateX(100%);
+      box-shadow: none;
+      pointer-events: none;
     }
     .inspector-header {
       flex: none;
