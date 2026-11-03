@@ -1,0 +1,1554 @@
+{
+  "id": "checkers-2p-minimax-duel",
+  "name": "Checkers 2P Minimax Duel (6-Ply vs 2-Ply)",
+  "description": "Complete 101-turn 2P Checkers game between two separate appliances over broker relay: vm-01 (6-Ply Hard Minimax) vs vm-02 (2-Ply Easy Minimax), culminating in terminal checkmate/elimination victory for P1",
+  "steps": [
+    {
+      "action": "boot",
+      "targetVm": "p1",
+      "opts": {
+        "width": 390,
+        "height": 844
+      },
+      "desc": "Ensure vm-01 (Seat P1) is initialized at 390×844 Mobile Portrait"
+    },
+    {
+      "action": "boot",
+      "targetVm": "p2",
+      "opts": {
+        "width": 390,
+        "height": 844
+      },
+      "desc": "Ensure vm-02 (Seat P2) is initialized at 390×844 Mobile Portrait"
+    },
+    {
+      "action": "setSplitView",
+      "targetVm": "p1",
+      "desc": "Enable side-by-side split view mode",
+      "enabled": true
+    },
+    {
+      "action": "openApp",
+      "targetVm": "p1",
+      "slot": "checkers",
+      "desc": "Open Checkers on vm-01 (Seat P1)"
+    },
+    {
+      "action": "openApp",
+      "targetVm": "p2",
+      "slot": "checkers",
+      "desc": "Open Checkers on vm-02 (Seat P2)"
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "p1",
+      "desc": "Configure vm-01 as Seat P1 (Hard 6-Ply Minimax) on 2P Match #701",
+      "game": "checkers",
+      "matchId": 701,
+      "seat": 1
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "p2",
+      "desc": "Configure vm-02 as Seat P2 (Easy 2-Ply Minimax) on 2P Match #701",
+      "game": "checkers",
+      "matchId": 701,
+      "seat": 2
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p1",
+      "seat": 1,
+      "desc": "Assert vm-01 initial turn is Seat P1 (Red)"
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p2",
+      "seat": 1,
+      "desc": "Assert vm-02 initial turn is Seat P1 (Red)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "desc": "Assert initial state hashes of vm-01 and vm-02 match exactly (0x08f16feb)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 23,
+      "desc": "P1 (p1): Select square 23 (PDN 24)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 18,
+      "desc": "P1 (p1): Move to square 18 (PDN 19)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "expectedHash": 2512559391,
+      "desc": "[Turn 1/101] Assert dual-VM causal convergence (0x95c29d1f, Red: 12, Black: 12)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P2 (p2): Select square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P2 (p2): Move to square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 27,
+      "desc": "P1 (p1): Select square 27 (PDN 28)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 23,
+      "desc": "P1 (p1): Move to square 23 (PDN 24)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 6,
+      "desc": "P2 (p2): Select square 6 (PDN 7)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P2 (p2): Move to square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P1 (p1): Select square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P1 (p1): Move to square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P2 (p2): Select square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P2 (p2): Move to square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P1 (p1): Select square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 16,
+      "desc": "P1 (p1): Move to square 16 (PDN 17)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P2 (p2): Select square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P2 (p2): Move to square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P1 (p1): Select square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P1 (p1): Move to square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P2 (p2): Select square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P2 (p2): Move to square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 26,
+      "desc": "P1 (p1): Select square 26 (PDN 27)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P1 (p1): Move to square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 4,
+      "desc": "P2 (p2): Select square 4 (PDN 5)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P2 (p2): Move to square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 16,
+      "desc": "P1 (p1): Select square 16 (PDN 17)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P1 (p1): Move to square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 9,
+      "desc": "P2 (p2): Select square 9 (PDN 10)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 16,
+      "desc": "P2 (p2): Move to square 16 (PDN 17)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 20,
+      "desc": "P1 (p1): Select square 20 (PDN 21)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P1 (p1): Move to square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 4,
+      "desc": "P1 (p1): Move to square 4 (PDN 5)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "expectedHash": 861022012,
+      "desc": "[Turn 15/101] Assert dual-VM causal convergence (0x3352273c, Red: 9, Black: 8)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P2 (p2): Select square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 9,
+      "desc": "P2 (p2): Move to square 9 (PDN 10)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 24,
+      "desc": "P1 (p1): Select square 24 (PDN 25)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P1 (p1): Move to square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P2 (p2): Select square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 15,
+      "desc": "P2 (p2): Move to square 15 (PDN 16)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 30,
+      "desc": "P1 (p1): Select square 30 (PDN 31)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P1 (p1): Move to square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 15,
+      "desc": "P2 (p2): Select square 15 (PDN 16)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P2 (p2): Move to square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P1 (p1): Select square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 18,
+      "desc": "P1 (p1): Move to square 18 (PDN 19)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 7,
+      "desc": "P2 (p2): Select square 7 (PDN 8)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P2 (p2): Move to square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 29,
+      "desc": "P1 (p1): Select square 29 (PDN 30)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P1 (p1): Move to square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 3,
+      "desc": "P2 (p2): Select square 3 (PDN 4)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 7,
+      "desc": "P2 (p2): Move to square 7 (PDN 8)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P1 (p1): Select square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P1 (p1): Move to square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P2 (p2): Select square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 15,
+      "desc": "P2 (p2): Move to square 15 (PDN 16)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P1 (p1): Select square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P1 (p1): Move to square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 9,
+      "desc": "P2 (p2): Select square 9 (PDN 10)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P2 (p2): Move to square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 23,
+      "desc": "P1 (p1): Select square 23 (PDN 24)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 19,
+      "desc": "P1 (p1): Move to square 19 (PDN 20)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 7,
+      "desc": "P2 (p2): Select square 7 (PDN 8)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P2 (p2): Move to square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P1 (p1): Select square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 7,
+      "desc": "P1 (p1): Move to square 7 (PDN 8)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P2 (p2): Select square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P2 (p2): Move to square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P1 (p1): Select square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P1 (p1): Move to square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 1,
+      "desc": "P2 (p2): Select square 1 (PDN 2)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P2 (p2): Move to square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 19,
+      "desc": "P1 (p1): Select square 19 (PDN 20)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P1 (p1): Move to square 10 (PDN 11)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "expectedHash": 2878068437,
+      "desc": "[Turn 35/101] Assert dual-VM causal convergence (0xab8bd6d5, Red: 8, Black: 4)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P2 (p2): Select square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P2 (p2): Move to square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 28,
+      "desc": "P1 (p1): Select square 28 (PDN 29)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 24,
+      "desc": "P1 (p1): Move to square 24 (PDN 25)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P2 (p2): Select square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P2 (p2): Move to square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 24,
+      "desc": "P1 (p1): Select square 24 (PDN 25)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P1 (p1): Move to square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 0,
+      "desc": "P2 (p2): Select square 0 (PDN 1)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P2 (p2): Move to square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 4,
+      "desc": "P1 (p1): Select square 4 (PDN 5)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 0,
+      "desc": "P1 (p1): Move to square 0 (PDN 1)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P2 (p2): Select square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P2 (p2): Move to square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P1 (p1): Select square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 9,
+      "desc": "P1 (p1): Move to square 9 (PDN 10)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P2 (p2): Select square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 12,
+      "desc": "P2 (p2): Move to square 12 (PDN 13)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 18,
+      "desc": "P1 (p1): Select square 18 (PDN 19)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P1 (p1): Move to square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 11,
+      "desc": "P2 (p2): Select square 11 (PDN 12)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 15,
+      "desc": "P2 (p2): Move to square 15 (PDN 16)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 7,
+      "desc": "P1 (p1): Select square 7 (PDN 8)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 3,
+      "desc": "P1 (p1): Move to square 3 (PDN 4)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 15,
+      "desc": "P2 (p2): Select square 15 (PDN 16)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 19,
+      "desc": "P2 (p2): Move to square 19 (PDN 20)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P1 (p1): Select square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P1 (p1): Move to square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P2 (p2): Select square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 16,
+      "desc": "P2 (p2): Move to square 16 (PDN 17)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P1 (p1): Select square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 18,
+      "desc": "P1 (p1): Move to square 18 (PDN 19)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 16,
+      "desc": "P2 (p2): Select square 16 (PDN 17)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P2 (p2): Move to square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P1 (p1): Select square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P1 (p1): Move to square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 19,
+      "desc": "P2 (p2): Select square 19 (PDN 20)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 23,
+      "desc": "P2 (p2): Move to square 23 (PDN 24)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 9,
+      "desc": "P1 (p1): Select square 9 (PDN 10)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P1 (p1): Move to square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 12,
+      "desc": "P2 (p2): Select square 12 (PDN 13)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 16,
+      "desc": "P2 (p2): Move to square 16 (PDN 17)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P1 (p1): Select square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 9,
+      "desc": "P1 (p1): Move to square 9 (PDN 10)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 16,
+      "desc": "P2 (p2): Select square 16 (PDN 17)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 20,
+      "desc": "P2 (p2): Move to square 20 (PDN 21)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 18,
+      "desc": "P1 (p1): Select square 18 (PDN 19)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P1 (p1): Move to square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 20,
+      "desc": "P2 (p2): Select square 20 (PDN 21)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 24,
+      "desc": "P2 (p2): Move to square 24 (PDN 25)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P1 (p1): Select square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 1,
+      "desc": "P1 (p1): Move to square 1 (PDN 2)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 24,
+      "desc": "P2 (p2): Select square 24 (PDN 25)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 29,
+      "desc": "P2 (p2): Move to square 29 (PDN 30)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 1,
+      "desc": "P1 (p1): Select square 1 (PDN 2)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P1 (p1): Move to square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 29,
+      "desc": "P2 (p2): Select square 29 (PDN 30)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P2 (p2): Move to square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P1 (p1): Select square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 6,
+      "desc": "P1 (p1): Move to square 6 (PDN 7)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P2 (p2): Select square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P2 (p2): Move to square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 6,
+      "desc": "P1 (p1): Select square 6 (PDN 7)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 1,
+      "desc": "P1 (p1): Move to square 1 (PDN 2)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 23,
+      "desc": "P2 (p2): Select square 23 (PDN 24)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 26,
+      "desc": "P2 (p2): Move to square 26 (PDN 27)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P1 (p1): Select square 14 (PDN 15)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P1 (p1): Move to square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 26,
+      "desc": "P2 (p2): Select square 26 (PDN 27)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 30,
+      "desc": "P2 (p2): Move to square 30 (PDN 31)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P1 (p1): Select square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P1 (p1): Move to square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P2 (p2): Select square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P2 (p2): Move to square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P1 (p1): Select square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 12,
+      "desc": "P1 (p1): Move to square 12 (PDN 13)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P2 (p2): Select square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P2 (p2): Move to square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 12,
+      "desc": "P1 (p1): Select square 12 (PDN 13)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P1 (p1): Move to square 5 (PDN 6)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "expectedHash": 3415039998,
+      "desc": "[Turn 75/101] Assert dual-VM causal convergence (0xcb8d5ffe, Red: 7, Black: 3)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P2 (p2): Select square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P2 (p2): Move to square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P1 (p1): Select square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P1 (p1): Move to square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P2 (p2): Select square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 29,
+      "desc": "P2 (p2): Move to square 29 (PDN 30)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 1,
+      "desc": "P1 (p1): Select square 1 (PDN 2)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P1 (p1): Move to square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 29,
+      "desc": "P2 (p2): Select square 29 (PDN 30)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P2 (p2): Move to square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P1 (p1): Select square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P1 (p1): Move to square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P2 (p2): Select square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P2 (p2): Move to square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P1 (p1): Select square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P1 (p1): Move to square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 30,
+      "desc": "P2 (p2): Select square 30 (PDN 31)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P2 (p2): Move to square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P1 (p1): Select square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 6,
+      "desc": "P1 (p1): Move to square 6 (PDN 7)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 25,
+      "desc": "P2 (p2): Select square 25 (PDN 26)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P2 (p2): Move to square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 0,
+      "desc": "P1 (p1): Select square 0 (PDN 1)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 5,
+      "desc": "P1 (p1): Move to square 5 (PDN 6)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 21,
+      "desc": "P2 (p2): Select square 21 (PDN 22)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 17,
+      "desc": "P2 (p2): Move to square 17 (PDN 18)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 31,
+      "desc": "P1 (p1): Select square 31 (PDN 32)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 26,
+      "desc": "P1 (p1): Move to square 26 (PDN 27)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P2 (p2): Select square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 31,
+      "desc": "P2 (p2): Move to square 31 (PDN 32)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P1 (p1): Select square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P1 (p1): Move to square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 31,
+      "desc": "P2 (p2): Select square 31 (PDN 32)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 27,
+      "desc": "P2 (p2): Move to square 27 (PDN 28)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 8,
+      "desc": "P1 (p1): Select square 8 (PDN 9)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 13,
+      "desc": "P1 (p1): Move to square 13 (PDN 14)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 27,
+      "desc": "P2 (p2): Select square 27 (PDN 28)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 23,
+      "desc": "P2 (p2): Move to square 23 (PDN 24)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 6,
+      "desc": "P1 (p1): Select square 6 (PDN 7)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 1,
+      "desc": "P1 (p1): Move to square 1 (PDN 2)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 23,
+      "desc": "P2 (p2): Select square 23 (PDN 24)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 19,
+      "desc": "P2 (p2): Move to square 19 (PDN 20)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P1 (p1): Select square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 18,
+      "desc": "P1 (p1): Move to square 18 (PDN 19)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 2,
+      "desc": "P2 (p2): Select square 2 (PDN 3)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 7,
+      "desc": "P2 (p2): Move to square 7 (PDN 8)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 3,
+      "desc": "P1 (p1): Select square 3 (PDN 4)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P1 (p1): Move to square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 19,
+      "desc": "P2 (p2): Select square 19 (PDN 20)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 15,
+      "desc": "P2 (p2): Move to square 15 (PDN 16)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P1 (p1): Select square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 19,
+      "desc": "P1 (p1): Move to square 19 (PDN 20)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "expectedHash": 1574642037,
+      "desc": "[Turn 101/101] Assert dual-VM causal convergence (0x5ddb2175, Red: 6, Black: 0)"
+    },
+    {
+      "action": "assertState",
+      "targetVm": "p1",
+      "desc": "Assert Player 1 (Red, 6-Ply Minimax) wins the match (winner == 1)"
+    },
+    {
+      "action": "assertState",
+      "targetVm": "p2",
+      "desc": "Assert Player 2 (Black, 2-Ply Minimax) eliminated (winner == 1, black_count == 0)"
+    },
+    {
+      "action": "splitSnapshot",
+      "label": "Checkers 2P Minimax Duel (6-Ply vs 2-Ply) - Terminal Victory for P1",
+      "desc": "Capture final dual-screen victory verification split snapshot"
+    }
+  ]
+}

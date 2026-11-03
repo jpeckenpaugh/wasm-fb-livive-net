@@ -34,5 +34,11 @@
     "name": "Minesweeper 2P Turn Relay & Sudden Death",
     "description": "Verify multiplayer turn-passing, bitboard scoring, and sudden-death elimination across two VMs",
     "file": "mines-2p-turn-relay.json"
+  },
+  {
+    "id": "checkers-2p-minimax-duel",
+    "name": "Mission 7: Checkers 2P Minimax Duel (6-Ply vs 2-Ply)",
+    "description": "Complete 101-turn 2P Checkers game between two separate appliances over broker relay: vm-01 (6-Ply Hard Minimax) vs vm-02 (2-Ply Easy Minimax), culminating in terminal checkmate/elimination victory for P1",
+    "file": "checkers-2p-minimax-duel.json"
   }
 ]

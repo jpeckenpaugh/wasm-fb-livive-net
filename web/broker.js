@@ -458,6 +458,7 @@ export class FastApiSqliteBroker {
   }
 
   renderDrawer() {
+    if (typeof document === 'undefined') return;
     const tbody = document.getElementById('broker-matches-tbody');
     const logEl = document.getElementById('broker-events-log');
     const countEl = document.getElementById('broker-events-count');
