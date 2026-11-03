@@ -74,13 +74,14 @@ Decouple **Seat** from **Actor Type**:
 
 ---
 
-## 4. Sub-Agent Work Breakdown & Assignments
+## 4. Work Breakdown & Status
+*(Status: **COMPLETED & DEPLOYED**)*
 
-| Sub-Agent Role | Component / Files | Responsibilities |
-|---|---|---|
-| **1. Hypervisor Engine Specialist** | `web/autopilot.js`<br>`web/missions.js` | • Implement multi-target resolution (`targetVm: 'p1' \| 'p2' \| id`) in `AutoPilotRunner`.<br>• Add `splitSnapshot` action to capture side-by-side framebuffers.<br>• Author and register Mission 5 (`checkers-2p-entangled-convergence`) and Mission 6 (`mines-2p-turn-relay`). |
-| **2. Broker & Mailbox Specialist** | `web/broker.js`<br>`web/adapters/*.js` | • Update match broker to record actor types (`Human`, `KernelEngine`, `AutoPilot`, `ExternalAgent`) in the `matches` table.<br>• Ensure synchronous TX/RX event delivery notifications wake the Auto Pilot step resolvers immediately. |
-| **3. UI & VM Chassis Architect** | `web/index.html`<br>`web/host.js` | • Update VM chassis header to display actor identity badges (`[✈️ AutoPilot]`, `[🤖 Minimax]`, `[👤 Human]`).<br>• Add multi-VM mission controls to the Auto Pilot drawer.<br>• Render dual-screen snapshot cards in the snapshot gallery tray. |
+| Role | Component / Files | Responsibilities / Deliverables | Status |
+|---|---|---|---|
+| **1. Hypervisor Engine Specialist** | `web/autopilot.js`<br>`web/missions.js`<br>`web/data/missions/*.json` | • Implement multi-target resolution (`targetVm: 'p1' \| 'p2' \| id`) in `AutoPilotRunner`.<br>• Add `splitSnapshot` action to capture side-by-side framebuffers.<br>• Author and register Mission 5 (`checkers-2p-entangled-convergence`) and Mission 6 (`mines-2p-turn-relay`) as 100% declarative JSON. | **Done** |
+| **2. Broker & Mailbox Specialist** | `web/broker.js`<br>`web/adapters/*.js` | • Update match broker to record actor types (`Human`, `KernelEngine`, `AutoPilot`, `ExternalAgent`) in the `matches` table.<br>• Ensure synchronous TX/RX event delivery notifications wake the Auto Pilot step resolvers immediately. | **Done** |
+| **3. UI & VM Chassis Architect** | `web/index.html`<br>`web/host.js`<br>`web/core/vm-manager.js` | • Update VM chassis header to display actor identity badges (`[✈️ AutoPilot]`, `[🤖 Minimax]`, `[👤 Human]`).<br>• Add multi-VM mission controls, custom resolution dropdown, and compact icon-only buttons (`⤢`, `📷`, `✕`).<br>• Render dual-screen snapshot cards in the snapshot gallery tray. | **Done** |
 
 ---
 

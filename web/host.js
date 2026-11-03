@@ -36,7 +36,7 @@ import {
   startTwoPlayerMatch,
 } from './adapters/mines.js';
 import { AutoPilotRunner } from './autopilot.js';
-import { MISSIONS } from './missions.js';
+import { MISSIONS, loadMissions } from './missions.js';
 import {
   TrajectoryRecorder,
   TrajectoryPlayer,
@@ -2334,6 +2334,21 @@ if (apRunBtn) {
     });
   });
 }
+
+// Warm the missions cache and sync dynamically
+loadMissions().then((missions) => {
+  if (apMissionSelect && missions && missions.length > 0) {
+    const currentVal = apMissionSelect.value;
+    apMissionSelect.replaceChildren();
+    for (const m of missions) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name;
+      if (m.id === currentVal) opt.selected = true;
+      apMissionSelect.appendChild(opt);
+    }
+  }
+}).catch((err) => console.warn('Could not warm missions cache:', err));
 
 if (apPauseBtn) {
   apPauseBtn.addEventListener('click', () => {

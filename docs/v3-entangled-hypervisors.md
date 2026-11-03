@@ -130,3 +130,24 @@ Every match in the SQLite `matches` and `match_events` tables (and any exported/
 2. Initialize with `seed`.
 3. Loop `k = 1 .. branchSeq` calling `app_checkers_apply_rx` (or `app_mines_apply_rx`), asserting `stateHash` at `branchSeq`.
 4. Render once (`app_render()`) and hand control of the branched universe to the user or agent.
+
+---
+
+## 5. Modular Frontend Architecture & Declarative Flight Plans
+
+As of `v3.2+`, the hypervisor host frontend is structured into modular layers:
+
+- **`web/data/`**: 100% pure declarative external structs:
+  - `registry.json`: Pinned Wasm builds, capabilities, and git commit provenance.
+  - `mounts.json`: Virtual filesystem mounts (`~/wallpapers`, `~/samples`, `gh://` repos).
+  - `keycodes.json`: Normalized browser key-to-appliance scancode maps.
+  - `missions/*.json`: Deterministic AutoPilot flight plans (`checkers-2p-entangled-convergence.json`, `mines-2p-turn-relay.json`, etc.) with cross-VM assertions.
+- **`web/core/`**: Core lifecycle primitives:
+  - `vm-manager.js`: Slot-aware VM registry managing multi-guest addressing (`Seat 1` vs `Seat 2`) and clean ID sequence isolation.
+- **`web/services/`**: Autonomous decoupled services:
+  - `snapshots.js`: PNG capture and dual-lens split-screen verification compositing.
+  - `tts.js`: In-browser SpeechSynthesis controller.
+  - `mounts.js`: Wasm memory staging, file fetchers, and RGBA decoding.
+  - `web-capture.js`: Headless web rendering proxy integration.
+- **`web/adapters/`**: Game-specific multiplayer and AI mailbox wrappers (`checkers.js`, `chess.js`, `mines.js`).
+
