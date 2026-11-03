@@ -35,6 +35,8 @@ import {
   launchMinesInGuest,
   startTwoPlayerMatch,
 } from './adapters/mines.js';
+import { AutoPilotRunner } from './autopilot.js';
+import { MISSIONS } from './missions.js';
 
 const DEFAULT_W = 1280;
 const DEFAULT_H = 720;
@@ -1974,6 +1976,186 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) pumpClock();
 });
 
+/* Auto Pilot Trajectory Runner & UI Wiring */
+const autoPilotRunner = new AutoPilotRunner({
+  getGuest: () => guests.find((candidate) => candidate.id === activeId) || guests[0],
+  getGuests: () => guests,
+  createGuest: (opts) => createGuest(opts),
+  captureSnapshot: (g, alreadyRecorded) => captureSnapshot(g, alreadyRecorded),
+  setStatus: (msg, ok) => setStatus(msg, ok),
+});
+
+const autoPilotBtn = document.getElementById('autopilot-btn');
+const autoPilotPanel = document.getElementById('autopilot-panel');
+const apHideBtn = document.getElementById('ap-hide-btn');
+const apMissionSelect = document.getElementById('ap-mission-select');
+const apPacingSelect = document.getElementById('ap-pacing-select');
+const apRunBtn = document.getElementById('ap-run-btn');
+const apPauseBtn = document.getElementById('ap-pause-btn');
+const apResumeBtn = document.getElementById('ap-resume-btn');
+const apCancelBtn = document.getElementById('ap-cancel-btn');
+const apRunnerState = document.getElementById('ap-runner-state');
+const apStatusBadge = document.getElementById('ap-status-badge');
+const apStepLabel = document.getElementById('ap-step-label');
+const apTimerLabel = document.getElementById('ap-timer-label');
+const apProgressBar = document.getElementById('ap-progress-bar');
+const apLogList = document.getElementById('ap-log-list');
+const apGalleryContainer = document.getElementById('ap-gallery-container');
+const apGalleryTray = document.getElementById('ap-gallery-tray');
+const apSnapCount = document.getElementById('ap-snap-count');
+
+let apTimerInterval = null;
+let apMissionStartTime = 0;
+
+function updateAutoPilotControls(state) {
+  if (apRunnerState) apRunnerState.textContent = state;
+  if (apStatusBadge) {
+    apStatusBadge.style.display = 'inline-block';
+    apStatusBadge.textContent = state.toUpperCase();
+    if (state === 'running') {
+      apStatusBadge.style.borderColor = 'var(--accent)';
+      apStatusBadge.style.color = 'var(--accent)';
+    } else if (state === 'error' || state === 'failed') {
+      apStatusBadge.style.borderColor = '#f87171';
+      apStatusBadge.style.color = '#f87171';
+    } else if (state === 'completed') {
+      apStatusBadge.style.borderColor = 'var(--ok)';
+      apStatusBadge.style.color = 'var(--ok)';
+    } else {
+      apStatusBadge.style.borderColor = 'var(--dim)';
+      apStatusBadge.style.color = 'var(--dim)';
+    }
+  }
+
+  if (apRunBtn) apRunBtn.disabled = state === 'running';
+  if (apPauseBtn) apPauseBtn.disabled = state !== 'running';
+  if (apResumeBtn) apResumeBtn.disabled = state !== 'paused';
+  if (apCancelBtn) apCancelBtn.disabled = state !== 'running' && state !== 'paused';
+}
+
+autoPilotRunner.onLog = ({ msg, level }) => {
+  if (!apLogList) return;
+  const li = document.createElement('li');
+  if (level === 'error') li.className = 'error';
+  li.textContent = msg;
+  apLogList.appendChild(li);
+  apLogList.scrollTop = apLogList.scrollHeight;
+};
+
+autoPilotRunner.onStepChange = ({ stepIdx, totalSteps, step }) => {
+  const current = stepIdx + 1;
+  const pct = Math.round((stepIdx / totalSteps) * 100);
+  if (apProgressBar) apProgressBar.style.width = `${pct}%`;
+  if (apStepLabel) {
+    apStepLabel.textContent = `[Step ${current}/${totalSteps}] ${step.desc || step.action}`;
+  }
+};
+
+autoPilotRunner.onReportComplete = (report) => {
+  if (apTimerInterval) {
+    clearInterval(apTimerInterval);
+    apTimerInterval = null;
+  }
+  if (apProgressBar) {
+    apProgressBar.style.width = report.status === 'passed' ? '100%' : apProgressBar.style.width;
+  }
+  if (apTimerLabel) {
+    apTimerLabel.textContent = `${report.durationMs}ms`;
+  }
+  updateAutoPilotControls(report.status === 'passed' ? 'completed' : 'error');
+
+  // Render snapshots in Auto Pilot gallery tray
+  if (apGalleryContainer && apGalleryTray && report.snapshots && report.snapshots.length > 0) {
+    apGalleryContainer.style.display = 'block';
+    apGalleryTray.replaceChildren();
+    if (apSnapCount) apSnapCount.textContent = report.snapshots.length;
+    for (const snap of report.snapshots) {
+      const card = document.createElement('div');
+      card.className = 'ap-gallery-card';
+      card.innerHTML = `
+        <img src="${snap.dataUrl}" alt="${snap.label}">
+        <div style="font-weight:600; color:var(--text);">${snap.label}</div>
+        <div style="color:var(--dimmer);">${snap.hashHex} · seq #${snap.seq}</div>
+      `;
+      apGalleryTray.appendChild(card);
+    }
+  }
+};
+
+if (autoPilotBtn && autoPilotPanel) {
+  autoPilotBtn.addEventListener('click', () => {
+    autoPilotPanel.hidden = !autoPilotPanel.hidden;
+    if (!autoPilotPanel.hidden) {
+      autoPilotPanel.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+}
+
+if (apHideBtn && autoPilotPanel) {
+  apHideBtn.addEventListener('click', () => {
+    autoPilotPanel.hidden = true;
+  });
+}
+
+if (apRunBtn) {
+  apRunBtn.addEventListener('click', () => {
+    const missionId = apMissionSelect ? apMissionSelect.value : 'system-audit';
+    const pacingMs = apPacingSelect ? parseInt(apPacingSelect.value, 10) : 400;
+
+    if (apLogList) {
+      apLogList.replaceChildren();
+    }
+    if (apGalleryTray) {
+      apGalleryTray.replaceChildren();
+    }
+    if (apGalleryContainer) {
+      apGalleryContainer.style.display = 'none';
+    }
+    if (apProgressBar) {
+      apProgressBar.style.width = '0%';
+    }
+
+    updateAutoPilotControls('running');
+    apMissionStartTime = performance.now();
+    if (apTimerInterval) clearInterval(apTimerInterval);
+    apTimerInterval = setInterval(() => {
+      if (apTimerLabel) {
+        apTimerLabel.textContent = `${Math.round(performance.now() - apMissionStartTime)}ms`;
+      }
+    }, 100);
+
+    autoPilotRunner.runMission(missionId, { pacingMs }).catch((err) => {
+      console.error('Auto Pilot mission failed:', err);
+      updateAutoPilotControls('error');
+    });
+  });
+}
+
+if (apPauseBtn) {
+  apPauseBtn.addEventListener('click', () => {
+    autoPilotRunner.pause();
+    updateAutoPilotControls('paused');
+  });
+}
+
+if (apResumeBtn) {
+  apResumeBtn.addEventListener('click', () => {
+    autoPilotRunner.resume();
+    updateAutoPilotControls('running');
+  });
+}
+
+if (apCancelBtn) {
+  apCancelBtn.addEventListener('click', () => {
+    autoPilotRunner.cancel();
+    if (apTimerInterval) {
+      clearInterval(apTimerInterval);
+      apTimerInterval = null;
+    }
+    updateAutoPilotControls('cancelled');
+  });
+}
+
 /* Programmatic Agent / QA Test Harness Surface (`window.__appliance`) */
 window.__appliance = {
   registry: () => buildRegistry,
@@ -2049,6 +2231,16 @@ window.__appliance = {
   setSplitView: (on) => setSplitView(on),
   snapshots: () => snapshots.slice(),
   add: (opts) => createGuest(opts),
+  autoPilot: {
+    runMission: (id, opts) => autoPilotRunner.runMission(id, opts),
+    pause: () => autoPilotRunner.pause(),
+    resume: () => autoPilotRunner.resume(),
+    step: () => autoPilotRunner.step(),
+    cancel: () => autoPilotRunner.cancel(),
+    listMissions: () => autoPilotRunner.listMissions(),
+    getReport: () => autoPilotRunner.getReport(),
+    inspectState: () => autoPilotRunner.inspectState(),
+  },
 };
 
 setStatus('booting Test Appliance Orchestration Console…', true);
