@@ -1381,15 +1381,29 @@ function updateGuestBanner(guest) {
       outcomeBadge.textContent = `${badgeIcon} ${outcomeInfo.label}`;
     }
     if (screenOutcome) {
-      screenOutcome.hidden = false;
-      screenOutcome.className = `screen-outcome-overlay outcome-${outcomeInfo.outcome}`;
-      screenOutcome.textContent = outcomeInfo.bannerText;
+      if (guest._outcomeDismissedKey !== outcomeInfo.bannerText) {
+        screenOutcome.hidden = false;
+        screenOutcome.className = `screen-outcome-overlay outcome-${outcomeInfo.outcome}`;
+        screenOutcome.innerHTML = `
+          <span class="outcome-text">${outcomeInfo.bannerText}</span>
+          <button class="outcome-close-btn" type="button" aria-label="Dismiss banner" title="Dismiss banner">✕</button>
+        `;
+        const closeBtn = screenOutcome.querySelector('.outcome-close-btn');
+        if (closeBtn) {
+          closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            guest._outcomeDismissedKey = outcomeInfo.bannerText;
+            screenOutcome.hidden = true;
+          };
+        }
+      }
     }
     if (panel) {
       panel.classList.toggle('winner-panel', outcomeInfo.outcome === 'winner');
       panel.classList.toggle('loser-panel', outcomeInfo.outcome === 'loser');
     }
   } else {
+    guest._outcomeDismissedKey = null;
     if (statusTag) statusTag.hidden = false;
     if (outcomeBadge) outcomeBadge.hidden = true;
     if (screenOutcome) screenOutcome.hidden = true;
