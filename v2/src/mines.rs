@@ -290,22 +290,22 @@ impl MinesApp {
     }
 }
 
-struct MinesGeom {
-    board_x: i32,
-    board_y: i32,
-    cell: i32,
-    gap: i32,
-    grid_px: i32,
-    info_x: i32,
-    info_y: i32,
-    info_w: i32,
-    btn_mode: Rect,
-    btn_seed: Rect,
-    btn_rule: Rect,
-    btn_mp: Rect,
+pub struct MinesGeom {
+    pub board_x: i32,
+    pub board_y: i32,
+    pub cell: i32,
+    pub gap: i32,
+    pub grid_px: i32,
+    pub info_x: i32,
+    pub info_y: i32,
+    pub info_w: i32,
+    pub btn_mode: Rect,
+    pub btn_seed: Rect,
+    pub btn_rule: Rect,
+    pub btn_mp: Rect,
 }
 
-fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
+pub fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
     let m = Metrics::new(client_w, client_h);
     let landscape = client_w >= client_h && client_w >= 600;
     let gap = m.pick(3, 4, 4);

@@ -152,18 +152,28 @@ impl<'a> Framebuffer<'a> {
 
     /// Compute 32-bit FNV-1a checksum over the RGBA bytes of the framebuffer.
     pub fn fnv1a_32(&self) -> u32 {
-        let mut h: u32 = 0x811c_9dc5;
-        for row in 0..(self.h as usize) {
+        self.fnv1a_32_sub(0, self.h)
+    }
+
+    /// Compute 32-bit FNV-1a checksum over rows `y_start .. y_start + h`.
+    pub fn fnv1a_32_sub(&self, y_start: i32, h: i32) -> u32 {
+        let y0 = y_start.clamp(0, self.h) as usize;
+        let y1 = (y_start + h).clamp(0, self.h) as usize;
+        let mut hash: u32 = 0x811c_9dc5;
+        if y0 >= y1 {
+            return hash;
+        }
+        for row in y0..y1 {
             let base = row * self.stride;
             for col in 0..(self.w as usize) {
                 let word = self.px[base + col].to_le_bytes();
                 for &b in &word {
-                    h ^= b as u32;
-                    h = h.wrapping_mul(0x0100_0193);
+                    hash ^= b as u32;
+                    hash = hash.wrapping_mul(0x0100_0193);
                 }
             }
         }
-        h
+        hash
     }
 
     /// Blit a tightly packed `sw x sh` `u32` (RGBA8888) buffer at `(x, y)`.

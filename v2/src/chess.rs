@@ -443,21 +443,21 @@ impl ChessApp {
     }
 }
 
-struct ChessGeom {
-    board_x: i32,
-    board_y: i32,
-    cell: i32,
-    grid_px: i32,
-    info_x: i32,
-    info_y: i32,
-    info_w: i32,
-    btn_new: Rect,
-    btn_mode: Rect,
-    btn_diff: Rect,
-    btn_flip: Rect,
+pub struct ChessGeom {
+    pub board_x: i32,
+    pub board_y: i32,
+    pub cell: i32,
+    pub grid_px: i32,
+    pub info_x: i32,
+    pub info_y: i32,
+    pub info_w: i32,
+    pub btn_new: Rect,
+    pub btn_mode: Rect,
+    pub btn_diff: Rect,
+    pub btn_flip: Rect,
 }
 
-fn chess_geom(client_w: i32, client_h: i32) -> ChessGeom {
+pub fn chess_geom(client_w: i32, client_h: i32) -> ChessGeom {
     let _m = Metrics::new(client_w, client_h);
     let landscape = client_w >= client_h && client_w >= 600;
 

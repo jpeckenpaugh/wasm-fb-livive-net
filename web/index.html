@@ -5,117 +5,757 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Test Appliance Orchestration Console</title>
   <style>
+    /* ------------------------------------------------ hypervisor slate/zinc theme --- */
     :root {
-      --bg: #08090b;
-      --panel: #0d1116;
-      --panel-2: #111820;
-      --line: #1d2731;
-      --line-2: #2a3843;
-      --text: #d4e2ea;
-      --dim: #7b8b98;
-      --dimmer: #4f5d68;
-      --accent: #2dd4bf;
-      --accent-soft: #0f766e;
+      --bg: #09090b;
+      --panel: #18181b;
+      --panel-2: #27272a;
+      --panel-elevated: #3f3f46;
+      --line: #3f3f46;
+      --line-2: #52525b;
+      --text: #f4f4f5;
+      --dim: #a1a1aa;
+      --dimmer: #71717a;
+      --accent: #818cf8;
+      --accent-soft: #4f46e5;
       --ok: #34d399;
       --warn: #fbbf24;
+      --danger: #ef4444;
       --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
       --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
-      --screen-w: 1280px;
-      --console-w: calc(var(--screen-w) + 32px);
     }
     * { box-sizing: border-box; }
-    html, body { min-height: 100%; }
-    body {
+    
+    /* Strict Fixed Viewport SPA layout: Root & body must never scroll vertically */
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      max-width: 100vw;
+      max-height: 100vh;
       margin: 0;
-      padding: 0 max(16px, calc((100% - var(--console-w)) / 2)) 40px;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
       color: var(--text);
       font: 13px/1.45 var(--sans);
       background-color: var(--bg);
       background-image:
-        linear-gradient(#ffffff06 1px, transparent 1px),
-        linear-gradient(90deg, #ffffff06 1px, transparent 1px),
-        radial-gradient(120% 80% at 50% -20%, #0d2b2a55, transparent 70%);
+        linear-gradient(#ffffff04 1px, transparent 1px),
+        linear-gradient(90deg, #ffffff04 1px, transparent 1px),
+        radial-gradient(120% 80% at 50% -20%, #4338ca15, transparent 70%);
       background-size: 24px 24px, 24px 24px, 100% 100%;
     }
-    body.wide-console {
-      --console-w: min(1920px, calc(100vw - 32px));
-    }
 
-    /* ---------------------------------------------------------- top bar --- */
+    /* ---------------------------------------------------------- fixed top bar (HUD) --- */
     .topbar {
-      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-      max-width: var(--console-w); margin: 0 auto; padding: 14px 15px 12px;
+      flex: none;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 16px;
+      background: #18181b;
       border-bottom: 1px solid var(--line);
+      z-index: 100;
+      user-select: none;
     }
-    .brand { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 10px; }
     .chip {
       width: 22px; height: 22px; border: 1px solid var(--accent-soft);
-      border-radius: 4px; position: relative; flex: none;
+      border-radius: 5px; position: relative; flex: none;
       background:
         linear-gradient(var(--accent), var(--accent)) center/6px 6px no-repeat,
-        repeating-linear-gradient(90deg, #2dd4bf22 0 2px, transparent 2px 5px);
-      box-shadow: 0 0 12px #2dd4bf33, inset 0 0 8px #00000088;
+        repeating-linear-gradient(90deg, #818cf822 0 2px, transparent 2px 5px);
+      box-shadow: 0 0 12px #6366f144, inset 0 0 6px #000000aa;
     }
     .product {
-      font: 600 13px/1 var(--mono); letter-spacing: 0.18em;
+      font: 700 12px/1 var(--mono); letter-spacing: 0.16em;
       text-transform: uppercase; color: var(--text);
+      display: inline-flex; align-items: center; gap: 6px;
     }
     .product em { color: var(--accent); font-style: normal; }
-    .slash { color: var(--dimmer); font: 13px var(--mono); }
-    .workload { font: 12px var(--mono); color: var(--dim); letter-spacing: 0.04em; }
+    .cluster-pill {
+      font: 11px/1 var(--mono); color: #cbd5e1;
+      background: #27272a; border: 1px solid var(--line-2);
+      border-radius: 9999px; padding: 4px 10px; display: inline-flex;
+      align-items: center; gap: 6px;
+    }
+    .cluster-pill .dot { width: 6px; height: 6px; }
+    .cluster-pill.live-toggle {
+      cursor: pointer; user-select: none; transition: all 0.15s ease;
+    }
+    .cluster-pill.live-toggle:hover {
+      background: #3f3f46; border-color: var(--accent); color: #fff;
+    }
+
+    .topbar-right {
+      display: flex; align-items: center; gap: 8px; margin-left: auto;
+    }
+    .nav-links { display: flex; align-items: center; gap: 6px; }
     .nav-link {
-      font: 11px var(--mono); color: var(--accent); text-decoration: none;
-      border: 1px solid var(--accent-soft); border-radius: 4px; padding: 3px 8px;
+      font: 11px var(--mono); color: var(--dim); text-decoration: none;
+      border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px;
+      transition: all 0.15s ease;
     }
-    .nav-link:hover { background: #2dd4bf18; }
+    .nav-link:hover { background: #ffffff0a; color: var(--text); border-color: var(--line-2); }
 
-    .host-stats { display: flex; gap: 16px; margin-left: auto; flex-wrap: wrap; }
-    .hstat { display: flex; flex-direction: column; gap: 2px; min-width: 58px; }
-    .hstat span {
-      font: 9px/1 var(--mono); letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--dimmer);
+    .pane-toggle-btn {
+      appearance: none; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 9px; border-radius: 4px;
+      border: 1px solid var(--line-2); background: var(--panel-2);
+      color: var(--dim); font: 11px/1 var(--mono);
+      transition: all 0.15s ease; user-select: none;
     }
-    .hstat b { font: 500 12px/1.2 var(--mono); color: var(--text); }
-    .hstat b.live { color: var(--accent); }
+    .pane-toggle-btn:hover {
+      color: var(--text); background: var(--panel-elevated); border-color: var(--accent);
+    }
+    .pane-toggle-btn.active-toggle {
+      color: #fff; background: #4f46e533; border-color: var(--accent);
+    }
 
-    /* ---------------------------------------------------------- console --- */
-    .console {
-      max-width: var(--console-w); margin: 18px auto 0;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: 0 20px 60px #00000066, inset 0 1px 0 #ffffff08;
+    /* ------------------------------------------------ middle work area --- */
+    .work-area {
+      flex: 1;
+      min-height: 0;
+      display: flex;
       overflow: hidden;
+      position: relative;
+      width: 100vw;
     }
-    .tabbar {
-      display: flex; align-items: flex-end; gap: 6px; flex-wrap: wrap;
-      padding: 8px 8px 0; background: linear-gradient(#0b1015, #0d1116);
+
+    /* Collapsible Left Sidebar */
+    .sidebar {
+      width: 250px;
+      flex: none;
+      background: #141417;
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 10;
+    }
+    .sidebar.collapsed {
+      margin-left: -250px;
+    }
+    .sidebar-section {
+      padding: 10px 12px;
       border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-    .tabs { display: flex; align-items: flex-end; gap: 2px; overflow-x: auto; }
-    .tab-wrap { position: relative; display: flex; }
+    .sidebar-title {
+      font: 600 10px/1 var(--mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--dimmer);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sidebar-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Inventory Tabs inside Sidebar */
+    .tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .tab-wrap {
+      position: relative;
+      display: flex;
+      width: 100%;
+    }
     .tab {
       appearance: none; cursor: pointer;
-      display: flex; align-items: center; gap: 7px;
-      padding: 7px 26px 7px 11px;
-      background: transparent; border: 1px solid transparent; border-bottom: none;
-      border-radius: 6px 6px 0 0; color: var(--dim);
-      font: 12px/1 var(--mono); letter-spacing: 0.04em;
-      position: relative; top: 1px;
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 28px 6px 10px;
+      width: 100%;
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: 5px; color: var(--dim);
+      font: 11px/1.3 var(--mono); letter-spacing: 0.03em;
+      transition: all 0.15s ease;
+      text-align: left;
     }
-    .tab:hover { color: var(--text); background: #ffffff05; }
+    .tab:hover { color: var(--text); background: var(--panel-elevated); border-color: var(--line-2); }
     .tab-wrap.active .tab {
-      color: var(--text); background: var(--panel);
-      border-color: var(--line);
-      box-shadow: inset 0 2px 0 var(--accent);
+      color: var(--text); background: #27272a;
+      border-color: var(--accent);
+      box-shadow: inset 3px 0 0 var(--accent);
     }
     .tab-badge {
       font-size: 10px; padding: 1px 5px; border-radius: 3px;
-      background: #2dd4bf18; border: 1px solid var(--accent-soft);
-      color: var(--accent);
+      background: #818cf822; border: 1px solid var(--accent-soft);
+      color: var(--accent); font-weight: 500; margin-left: auto;
     }
+    .tab-close {
+      appearance: none; border: 0; background: transparent; cursor: pointer;
+      position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      width: 18px; height: 18px; border-radius: 4px;
+      color: var(--dimmer); font: 14px/1 var(--mono); padding: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tab-close:hover { background: #ef444422; color: #f87171; }
+
+    /* Button and Input Styling */
+    .btn-bar {
+      appearance: none; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 6px 10px; border-radius: 5px;
+      border: 1px solid var(--line-2); background: var(--panel-2);
+      color: var(--text); font: 11px/1.3 var(--mono); letter-spacing: 0.03em;
+      transition: all 0.15s ease; text-decoration: none;
+    }
+    .btn-bar:hover { border-color: var(--accent-soft); color: #fff; background: var(--panel-elevated); }
+    .btn-bar.primary {
+      border-color: var(--accent-soft); background: #6366f124; color: #c7d2fe; font-weight: 600;
+    }
+    .btn-bar.primary:hover {
+      background: #6366f140; border-color: var(--accent); color: #fff;
+      box-shadow: 0 0 10px #6366f133;
+    }
+    .btn-bar.active-toggle {
+      border-color: var(--accent); background: #4f46e533; color: #fff;
+    }
+    .res-select {
+      appearance: none; cursor: pointer;
+      padding: 5px 8px; border-radius: 5px;
+      border: 1px solid var(--line-2); background: var(--panel-2);
+      color: var(--text); font: 11px/1.3 var(--mono);
+      outline: none; transition: border-color 0.15s ease;
+      width: 100%;
+    }
+    .res-select:hover, .res-select:focus { border-color: var(--accent); }
+
+    .diag {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--dimmer);
+      font: 10px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
+      cursor: pointer; user-select: none;
+      padding: 2px 4px;
+    }
+    .diag input { accent-color: var(--accent); margin: 0; }
+
+    /* ------------------------------------------------ central stage --- */
+    .stage {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      background: radial-gradient(circle at center, #18181b 0%, #09090b 100%);
+    }
+
+    .panels {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .panels.split-view {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      align-items: stretch;
+      justify-items: stretch;
+    }
+    .vm-panel[hidden] { display: none !important; }
+
+    /* Appliance Container Chassis (Outer monitor bezel) */
+    .vm-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0;
+      background: #18181b;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-width: 100%;
+      max-height: 100%;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .vm-panel.active-panel {
+      border-color: #818cf8aa;
+      box-shadow: 0 0 0 1px #818cf844, 0 20px 48px rgba(0, 0, 0, 0.85);
+    }
+
+    /* VM Chassis Header Bar */
+    .vm-chassis-header {
+      flex: none;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      padding: 6px 12px;
+      background: #202024;
+      border-bottom: 1px solid var(--line);
+      font: 11px/1.3 var(--mono); color: var(--dim);
+      user-select: none;
+    }
+    .vm-header-left {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .vm-status-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      font: 600 10px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--ok); background: #34d39915; border: 1px solid #34d39944;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .vm-id-badge {
+      font: 700 11px/1 var(--mono); color: var(--text);
+      background: var(--panel-elevated); border: 1px solid var(--line-2);
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .vm-build-label {
+      color: var(--dim); font-size: 11px;
+    }
+    .vm-header-right {
+      display: flex; align-items: center; gap: 6px; margin-left: auto;
+    }
+    .seat-pill {
+      padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 500;
+      background: #818cf818; border: 1px solid var(--accent-soft); color: #c7d2fe;
+    }
+    .vm-action-btn {
+      background: var(--panel-2);
+      border: 1px solid var(--line-2);
+      color: var(--dim);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font: 11px/1 var(--mono);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+    .vm-action-btn:hover {
+      color: var(--text); border-color: var(--accent); background: var(--panel-elevated);
+    }
+    .vm-action-btn.btn-danger:hover {
+      color: #fff; background: #ef444433; border-color: var(--danger);
+    }
+    .commit-link {
+      color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent-soft);
+    }
+    .commit-link:hover { color: #fff; }
+
+    /* Virtual Screen Framed Bezel (Inner dark appliance monitor) */
+    .screen {
+      flex: 1;
+      min-height: 0;
+      display: flex; justify-content: center; align-items: center;
+      margin: 8px 10px;
+      border: 1px solid #27272a; border-radius: 4px; overflow: hidden;
+      background: #0b1016; /* Deep blue appliance interior */
+      box-shadow: inset 0 0 30px #000000dd, 0 4px 16px rgba(0, 0, 0, 0.6);
+    }
+    .screen canvas {
+      display: block;
+      max-width: 100%;
+      max-height: calc(100vh - 120px);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      image-rendering: pixelated;
+      touch-action: none;
+      outline: none;
+      cursor: crosshair;
+    }
+    .screen canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+
+    /* VM Chassis Footer & Telemetry Bar */
+    .vm-chassis-footer {
+      flex: none;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      padding: 5px 10px;
+      background: #1c1c20;
+      border-top: 1px solid var(--line);
+      font: 11px/1.3 var(--mono); color: var(--dim);
+      user-select: none;
+    }
+    .vm-telemetry-summary {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      font-size: 10px;
+    }
+    .vm-telemetry-summary span {
+      display: inline-flex; align-items: center; gap: 3px;
+    }
+    .vm-telemetry-summary b {
+      color: var(--text); font-weight: 500;
+    }
+    .vm-metrics-toggle {
+      background: transparent; border: 1px dashed var(--line-2);
+      color: var(--dim); font: 9px/1.2 var(--mono); padding: 2px 6px;
+      border-radius: 3px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em;
+      transition: all 0.15s ease;
+    }
+    .vm-metrics-toggle:hover {
+      border-color: var(--accent); color: var(--accent); background: #ffffff08;
+    }
+
+    /* Detailed VM Metrics Grid (Collapsible) */
+    .vm-stats {
+      flex: none;
+      display: grid; margin: 0; padding: 0;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px; background: var(--line); border-top: 1px solid var(--line);
+    }
+    .vm-stats[hidden] { display: none !important; }
+    .cell { background: #1c1c20; padding: 5px 8px; }
+    .cell dt {
+      margin: 0 0 2px; font: 9px/1 var(--mono); letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--dimmer);
+    }
+    .cell dd { margin: 0; font: 500 11px/1.2 var(--mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cell dd.state { color: var(--ok); }
+    .cell dd.state::before { content: "● "; font-size: 9px; vertical-align: 1px; }
+
+    /* ------------------------------------------------ collapsible right inspector pane --- */
+    .inspector-pane {
+      width: 380px;
+      flex: none;
+      background: #141417;
+      border-left: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      transition: margin-right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 10;
+    }
+    .inspector-pane.collapsed {
+      margin-right: -380px;
+    }
+    .inspector-header {
+      flex: none;
+      height: 38px;
+      padding: 0 12px;
+      background: #1c1c20;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    .inspector-header-title {
+      font: 700 11px/1 var(--mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .inspector-close-btn {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: var(--dimmer);
+      cursor: pointer;
+      font: 14px/1 var(--mono);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .inspector-close-btn:hover {
+      background: #ef444422;
+      color: #f87171;
+    }
+    .inspector-content {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Telemetry drawer inside inspector */
+    .host-telemetry-drawer {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 6px; padding: 10px 12px;
+    }
+    .host-telemetry-drawer[hidden] { display: none; }
+    .host-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .hstat { display: flex; flex-direction: column; gap: 2px; }
+    .hstat span {
+      font: 9px/1 var(--mono); letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--dimmer);
+    }
+    .hstat b { font: 600 11px/1.2 var(--mono); color: var(--text); }
+    .hstat b.live { color: var(--accent); }
+
+    /* Drawers inside inspector */
+    .drawer {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: 6px; padding: 10px 12px;
+    }
+    .drawer[hidden] { display: none; }
+    .drawer-head {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      margin-bottom: 8px; font: 11px var(--mono); color: var(--dim);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .net-box {
+      margin-bottom: 10px; padding: 8px 10px; border-radius: 6px;
+      background: #0d1520; border: 1px solid #1e3a5f; font: 11px/1.5 var(--mono);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .net-box h4 {
+      margin: 0; font: 600 10px/1 var(--mono); color: #38bdf8;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .net-box .net-controls {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .net-box input[type="text"] {
+      padding: 4px 6px; border-radius: 4px; border: 1px solid var(--line-2);
+      background: var(--panel-2); color: var(--text); font: 11px var(--mono);
+      width: 100%;
+    }
+    .net-box .badge-online {
+      padding: 2px 6px; border-radius: 3px; font-size: 9px;
+      background: #0284c722; border: 1px solid #38bdf8; color: #38bdf8;
+    }
+    .broker-grid {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .sql-box {
+      background: var(--panel-2); border: 1px solid var(--line-2);
+      border-radius: 5px; padding: 6px 8px; font: 10px/1.4 var(--mono);
+      overflow-x: auto;
+    }
+    .sql-box h4 {
+      margin: 0 0 4px; font: 600 9px/1 var(--mono); color: var(--accent);
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .sql-table {
+      width: 100%; border-collapse: collapse; font: 10px/1.3 var(--mono);
+    }
+    .sql-table th, .sql-table td {
+      text-align: left; padding: 3px 4px; border-bottom: 1px solid var(--line);
+    }
+    .sql-table th { color: var(--dimmer); font-weight: 500; font-size: 9px; text-transform: uppercase; }
+    .sql-log {
+      max-height: 120px; overflow-y: auto; margin: 0; padding: 0; list-style: none;
+    }
+    .sql-log li {
+      padding: 2px 0; border-bottom: 1px dashed #3f3f4688; color: var(--dim);
+    }
+    .sql-log li b { color: var(--text); font-weight: 500; }
+    .sql-log li .method { color: var(--ok); }
+
+    .snap-list {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .snap-card {
+      background: var(--panel-2); border: 1px solid var(--line-2);
+      border-radius: 5px; padding: 6px; font: 10px/1.3 var(--mono);
+    }
+    .snap-card img {
+      display: block; width: 100%; height: auto; border-radius: 3px;
+      border: 1px solid var(--line); margin-bottom: 4px;
+      image-rendering: pixelated;
+    }
+    .snap-meta { display: flex; justify-content: space-between; color: var(--dim); }
+    .snap-meta b { color: var(--accent); }
+    .snap-dl {
+      display: inline-block; margin-top: 3px; color: var(--text);
+      text-decoration: none; font-size: 9px; border-bottom: 1px dashed var(--dimmer);
+    }
+
+    .empty {
+      padding: 30px 10px; text-align: center; color: var(--dimmer);
+      font: 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .fault {
+      padding: 30px 10px; text-align: center;
+      color: #ff9b9b; font: 11px/1.6 var(--mono);
+    }
+    .fault span { color: var(--dimmer); }
+
+    /* Auto Pilot Modal / Drawer inside Inspector */
+    .ap-box {
+      margin-bottom: 8px; padding: 8px 10px; border-radius: 5px;
+      background: #0b1420; border: 1px solid #1e3a5f; font: 10px/1.4 var(--mono);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .ap-controls-row {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .ap-progress-bar-wrap {
+      width: 100%; height: 5px; background: var(--panel-2); border-radius: 3px;
+      overflow: hidden; border: 1px solid var(--line-2); position: relative;
+    }
+    .ap-progress-bar-fill {
+      height: 100%; width: 0%; background: var(--accent);
+      transition: width 0.2s ease;
+    }
+    .ap-log {
+      max-height: 110px; overflow-y: auto; margin: 0; padding: 4px 6px;
+      list-style: none; background: #070b10; border-radius: 4px; border: 1px solid var(--line);
+      font: 10px/1.4 var(--mono); color: var(--dim);
+    }
+    .ap-log li { padding: 2px 0; }
+    .ap-log li.error { color: #f87171; }
+    .ap-gallery-tray {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 6px; margin-top: 4px;
+    }
+    .ap-gallery-card {
+      background: var(--panel-2); border: 1px solid var(--line-2);
+      border-radius: 3px; padding: 4px; font: 9px/1.2 var(--mono);
+    }
+    .ap-gallery-card img {
+      width: 100%; height: auto; border-radius: 2px; border: 1px solid var(--line);
+      margin-bottom: 3px; image-rendering: pixelated; display: block;
+    }
+    .ap-badge {
+      padding: 1px 5px; border-radius: 8px; font-size: 9px;
+      background: #818cf822; border: 1px solid var(--accent); color: var(--accent);
+    }
+
+    /* Trajectory drawer & flight bar inside Inspector */
+    .btn-bar.recording-active {
+      background: rgba(239, 68, 68, 0.2) !important;
+      border-color: #ef4444 !important;
+      color: #fca5a5 !important;
+      animation: recPulse 1.2s infinite ease-in-out;
+    }
+    @keyframes recPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      50% { box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.6); }
+    }
+    .traj-box {
+      margin-bottom: 8px; padding: 8px 10px; border-radius: 5px;
+      background: #0d131a; border: 1px solid #1e293b; font: 10px/1.4 var(--mono);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .traj-banner-row {
+      display: flex; flex-direction: column; gap: 6px;
+      background: var(--panel-2); padding: 6px 8px; border-radius: 4px; border: 1px solid var(--line-2);
+    }
+    .traj-stats-cluster {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+    }
+    .traj-stat-item {
+      display: inline-flex; align-items: center; gap: 4px; font-size: 10px;
+    }
+    .traj-stat-item span { color: var(--dimmer); font-size: 9px; text-transform: uppercase; }
+    .traj-stat-item b { color: var(--text); }
+    .traj-badge {
+      padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .traj-badge.ok {
+      background: rgba(52, 211, 153, 0.15); border: 1px solid var(--ok); color: var(--ok);
+    }
+    .traj-badge.diverged {
+      background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5;
+    }
+    .traj-badge.neutral {
+      background: rgba(148, 163, 184, 0.1); border: 1px solid var(--line-2); color: var(--dim);
+    }
+    .traj-controls-cluster {
+      display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    }
+    .speed-btn-group {
+      display: inline-flex; border-radius: 4px; overflow: hidden; border: 1px solid var(--line-2);
+    }
+    .speed-btn-group .btn-bar {
+      border: none; border-radius: 0; padding: 2px 6px; font-size: 9px;
+      background: var(--panel-2);
+    }
+    .speed-btn-group .btn-bar + .btn-bar {
+      border-left: 1px solid var(--line-2);
+    }
+    .speed-btn-group .btn-bar.active-speed {
+      background: var(--accent-soft); color: #fff; font-weight: 700;
+    }
+    .traj-timeline-wrap {
+      width: 100%; height: 5px; background: #070b10; border-radius: 3px;
+      overflow: hidden; border: 1px solid var(--line-2); position: relative;
+    }
+    .traj-timeline-fill {
+      height: 100%; width: 0%; background: #38bdf8;
+      transition: width 0.1s linear;
+    }
+    .traj-events-list {
+      max-height: 100px; overflow-y: auto; margin: 0; padding: 4px 6px;
+      list-style: none; background: #070b10; border-radius: 4px; border: 1px solid var(--line);
+      font: 10px/1.3 var(--mono); color: var(--dim);
+    }
+    .traj-events-list li { padding: 1px 0; }
+    .traj-events-list li.current { color: #38bdf8; font-weight: 600; }
+    .traj-events-list li.diverged { color: #f87171; }
+
+    /* -------------------------------------------------------- status bar --- */
+    .statusbar {
+      flex: none;
+      height: 24px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      padding: 0 14px; border-top: 1px solid var(--line);
+      background: #111113;
+      font: 10px/1 var(--mono); letter-spacing: 0.06em;
+      color: var(--dimmer); text-transform: uppercase;
+      z-index: 100;
+      user-select: none;
+    }
+    .statusbar .ok { color: var(--ok); }
+    .statusbar b { color: var(--dim); font-weight: 500; }
+
+    /* Fullscreen Overlay */
+    #fullscreen-overlay {
+      position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000;
+      z-index: 99999; display: flex; justify-content: center; align-items: center;
+      overflow: hidden; touch-action: none;
+    }
+    #fullscreen-overlay[hidden] { display: none !important; }
+    #fullscreen-canvas-container {
+      width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;
+    }
+    #fullscreen-overlay canvas {
+      max-width: 100vw; max-height: 100vh; width: auto; height: auto;
+      object-fit: contain; image-rendering: pixelated; image-rendering: crisp-edges;
+      outline: none; box-shadow: 0 0 50px rgba(0, 0, 0, 0.9); cursor: crosshair;
+    }
+    #fullscreen-hud {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 12px; padding: 6px 14px;
+      background: rgba(24, 24, 27, 0.85); backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px); border: 1px solid var(--line-2);
+      border-radius: 9999px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+      font: 11px/1 var(--mono); color: var(--dim); pointer-events: auto;
+      transition: opacity 0.35s ease, transform 0.35s ease; z-index: 100000; user-select: none;
+    }
+    #fullscreen-hud.hud-hidden { opacity: 0; transform: translate(-50%, -12px); pointer-events: none; }
+    #fullscreen-hud .hud-title { font-weight: 600; color: var(--text); }
+    #fullscreen-hud .hud-pill {
+      padding: 2px 8px; border-radius: 10px; font-size: 10px;
+      background: rgba(129, 140, 248, 0.15); border: 1px solid var(--accent); color: var(--accent);
+    }
+    #fullscreen-hud .hud-res { color: var(--dimmer); font-size: 10px; }
+    #fullscreen-hud .hud-exit-btn {
+      background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #f87171; padding: 3px 10px; border-radius: 12px; cursor: pointer;
+      font: 600 10px var(--mono); transition: all 0.15s ease;
+    }
+    #fullscreen-hud .hud-exit-btn:hover { background: rgba(239, 68, 68, 0.3); border-color: #ef4444; color: #fff; }
+
     .dot {
-      width: 6px; height: 6px; border-radius: 50%; flex: none;
+      width: 7px; height: 7px; border-radius: 50%; flex: none;
       background: var(--dimmer);
     }
     .dot.running {
@@ -124,563 +764,340 @@
       animation: pulse 2.4s ease-in-out infinite;
     }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
-    .tab-close {
-      appearance: none; border: 0; background: transparent; cursor: pointer;
-      position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
-      width: 18px; height: 18px; border-radius: 4px;
-      color: var(--dimmer); font: 14px/1 var(--mono); padding: 0;
-    }
-    .tab-close:hover { background: #ffffff10; color: var(--warn); }
-
-    .btn-bar {
-      appearance: none; cursor: pointer; margin-left: 2px;
-      padding: 6px 10px; border-radius: 6px;
-      border: 1px dashed var(--line-2); background: transparent;
-      color: var(--dim); font: 11px/1.4 var(--mono); letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-    .btn-bar:hover { border-color: var(--accent-soft); color: var(--accent); }
-    .btn-bar.primary {
-      border-style: solid; border-color: var(--accent-soft); color: var(--accent);
-    }
-    .btn-bar.primary:hover { background: #2dd4bf15; }
-    .btn-bar.active-toggle {
-      border-style: solid; border-color: var(--accent); background: #2dd4bf20; color: var(--text);
-    }
-    .res-select {
-      appearance: none; cursor: pointer; margin-left: 4px;
-      padding: 6px 9px; border-radius: 6px;
-      border: 1px solid var(--line-2); background: var(--panel-2);
-      color: var(--text); font: 11px/1.4 var(--mono); letter-spacing: 0.03em;
-    }
-    .res-select:hover, .res-select:focus { border-color: var(--accent-soft); outline: none; }
-
-    .controls-right {
-      margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-      padding-bottom: 6px;
-    }
-    .diag {
-      display: flex; align-items: center; gap: 6px;
-      color: var(--dimmer);
-      font: 10px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
-      cursor: pointer; user-select: none; margin-left: 4px;
-    }
-    .diag input { accent-color: var(--accent); margin: 0; }
-
-    /* ------------------------------------------------------------ panels --- */
-    .panels { padding: 14px; }
-    .panels.split-view {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
-      gap: 14px;
-    }
-    .vm-panel[hidden] { display: none; }
-    .panels.split-view .vm-panel {
-      border: 1px solid var(--line-2);
-      border-radius: 6px;
-      padding: 10px;
-      background: #0a0e13;
-    }
-    .panels.split-view .vm-panel.active-panel {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent-soft);
-    }
-    .panel-banner {
-      display: flex; justify-content: space-between; align-items: center; gap: 8px;
-      margin-bottom: 8px; padding: 4px 8px; border-radius: 4px;
-      background: var(--panel-2); border: 1px solid var(--line);
-      font: 11px/1.3 var(--mono); color: var(--dim);
-    }
-    .panel-banner b { color: var(--text); }
-    .panel-banner .seat-pill {
-      padding: 2px 6px; border-radius: 3px; font-size: 10px;
-      background: #2dd4bf1a; border: 1px solid var(--accent-soft); color: var(--accent);
-    }
-    .commit-link {
-      color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent-soft);
-    }
-    .commit-link:hover { color: var(--ok); }
-
-    .screen {
-      display: flex; justify-content: center; align-items: center;
-      border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
-      background: #050709;
-      box-shadow: inset 0 0 40px #000000cc, 0 0 0 1px #00000066;
-    }
-    .screen canvas {
-      display: block; max-width: 100%; max-height: 78vh; width: auto; height: auto;
-      image-rendering: pixelated; touch-action: none; outline: none;
-      cursor: crosshair;
-    }
-    .screen canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
-
-    .vm-stats {
-      display: grid; margin: 10px 0 0; padding: 0;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 1px; background: var(--line); border: 1px solid var(--line);
-    }
-    .cell { background: var(--panel-2); padding: 6px 8px 7px; }
-    .cell dt {
-      margin: 0 0 3px; font: 9px/1 var(--mono); letter-spacing: 0.13em;
-      text-transform: uppercase; color: var(--dimmer);
-    }
-    .cell dd { margin: 0; font: 500 11px/1.25 var(--mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cell dd.state { color: var(--ok); }
-    .cell dd.state::before { content: "● "; font-size: 9px; vertical-align: 1px; }
-
-    /* ------------------------------------------------ broker & snapshot drawers --- */
-    .drawer {
-      max-width: var(--console-w); margin: 14px auto 0;
-      background: var(--panel); border: 1px solid var(--line);
-      border-radius: 8px; padding: 12px 14px;
-    }
-    .drawer[hidden] { display: none; }
-    .drawer-head {
-      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
-      margin-bottom: 10px; font: 11px var(--mono); color: var(--dim);
-      text-transform: uppercase; letter-spacing: 0.08em;
-    }
-    .net-box {
-      margin-bottom: 12px; padding: 10px 12px; border-radius: 6px;
-      background: #0d1520; border: 1px solid #1e3a5f; font: 11px/1.5 var(--mono);
-      display: flex; flex-direction: column; gap: 8px;
-    }
-    .net-box h4 {
-      margin: 0; font: 600 11px/1 var(--mono); color: #38bdf8;
-      letter-spacing: 0.08em; text-transform: uppercase;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .net-box .net-controls {
-      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    }
-    .net-box input[type="text"] {
-      padding: 4px 8px; border-radius: 4px; border: 1px solid var(--line-2);
-      background: var(--panel-2); color: var(--text); font: 11px var(--mono);
-    }
-    .net-box .badge-online {
-      padding: 2px 6px; border-radius: 3px; font-size: 10px;
-      background: #0284c722; border: 1px solid #38bdf8; color: #38bdf8;
-    }
-    .broker-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-      gap: 12px;
-    }
-    .sql-box {
-      background: var(--panel-2); border: 1px solid var(--line-2);
-      border-radius: 6px; padding: 8px 10px; font: 11px/1.45 var(--mono);
-    }
-    .sql-box h4 {
-      margin: 0 0 6px; font: 600 10px/1 var(--mono); color: var(--accent);
-      letter-spacing: 0.1em; text-transform: uppercase;
-    }
-    .sql-table {
-      width: 100%; border-collapse: collapse; font: 11px/1.35 var(--mono);
-    }
-    .sql-table th, .sql-table td {
-      text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line);
-    }
-    .sql-table th { color: var(--dimmer); font-weight: 500; font-size: 10px; text-transform: uppercase; }
-    .sql-log {
-      max-height: 150px; overflow-y: auto; margin: 0; padding: 0; list-style: none;
-    }
-    .sql-log li {
-      padding: 3px 0; border-bottom: 1px dashed #1d273188; color: var(--dim);
-    }
-    .sql-log li b { color: var(--text); font-weight: 500; }
-    .sql-log li .method { color: var(--ok); }
-
-    .snap-list {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 10px;
-    }
-    .snap-card {
-      background: var(--panel-2); border: 1px solid var(--line-2);
-      border-radius: 6px; padding: 8px; font: 11px/1.4 var(--mono);
-    }
-    .snap-card img {
-      display: block; width: 100%; height: auto; border-radius: 3px;
-      border: 1px solid var(--line); margin-bottom: 6px;
-      image-rendering: pixelated;
-    }
-    .snap-meta { display: flex; justify-content: space-between; color: var(--dim); }
-    .snap-meta b { color: var(--accent); }
-    .snap-dl {
-      display: inline-block; margin-top: 4px; color: var(--text);
-      text-decoration: none; font-size: 10px; border-bottom: 1px dashed var(--dimmer);
-    }
-
-    .empty {
-      padding: 56px 20px; text-align: center; color: var(--dimmer);
-      font: 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
-    }
-    .fault {
-      padding: 48px 20px; text-align: center;
-      color: #ff9b9b; font: 12px/1.7 var(--mono);
-    }
-    .fault span { color: var(--dimmer); }
-
-    /* -------------------------------------------------------- status bar --- */
-    .statusbar {
-      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-      padding: 8px 14px; border-top: 1px solid var(--line);
-      background: #0a0e12;
-      font: 10px/1.4 var(--mono); letter-spacing: 0.08em;
-      color: var(--dimmer); text-transform: uppercase;
-    }
-    .statusbar .ok { color: var(--accent); }
-    .statusbar b { color: var(--dim); font-weight: 500; }
-
-    footer.page {
-      max-width: var(--console-w); margin: 14px auto 0;
-      padding: 0 15px;
-      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-      color: var(--dimmer); font: 11px/1.5 var(--mono);
-    }
-    kbd {
-      background: var(--panel-2); border: 1px solid var(--line-2);
-      border-bottom-width: 2px; border-radius: 3px; padding: 0 4px;
-      font: inherit; font-size: 10px; color: var(--dim);
-    }
-    @media (max-width: 720px) {
-      .host-stats { gap: 12px; }
-      .hstat { min-width: 52px; }
-      .vm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .panels.split-view { grid-template-columns: 1fr; }
-    }
-
-    /* -------------------------------------- focused fullscreen overlay --- */
-    #fullscreen-overlay {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      background: #000000;
-      z-index: 99999;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      overflow: hidden;
-      touch-action: none;
-    }
-    #fullscreen-overlay[hidden] {
-      display: none !important;
-    }
-    #fullscreen-canvas-container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    #fullscreen-overlay canvas {
-      max-width: 100vw;
-      max-height: 100vh;
-      width: auto;
-      height: auto;
-      object-fit: contain;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      outline: none;
-      box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
-      cursor: crosshair;
-    }
-    #fullscreen-hud {
-      position: absolute;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 6px 14px;
-      background: rgba(10, 14, 19, 0.82);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(45, 212, 191, 0.35);
-      border-radius: 9999px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-      font: 12px/1 var(--mono);
-      color: var(--dim);
-      pointer-events: auto;
-      transition: opacity 0.35s ease, transform 0.35s ease;
-      z-index: 100000;
-      user-select: none;
-    }
-    #fullscreen-hud.hud-hidden {
-      opacity: 0;
-      transform: translate(-50%, -12px);
-      pointer-events: none;
-    }
-    #fullscreen-hud .hud-title {
-      font-weight: 600;
-      color: var(--text);
-    }
-    #fullscreen-hud .hud-pill {
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      background: rgba(45, 212, 191, 0.15);
-      border: 1px solid var(--accent);
-      color: var(--accent);
-    }
-    #fullscreen-hud .hud-res {
-      color: var(--dimmer);
-      font-size: 11px;
-    }
-    #fullscreen-hud .hud-exit-btn {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      color: #f87171;
-      padding: 3px 10px;
-      border-radius: 12px;
-      cursor: pointer;
-      font: 600 11px var(--mono);
-      transition: all 0.15s ease;
-    }
-    #fullscreen-hud .hud-exit-btn:hover {
-      background: rgba(239, 68, 68, 0.3);
-      border-color: #ef4444;
-      color: #fff;
-    }
-    .panel-banner-btn {
-      background: #141b24;
-      border: 1px solid var(--line-2);
-      color: var(--dim);
-      padding: 2px 7px;
-      border-radius: 3px;
-      font: 10px var(--mono);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-    }
-    .panel-banner-btn:hover {
-      color: var(--accent);
-      border-color: var(--accent-soft);
-    }
-
-    /* ------------------------------------------------ auto pilot modal / drawer --- */
-    .ap-box {
-      margin-bottom: 12px; padding: 10px 12px; border-radius: 6px;
-      background: #0b1420; border: 1px solid #1e3a5f; font: 11px/1.5 var(--mono);
-      display: flex; flex-direction: column; gap: 10px;
-    }
-    .ap-controls-row {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    }
-    .ap-progress-bar-wrap {
-      width: 100%; height: 6px; background: var(--panel-2); border-radius: 3px;
-      overflow: hidden; border: 1px solid var(--line-2); position: relative;
-    }
-    .ap-progress-bar-fill {
-      height: 100%; width: 0%; background: var(--accent);
-      transition: width 0.2s ease;
-    }
-    .ap-log {
-      max-height: 140px; overflow-y: auto; margin: 0; padding: 6px 8px;
-      list-style: none; background: #070b10; border-radius: 4px; border: 1px solid var(--line);
-      font: 11px/1.4 var(--mono); color: var(--dim);
-    }
-    .ap-log li { padding: 2px 0; }
-    .ap-log li.error { color: #f87171; }
-    .ap-gallery-tray {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 10px; margin-top: 6px;
-    }
-    .ap-gallery-card {
-      background: var(--panel-2); border: 1px solid var(--line-2);
-      border-radius: 4px; padding: 6px; font: 10px/1.3 var(--mono);
-    }
-    .ap-gallery-card img {
-      width: 100%; height: auto; border-radius: 2px; border: 1px solid var(--line);
-      margin-bottom: 4px; image-rendering: pixelated; display: block;
-    }
-    .ap-badge {
-      padding: 1px 6px; border-radius: 10px; font-size: 10px;
-      background: #2dd4bf22; border: 1px solid var(--accent); color: var(--accent);
-    }
   </style>
 </head>
 <body>
+  <!-- Fixed Top HUD Bar (height: ~44px) -->
   <header class="topbar">
     <div class="brand">
+      <button class="pane-toggle-btn active-toggle" id="toggle-sidebar-btn" type="button" title="Toggle Sidebar [◧]">◧ Sidebar</button>
       <span class="chip" aria-hidden="true"></span>
-      <span class="product">APPLIANCE <em>ORCHESTRATOR</em></span>
-      <span class="slash">/</span>
-      <span class="workload">deterministic Wasm hypervisor orchestration · live multi-client matchmaking · A/B build provenance</span>
-      <a class="nav-link" href="./v2/">v2 baseline →</a>
-      <a class="nav-link" href="./v1/">v1 gallery →</a>
+      <span class="product">⚡ HYPERVISOR <em>ORCHESTRATOR</em></span>
+      <button class="cluster-pill live-toggle" id="host-stats-pill" type="button" title="Toggle detailed Host &amp; Wasm Hypervisor telemetry drawer in Inspector">
+        <span class="dot running"></span>
+        <span>Local Host · <b id="h-guests-pill">0</b> VMs · Uptime <b id="h-uptime-pill">00:00:00</b></span>
+        <span style="font-size: 9px; opacity: 0.7;">[▾ TELEMETRY]</span>
+      </button>
     </div>
-    <div class="host-stats" aria-label="host statistics">
-      <div class="hstat"><span>builds</span><b id="h-builds">3</b></div>
-      <div class="hstat"><span>module</span><b id="h-module">—</b></div>
-      <div class="hstat"><span>guests</span><b id="h-guests">0</b></div>
-      <div class="hstat"><span>matches</span><b id="h-matches">0</b></div>
-      <div class="hstat"><span>mem reserved</span><b id="h-mem">0 B</b></div>
-      <div class="hstat"><span>blits</span><b id="h-frames">0</b></div>
-      <div class="hstat"><span>snapshots</span><b id="h-snaps">0</b></div>
-      <div class="hstat"><span>uptime</span><b id="h-uptime" class="live">00:00:00</b></div>
+    <div class="topbar-right">
+      <button class="pane-toggle-btn active-toggle" id="toggle-inspector-btn" type="button" title="Toggle Inspector Pane [◨]">◨ Inspector</button>
+      <nav class="nav-links">
+        <a class="nav-link" href="./v2/">v2 baseline →</a>
+        <a class="nav-link" href="./v1/">v1 gallery →</a>
+      </nav>
     </div>
   </header>
 
-  <main class="console">
-    <div class="tabbar">
-      <div class="tabs" id="tabs" role="tablist" aria-label="guest instances"></div>
-      <select class="res-select" id="vm-build" aria-label="Appliance build version for new guest" title="Select immutable appliance build from registry.json">
-        <option value="build-03" selected>Build #3 · v3.1 (Checkers + AI + 2P Broker)</option>
-        <option value="build-02">Build #2 · v3.0 (aea4b4b · 2P Mines + Registry)</option>
-        <option value="build-01">Build #1 · v2.0 (7ac8a67 · 1P Baseline)</option>
-      </select>
-      <select class="res-select" id="vm-res" aria-label="New guest framebuffer resolution" title="Framebuffer resolution for + new guest (locked per session)">
-        <optgroup label="Desktop / HD (Landscape)">
-          <option value="1280x720" selected>720p · 1280×720 (16:9)</option>
-          <option value="1920x1080">1080p · 1920×1080 (16:9)</option>
-          <option value="640x480">VGA · 640×480 (4:3)</option>
-        </optgroup>
-        <optgroup label="Desktop / HD (Portrait)">
-          <option value="720x1280">720p Portrait · 720×1280</option>
-          <option value="1080x1920">1080p Portrait · 1080×1920</option>
-          <option value="480x640">VGA Portrait · 480×640</option>
-        </optgroup>
-        <optgroup label="Mobile Viewport">
-          <option value="390x844">Mobile Portrait · 390×844 (iPhone)</option>
-          <option value="844x390">Mobile Landscape · 844×390 (iPhone)</option>
-          <option value="360x800">Mobile Portrait · 360×800 (Android)</option>
-          <option value="800x360">Mobile Landscape · 800×360 (Android)</option>
-        </optgroup>
-      </select>
-      <button class="btn-bar" id="new-vm" type="button">+ new guest</button>
-      <div class="controls-right">
-        <button class="btn-bar primary" id="chs-match-btn" type="button" title="Start a 2-Player Chess match across two v3.2 guests via the in-browser FastAPI + SQLite broker">♟️ 2P chess match</button>
-        <button class="btn-bar primary" id="chk-match-btn" type="button" title="Start a 2-Player English Draughts (Checkers) match across two v3.1 guests via the in-browser FastAPI + SQLite broker">♟️ 2P checkers match</button>
-        <button class="btn-bar primary" id="mp-match-btn" type="button" title="Start a 2-Player Turn-Based Minesweeper match across two v3 guests via the in-browser FastAPI + SQLite broker">🎮 2P mines match</button>
-        <button class="btn-bar" id="net-match-btn" type="button" title="Create or Join a Cross-Browser Network Match over HTTP/SSE relay" style="color: #38bdf8; border-color: #38bdf866;">🌐 network match</button>
-        <button class="btn-bar" id="ab-btn" type="button" title="Compare Build #3 (v3.1, Checkers + 2P Mines) vs Build #2 (aea4b4b, v3.0) side-by-side">⇄ A/B builds</button>
-        <button class="btn-bar" id="split-btn" type="button" title="Toggle side-by-side split view of guest framebuffers">⧉ split view</button>
-        <button class="btn-bar" id="fullscreen-btn" type="button" title="Open active guest in clutter-free focused fullscreen overlay (Zen mode)">⤢ full screen</button>
-        <button class="btn-bar primary" id="autopilot-btn" type="button" title="Toggle Auto Pilot Trajectory Runner &amp; Mission Control" style="color: #a78bfa; border-color: #8b5cf688; background: #2e106533;">✈️ auto pilot</button>
-        <button class="btn-bar" id="step1-btn" type="button" title="Run automated Step 1 pipeline: Open Home [≡] -> Launch System -> Capture Snapshot">▶ step 1</button>
-        <button class="btn-bar" id="snap-btn" type="button" title="Capture framebuffer snapshot of active guest">📷 snapshot</button>
-        <label class="diag"><input id="pattern" type="checkbox"> diag</label>
-      </div>
-    </div>
-    <div class="panels" id="panels"></div>
-    <div class="statusbar">
-      <span id="sb-left"><span class="ok">ready</span> · click ♟️ 2P checkers match, 🎮 2P mines match, or ⇄ A/B builds to compare side-by-side</span>
-      <span>rgba8888 · <b id="sb-res">1280×720</b> · rust wasm32 · <b id="sb-copies">0</b> framebuffer copies</span>
-    </div>
-  </main>
-
-  <section class="drawer" id="broker-drawer" hidden>
-    <div class="drawer-head">
-      <span>⚡ FastAPI + SQLite match broker (<b id="broker-status">idle</b>)</span>
-      <div>
-        <button class="btn-bar" id="broker-reset-btn" type="button">↻ new match</button>
-        <button class="btn-bar" id="broker-hide-btn" type="button">hide</button>
-      </div>
-    </div>
-    <div class="net-box" id="net-broker-panel">
-      <h4>
-        <span>🌐 Cross-Browser Matchmaking &amp; Relay</span>
-        <span id="net-relay-status" class="badge-online">Mode: Local Memory</span>
-      </h4>
-      <div class="net-controls">
-        <span><b>Create Room:</b></span>
-        <button class="btn-bar primary" id="net-create-chs" type="button">Create Chess Match (Seat P1)</button>
-        <button class="btn-bar primary" id="net-create-chk" type="button">Create Checkers Match (Seat P1)</button>
-        <button class="btn-bar primary" id="net-create-mines" type="button">Create Mines Match (Seat P1)</button>
-        <span style="margin: 0 4px; color: var(--line-2);">|</span>
-        <span><b>Join Room:</b></span>
-        <input type="text" id="net-join-id" placeholder="Match ID (e.g. 100)" size="12" style="width: 140px;">
-        <button class="btn-bar" id="net-join-p1-btn" type="button" title="Join as Seat P1">Join P1</button>
-        <button class="btn-bar" id="net-join-p2-btn" type="button" title="Join as Seat P2">Join P2</button>
-      </div>
-      <div id="net-room-info" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; background:#070b10; padding:6px 10px; border-radius:4px; border:1px solid #1e3a5f;">
-        <span>Room URL: <code id="net-room-link" style="color:var(--ok);">—</code></span>
-        <button class="btn-bar" id="net-copy-link-btn" type="button" style="padding:2px 8px;">📋 Copy Link</button>
-        <span id="net-room-msg" style="color:var(--dimmer); font-size:10px;">Share this link to join from Chrome, Safari, or across LAN</span>
-      </div>
-    </div>
-    <div class="broker-grid">
-      <div class="sql-box">
-        <h4>sqlite table · matches</h4>
-        <table class="sql-table">
-          <thead>
-            <tr><th>id</th><th>game</th><th>seats</th><th>turn</th><th>state / score</th><th>hash / seed</th><th>seq</th><th>status</th></tr>
-          </thead>
-          <tbody id="broker-matches-tbody"></tbody>
-        </table>
-      </div>
-      <div class="sql-box">
-        <h4>fastapi + sqlite log · match_events (<span id="broker-events-count">0</span>)</h4>
-        <ul class="sql-log" id="broker-events-log"></ul>
-      </div>
-    </div>
-  </section>
-
-  <section class="drawer" id="autopilot-panel" hidden>
-    <div class="drawer-head">
-      <span>✈️ Auto Pilot Appliance Mode · Mission Control (<b id="ap-runner-state">idle</b>)</span>
-      <div>
-        <button class="btn-bar" id="ap-hide-btn" type="button">hide</button>
-      </div>
-    </div>
-    <div class="ap-box">
-      <div class="ap-controls-row">
-        <label for="ap-mission-select"><b>Mission:</b></label>
-        <select id="ap-mission-select" class="selector" style="min-width: 280px;">
-          <option value="system-audit">System Audit (About → Fonts → Theme)</option>
-          <option value="mines-gold-path">Minesweeper Known-Seed Victory &amp; Detonation</option>
-          <option value="chess-checkers-opening">Chess &amp; Checkers Opening vs Minimax AI</option>
-        </select>
-        <label for="ap-pacing-select"><b>Pacing:</b></label>
-        <select id="ap-pacing-select" class="selector">
-          <option value="400">Live Paced (400ms)</option>
-          <option value="0">Instant (0ms)</option>
-          <option value="800">Slow Observability (800ms)</option>
-        </select>
-        <button class="btn-bar primary" id="ap-run-btn" type="button" style="color: #a78bfa; border-color: #8b5cf688;">▶ Run Mission</button>
-        <button class="btn-bar" id="ap-pause-btn" type="button" disabled>⏸ Pause</button>
-        <button class="btn-bar" id="ap-resume-btn" type="button" disabled>▶ Resume</button>
-        <button class="btn-bar" id="ap-cancel-btn" type="button" disabled>✕ Cancel</button>
-        <span id="ap-status-badge" class="ap-badge" style="display: none;">Ready</span>
-      </div>
-
-      <div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: var(--dim);">
-          <span id="ap-step-label">Step 0/0 · Ready to execute flight plan</span>
-          <span id="ap-timer-label">0ms</span>
+  <!-- Middle Work Area: Sidebar + Stage + Inspector -->
+  <div class="work-area">
+    <!-- Collapsible Left Sidebar (~250px) -->
+    <aside class="sidebar" id="sidebar">
+      <!-- VM Provisioning -->
+      <section class="sidebar-section" aria-label="VM Provisioning">
+        <div class="sidebar-title"><span>+ Deploy Guest VM</span></div>
+        <div class="sidebar-row">
+          <select class="res-select" id="vm-build" aria-label="Appliance build version for new guest" title="Select immutable appliance build from registry.json">
+            <option value="build-03" selected>Build #3 · v3.1 (Checkers + AI + 2P)</option>
+            <option value="build-02">Build #2 · v3.0 (2P Mines + Registry)</option>
+            <option value="build-01">Build #1 · v2.0 (1P Baseline)</option>
+          </select>
+          <select class="res-select" id="vm-res" aria-label="New guest framebuffer resolution" title="Framebuffer resolution for + new guest">
+            <optgroup label="Desktop / HD (Landscape)">
+              <option value="1280x720" selected>720p · 1280×720 (16:9)</option>
+              <option value="1920x1080">1080p · 1920×1080 (16:9)</option>
+              <option value="640x480">VGA · 640×480 (4:3)</option>
+            </optgroup>
+            <optgroup label="Desktop / HD (Portrait)">
+              <option value="720x1280">720p Portrait · 720×1280</option>
+              <option value="1080x1920">1080p Portrait · 1080×1920</option>
+              <option value="480x640">VGA Portrait · 480×640</option>
+            </optgroup>
+            <optgroup label="Mobile Viewport">
+              <option value="390x844">Mobile Portrait · 390×844</option>
+              <option value="844x390">Mobile Landscape · 844×390</option>
+              <option value="360x800">Mobile Portrait · 360×800</option>
+              <option value="800x360">Mobile Landscape · 800×360</option>
+            </optgroup>
+          </select>
+          <button class="btn-bar primary" id="new-vm" type="button" title="Deploy a new guest VM into the hypervisor">+ Deploy VM</button>
         </div>
-        <div class="ap-progress-bar-wrap">
-          <div class="ap-progress-bar-fill" id="ap-progress-bar"></div>
+      </section>
+
+      <!-- Active VM Instances Inventory -->
+      <section class="sidebar-section" aria-label="Guest Instances">
+        <div class="sidebar-title"><span>VM Inventory</span></div>
+        <div class="tabs" id="tabs" role="tablist" aria-label="guest instances"></div>
+      </section>
+
+      <!-- Workloads & Quick Match -->
+      <section class="sidebar-section" aria-label="Workloads &amp; Matchmaking">
+        <div class="sidebar-title"><span>Workloads / Match</span></div>
+        <div class="sidebar-row">
+          <button class="btn-bar" id="chs-match-btn" type="button" title="Start 2-Player Chess match">♟️ 2P Chess</button>
+          <button class="btn-bar" id="chk-match-btn" type="button" title="Start 2-Player Checkers match">♟️ 2P Checkers</button>
+          <button class="btn-bar" id="mp-match-btn" type="button" title="Start 2-Player Mines match">🎮 2P Mines</button>
+          <button class="btn-bar" id="net-match-btn" type="button" title="Create or Join Network Match" style="color: #38bdf8; border-color: #38bdf866;">🌐 Network Match</button>
         </div>
+      </section>
+
+      <!-- Automation & Flight Deck -->
+      <section class="sidebar-section" aria-label="Automation Flight Deck">
+        <div class="sidebar-title"><span>Automation</span></div>
+        <div class="sidebar-row">
+          <button class="btn-bar primary" id="autopilot-btn" type="button" title="Toggle Auto Pilot Mission Control" style="color: #c4b5fd; border-color: #8b5cf688; background: #4f46e522;">✈️ Auto Pilot</button>
+          <button class="btn-bar" id="record-btn" type="button" title="Record live session clicks and keypresses" style="color: #ef4444; border-color: #ef444466;">⏺ Record</button>
+          <button class="btn-bar" id="traj-drawer-btn" type="button" title="Open Trajectory Flight Bar / Drawer" style="color: #38bdf8; border-color: #38bdf866;">🎬 Trajectory</button>
+          <button class="btn-bar" id="step1-btn" type="button" title="Run automated Step 1 pipeline">▶ Step 1</button>
+        </div>
+      </section>
+
+      <!-- Layout & Observability -->
+      <section class="sidebar-section" aria-label="Layout &amp; Observability Controls">
+        <div class="sidebar-title"><span>Observability</span></div>
+        <div class="sidebar-row">
+          <button class="btn-bar" id="ab-btn" type="button" title="Compare Build #3 vs Build #2 side-by-side">⇄ A/B Builds</button>
+          <button class="btn-bar" id="split-btn" type="button" title="Toggle split view">⧉ Split View</button>
+          <button class="btn-bar" id="fullscreen-btn" type="button" title="Open active guest in Zen Fullscreen">⤢ Fullscreen</button>
+          <button class="btn-bar" id="snap-btn" type="button" title="Capture framebuffer snapshot">📷 Snapshot</button>
+          <label class="diag"><input id="pattern" type="checkbox"> Test Pattern Diag</label>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Central Stage: Dynamic Scaling Container -->
+    <main class="stage" id="stage">
+      <div class="panels" id="panels"></div>
+    </main>
+
+    <!-- Collapsible Right Inspector Pane (~380px) -->
+    <aside class="inspector-pane" id="inspector-pane">
+      <header class="inspector-header">
+        <span class="inspector-header-title">⚡ Hypervisor Inspector</span>
+        <button class="inspector-close-btn" id="close-inspector-btn" type="button" title="Close Inspector">✕</button>
+      </header>
+
+      <div class="inspector-content">
+        <!-- Host Hypervisor Telemetry -->
+        <section class="host-telemetry-drawer" id="host-stats-drawer" hidden aria-label="host hypervisor telemetry">
+          <div class="drawer-head">
+            <span>Host Hypervisor Telemetry</span>
+          </div>
+          <div class="host-stats">
+            <div class="hstat"><span>immutable builds</span><b id="h-builds">3</b></div>
+            <div class="hstat"><span>wasm module</span><b id="h-module">—</b></div>
+            <div class="hstat"><span>active guests</span><b id="h-guests">0</b></div>
+            <div class="hstat"><span>broker matches</span><b id="h-matches">0</b></div>
+            <div class="hstat"><span>mem reserved</span><b id="h-mem">0 B</b></div>
+            <div class="hstat"><span>framebuffer blits</span><b id="h-frames">0</b></div>
+            <div class="hstat"><span>snapshots</span><b id="h-snaps">0</b></div>
+            <div class="hstat"><span>hypervisor uptime</span><b id="h-uptime" class="live">00:00:00</b></div>
+          </div>
+        </section>
+
+        <!-- Auto Pilot Drawer -->
+        <section class="drawer" id="autopilot-panel" hidden>
+          <div class="drawer-head">
+            <span>✈️ Auto Pilot · Mission Control (<b id="ap-runner-state">idle</b>)</span>
+            <div>
+              <button class="btn-bar" id="ap-hide-btn" type="button">hide</button>
+            </div>
+          </div>
+          <div class="ap-box">
+            <div class="ap-controls-row">
+              <label for="ap-mission-select"><b>Mission:</b></label>
+              <select id="ap-mission-select" class="res-select">
+                <option value="system-audit">System Audit (About → Fonts → Theme)</option>
+                <option value="mines-gold-path">Minesweeper Known-Seed Victory &amp; Detonation</option>
+                <option value="chess-checkers-opening">Chess &amp; Checkers Opening vs Minimax AI</option>
+                <option value="chess-checkmate-6-moves">Chess - Checkmate in 6 Moves (vs AI)</option>
+              </select>
+              <label for="ap-pacing-select"><b>Pacing:</b></label>
+              <select id="ap-pacing-select" class="res-select">
+                <option value="400">Live Paced (400ms)</option>
+                <option value="0">Instant (0ms)</option>
+                <option value="800">Slow Observability (800ms)</option>
+              </select>
+              <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:2px;">
+                <button class="btn-bar primary" id="ap-run-btn" type="button" style="color: #a78bfa; border-color: #8b5cf688;">▶ Run</button>
+                <button class="btn-bar" id="ap-pause-btn" type="button" disabled>⏸ Pause</button>
+                <button class="btn-bar" id="ap-resume-btn" type="button" disabled>▶ Resume</button>
+                <button class="btn-bar" id="ap-cancel-btn" type="button" disabled>✕ Cancel</button>
+                <span id="ap-status-badge" class="ap-badge" style="display: none;">Ready</span>
+              </div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: var(--dim);">
+                <span id="ap-step-label">Step 0/0 · Ready to execute flight plan</span>
+                <span id="ap-timer-label">0ms</span>
+              </div>
+              <div class="ap-progress-bar-wrap">
+                <div class="ap-progress-bar-fill" id="ap-progress-bar"></div>
+              </div>
+            </div>
+
+            <div>
+              <h4 style="margin: 0 0 4px; font: 600 10px/1 var(--mono); color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase;">Execution Log</h4>
+              <ul class="ap-log" id="ap-log-list">
+                <li>Select a mission above and click [▶ Run] to begin automated flight plan.</li>
+              </ul>
+            </div>
+
+            <div id="ap-gallery-container" style="display: none;">
+              <h4 style="margin: 6px 0 4px; font: 600 10px/1 var(--mono); color: #38bdf8; letter-spacing: 0.1em; text-transform: uppercase;">Mission Snapshots Tray (<span id="ap-snap-count">0</span>)</h4>
+              <div class="ap-gallery-tray" id="ap-gallery-tray"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Trajectory Drawer -->
+        <section class="drawer" id="trajectory-drawer" hidden>
+          <div class="drawer-head">
+            <span>🎬 Trajectory Flight Bar (<b id="traj-runner-state">idle</b>)</span>
+            <div>
+              <button class="btn-bar" id="traj-hide-btn" type="button">hide</button>
+            </div>
+          </div>
+          <div class="traj-box">
+            <!-- Status Banner -->
+            <div class="traj-banner-row">
+              <div class="traj-stats-cluster">
+                <div class="traj-stat-item">
+                  <span>Status:</span>
+                  <span id="traj-status-badge" class="traj-badge neutral">IDLE</span>
+                </div>
+                <div class="traj-stat-item">
+                  <span>Actions:</span>
+                  <b id="traj-actions-stat">0</b>
+                </div>
+                <div class="traj-stat-item">
+                  <span>Duration:</span>
+                  <b id="traj-duration-stat">0ms</b>
+                </div>
+                <div class="traj-stat-item">
+                  <span>Parity:</span>
+                  <span id="traj-parity-badge" class="traj-badge ok">100% OK</span>
+                </div>
+                <div class="traj-stat-item">
+                  <span>Target:</span>
+                  <b id="traj-target-stat">—</b>
+                </div>
+                <div class="traj-stat-item">
+                  <span>Recorded:</span>
+                  <b id="traj-recorded-res-stat">—</b>
+                </div>
+              </div>
+              <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                <button class="btn-bar" id="traj-save-btn" type="button" title="Download trajectory recording">⬇ Save</button>
+                <input type="file" id="traj-file-input" accept=".json" style="display: none;">
+                <button class="btn-bar" id="traj-load-btn" type="button" title="Load trajectory JSON">⬆ Load</button>
+                <button class="btn-bar primary" id="traj-convert-btn" type="button" title="Convert to Mission" style="color: #a78bfa; border-color: #8b5cf688;">✈️ Convert</button>
+              </div>
+            </div>
+
+            <!-- Playback Controls -->
+            <div class="traj-controls-cluster">
+              <button class="btn-bar" id="traj-step-btn" type="button" title="Step forward 1 event">⏮ Step</button>
+              <button class="btn-bar primary" id="traj-play-btn" type="button" title="Play">▶ Play</button>
+              <button class="btn-bar" id="traj-pause-btn" type="button" disabled title="Pause">⏸</button>
+              <button class="btn-bar" id="traj-stop-btn" type="button" title="Stop">⏹</button>
+              <div class="speed-btn-group" id="traj-mode-group">
+                <button class="btn-bar active-speed" data-mode="auto" type="button">Auto</button>
+                <button class="btn-bar" data-mode="physical" type="button">1:1</button>
+                <button class="btn-bar" data-mode="semantic" type="button">Semantic</button>
+              </div>
+              <div class="speed-btn-group" id="traj-speed-group">
+                <button class="btn-bar" data-speed="0.5" type="button">0.5x</button>
+                <button class="btn-bar active-speed" data-speed="1.0" type="button">1x</button>
+                <button class="btn-bar" data-speed="2.0" type="button">2x</button>
+                <button class="btn-bar" data-speed="0" type="button">MAX</button>
+              </div>
+            </div>
+
+            <!-- Timeline Progress -->
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: var(--dim); font-size: 9px;">
+                <span id="traj-action-label">Action 0/0 · Ready</span>
+                <span id="traj-progress-pct">0%</span>
+              </div>
+              <div class="traj-timeline-wrap">
+                <div class="traj-timeline-fill" id="traj-timeline-fill"></div>
+              </div>
+            </div>
+
+            <!-- Event Stream Log -->
+            <div>
+              <h4 style="margin: 0 0 2px; font: 600 9px/1 var(--mono); color: #38bdf8; letter-spacing: 0.08em; text-transform: uppercase;">Event Stream &amp; Hash Ledger</h4>
+              <ul class="traj-events-list" id="traj-events-list">
+                <li>Click [⏺ Record] or load trajectory JSON.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Multiplayer & SQLite Broker Drawer -->
+        <section class="drawer" id="broker-drawer" hidden>
+          <div class="drawer-head">
+            <span>⚡ FastAPI + SQLite Match Broker (<b id="broker-status">idle</b>)</span>
+            <div>
+              <button class="btn-bar" id="broker-reset-btn" type="button">↻ new</button>
+              <button class="btn-bar" id="broker-hide-btn" type="button">hide</button>
+            </div>
+          </div>
+          <div class="net-box" id="net-broker-panel">
+            <h4>
+              <span>🌐 Cross-Browser Matchmaking &amp; Relay</span>
+              <span id="net-relay-status" class="badge-online">Mode: Local</span>
+            </h4>
+            <div class="net-controls">
+              <button class="btn-bar primary" id="net-create-chs" type="button">Create Chess P1</button>
+              <button class="btn-bar primary" id="net-create-chk" type="button">Create Checkers P1</button>
+              <button class="btn-bar primary" id="net-create-mines" type="button">Create Mines P1</button>
+              <div style="display:flex; gap:4px; width:100%; margin-top:4px;">
+                <input type="text" id="net-join-id" placeholder="Match ID (e.g. 100)">
+                <button class="btn-bar" id="net-join-p1-btn" type="button" title="Join Seat P1">Join P1</button>
+                <button class="btn-bar" id="net-join-p2-btn" type="button" title="Join Seat P2">Join P2</button>
+              </div>
+            </div>
+            <div id="net-room-info" style="display:none; align-items:center; gap:6px; flex-wrap:wrap; background:#070b10; padding:4px 8px; border-radius:4px; border:1px solid #1e3a5f;">
+              <span>URL: <code id="net-room-link" style="color:var(--ok);">—</code></span>
+              <button class="btn-bar" id="net-copy-link-btn" type="button" style="padding:1px 6px;">📋 Copy</button>
+              <span id="net-room-msg" style="color:var(--dimmer); font-size:9px;">Share to join</span>
+            </div>
+          </div>
+          <div class="broker-grid">
+            <div class="sql-box">
+              <h4>sqlite table · matches</h4>
+              <table class="sql-table">
+                <thead>
+                  <tr><th>id</th><th>game</th><th>seats</th><th>turn</th><th>state</th><th>hash</th><th>seq</th><th>status</th></tr>
+                </thead>
+                <tbody id="broker-matches-tbody"></tbody>
+              </table>
+            </div>
+            <div class="sql-box">
+              <h4>match_events (<span id="broker-events-count">0</span>)</h4>
+              <ul class="sql-log" id="broker-events-log"></ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Snapshots Gallery Drawer -->
+        <section class="drawer" id="snapshots-drawer" hidden>
+          <div class="drawer-head">
+            <span>Captured Snapshots (<b id="snap-count">0</b>)</span>
+            <button class="btn-bar" id="clear-snaps" type="button">clear</button>
+          </div>
+          <div class="snap-list" id="snap-list"></div>
+        </section>
       </div>
+    </aside>
+  </div>
 
-      <div>
-        <h4 style="margin: 0 0 4px; font: 600 10px/1 var(--mono); color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase;">Execution Log</h4>
-        <ul class="ap-log" id="ap-log-list">
-          <li>Select a mission above and click [▶ Run Mission] to begin automated flight plan.</li>
-        </ul>
-      </div>
-
-      <div id="ap-gallery-container" style="display: none;">
-        <h4 style="margin: 6px 0 4px; font: 600 10px/1 var(--mono); color: #38bdf8; letter-spacing: 0.1em; text-transform: uppercase;">Mission Snapshots Tray (<span id="ap-snap-count">0</span>)</h4>
-        <div class="ap-gallery-tray" id="ap-gallery-tray"></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="drawer" id="snapshots-drawer" hidden>
-    <div class="drawer-head">
-      <span>captured environment snapshots (<b id="snap-count">0</b>)</span>
-      <button class="btn-bar" id="clear-snaps" type="button">clear</button>
-    </div>
-    <div class="snap-list" id="snap-list"></div>
-  </section>
-
-  <footer class="page">
-    <span>shortcuts: home <kbd>[≡]</kbd> · calc <kbd>0-9 + - * / = Esc</kbd> · checkers <kbd>N (new)</kbd> <kbd>M (mode)</kbd> <kbd>D (AI diff)</kbd> <kbd>F (flip)</kbd> · mines <kbd>F (flag)</kbd> <kbd>N (new)</kbd> <kbd>M (2P mode)</kbd> · files <kbd>Tab / I</kbd> (context) · <kbd>[ / ]</kbd> (page).</span>
-    <span>Test Appliance Orchestration Console: select any historical build in the dropdown (`build-03`, `build-02`, `build-01`), click <kbd>♟️ 2P checkers match</kbd> for English Draughts, <kbd>🎮 2P mines match</kbd> for turn-based Minesweeper, or <kbd>⇄ A/B builds</kbd> to compare side-by-side with live matchmaking and hypervisor telemetry.</span>
+  <!-- Fixed Bottom Status Bar (height: ~24px) -->
+  <footer class="statusbar">
+    <span id="sb-left"><span class="ok">ready</span> · hypervisor online</span>
+    <span>rgba8888 · <b id="sb-res">1280×720</b> · rust wasm32 · <b id="sb-copies">0</b> blits</span>
   </footer>
 
   <!-- Focused Fullscreen Overlay & Dynamic Viewport -->

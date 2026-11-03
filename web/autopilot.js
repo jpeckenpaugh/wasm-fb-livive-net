@@ -309,7 +309,73 @@ export class AutoPilotRunner {
 
       case 'click': {
         if (!guest || !guest.clickLogical) throw new Error('Action click: guest VM not available');
-        guest.clickLogical(step.x, step.y);
+        let clickX = step.x;
+        let clickY = step.y;
+
+        // Support semantic target in click action if present
+        if (step.target) {
+          const t = step.target;
+          if (t.game === 'chess' || t.square) {
+            let sqId = t.id;
+            if (sqId == null && t.square) {
+              const file = t.square.charCodeAt(0) - 97;
+              const rank = parseInt(t.square[1], 10) - 1;
+              sqId = rank * 8 + file;
+            }
+            if (guest.exports?.app_semantic_coord && sqId != null) {
+              const packed = guest.exports.app_semantic_coord(2, sqId) >>> 0;
+              if (packed !== 0) {
+                clickX = packed >> 16;
+                clickY = packed & 0xFFFF;
+              }
+            }
+          } else if (t.game === 'mines' || (t.row != null && t.col != null)) {
+            const cellId = t.id ?? (t.row * 8 + t.col);
+            if (guest.exports?.app_semantic_coord && cellId != null) {
+              const packed = guest.exports.app_semantic_coord(4, cellId) >>> 0;
+              if (packed !== 0) {
+                clickX = packed >> 16;
+                clickY = packed & 0xFFFF;
+              }
+            }
+          }
+        }
+
+        guest.clickLogical(clickX, clickY);
+        if (guest.render) guest.render();
+        break;
+      }
+
+      case 'clickSquare': {
+        if (!guest || !guest.clickLogical) throw new Error('Action clickSquare: guest VM not available');
+        const sq = step.square;
+        let sqId = typeof step.id === 'number' ? step.id : null;
+        if (sqId == null && typeof sq === 'string') {
+          const file = sq.toLowerCase().charCodeAt(0) - 97;
+          const rank = parseInt(sq[1], 10) - 1;
+          if (file >= 0 && file < 8 && rank >= 0 && rank < 8) {
+            sqId = rank * 8 + file;
+          }
+        }
+        if (sqId == null) {
+          throw new Error(`Action clickSquare: invalid square '${sq}'`);
+        }
+
+        let clickX = step.x;
+        let clickY = step.y;
+        if (guest.exports?.app_semantic_coord) {
+          const kind = step.game === 'checkers' ? 3 : 2;
+          const packed = guest.exports.app_semantic_coord(kind, sqId) >>> 0;
+          if (packed !== 0) {
+            clickX = packed >> 16;
+            clickY = packed & 0xFFFF;
+          }
+        }
+        if (clickX == null || clickY == null) {
+          throw new Error(`Action clickSquare: unable to compute coordinates for square '${sq}'`);
+        }
+
+        guest.clickLogical(clickX, clickY);
         if (guest.render) guest.render();
         break;
       }
@@ -321,17 +387,32 @@ export class AutoPilotRunner {
         if (typeof row !== 'number' || typeof col !== 'number') {
           throw new Error(`Action clickCell: row and col must be numbers (got row=${row}, col=${col})`);
         }
-        // Coordinate calculation for Minesweeper 8x8 on 1280x720 (board_x = 134, board_y = 42, cell = 72, gap = 4)
-        const cell = 72;
-        const gap = 4;
-        const boardX = 134;
-        const boardY = 42;
-        const titleH = 32;
 
-        const x = boardX + col * (cell + gap) + Math.floor(cell / 2);
-        const y = titleH + boardY + row * (cell + gap) + Math.floor(cell / 2);
+        let clickX = null;
+        let clickY = null;
 
-        guest.clickLogical(x, y);
+        if (guest.exports?.app_semantic_coord) {
+          const cellId = row * 8 + col;
+          const packed = guest.exports.app_semantic_coord(4, cellId) >>> 0;
+          if (packed !== 0) {
+            clickX = packed >> 16;
+            clickY = packed & 0xFFFF;
+          }
+        }
+
+        if (clickX == null || clickY == null) {
+          // Fallback coordinate calculation for Minesweeper 8x8 on 1280x720
+          const cell = 72;
+          const gap = 4;
+          const boardX = 134;
+          const boardY = 42;
+          const titleH = 32;
+
+          clickX = boardX + col * (cell + gap) + Math.floor(cell / 2);
+          clickY = titleH + boardY + row * (cell + gap) + Math.floor(cell / 2);
+        }
+
+        guest.clickLogical(clickX, clickY);
         if (guest.render) guest.render();
         break;
       }

@@ -534,6 +534,17 @@ pub extern "C" fn app_fb_hash() -> u32 {
 }
 
 #[no_mangle]
+pub extern "C" fn app_client_fb_hash() -> u32 {
+    with_state(|wm, fb, _, _, _| {
+        if wm.ready {
+            fb.fnv1a_32_sub(wm::TITLE_H, fb.h - wm::TITLE_H)
+        } else {
+            0
+        }
+    })
+}
+
+#[no_mangle]
 pub extern "C" fn app_snapshot_count() -> u32 {
     unsafe { (*GUEST.wm.get()).snapshot_seq }
 }
@@ -582,6 +593,256 @@ pub extern "C" fn app_selected() -> i32 {
 #[no_mangle]
 pub extern "C" fn app_count() -> i32 {
     AppSlot::APP_COUNT as i32
+}
+
+#[no_mangle]
+pub extern "C" fn app_semantic_hit(x: i32, y: i32) -> u32 {
+    unsafe {
+        let wm = &*GUEST.wm.get();
+        if !wm.ready {
+            return 0;
+        }
+
+        let layout = wm::WmLayout::new(wm.width);
+
+        // 1. If Drawer is open and clicked on home menu items
+        if let wm::Focus::Menu { menu, .. } = wm.focus {
+            if menu == wm::MenuId::Home {
+                let items = wm.menu_items(menu);
+                let r = layout.dropdown_rect(menu, items.len(), wm.width);
+                if r.contains(x, y) {
+                    for idx in 0..items.len() {
+                        let ir = layout.menu_item_rect(menu, idx, items.len(), wm.width);
+                        if ir.contains(x, y) {
+                            return (1 << 24) | (idx as u32);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Title Bar: Home button or header rect
+        if (0..wm::TITLE_H).contains(&y) {
+            if layout.header_rect(wm::MenuId::Home).contains(x, y) {
+                return (1 << 24) | 0; // Home toggle
+            }
+            if layout.header_rect(wm::MenuId::App).contains(x, y) {
+                return (1 << 24) | 100; // App menu
+            }
+            return (1 << 24) | 0xFF; // Title bar generic
+        }
+
+        // 3. Client surface hit
+        let cx = x;
+        let cy = y - wm::TITLE_H;
+        let client_w = wm.width;
+        let client_h = (wm.height - wm::TITLE_H).max(1);
+
+        match wm.active_app {
+            AppSlot::Chess => {
+                let g = chess::chess_geom(client_w, client_h);
+                if layout::Rect::new(g.board_x, g.board_y, g.grid_px, g.grid_px).contains(cx, cy) {
+                    let v_col = (cx - g.board_x) / g.cell;
+                    let v_row = (cy - g.board_y) / g.cell;
+                    if (0..8).contains(&v_col) && (0..8).contains(&v_row) {
+                        let f = if wm.chess.flipped { 7 - v_col } else { v_col };
+                        let r = if wm.chess.flipped { v_row } else { 7 - v_row };
+                        if let Some(sq) = chess_sm::coord_to_square(f as i8, r as i8) {
+                            return (2 << 24) | (sq as u32);
+                        }
+                    }
+                }
+                if g.btn_new.contains(cx, cy) {
+                    return (5 << 24) | 0; // New Game
+                }
+                if g.btn_mode.contains(cx, cy) {
+                    return (5 << 24) | 1; // Mode
+                }
+                if g.btn_diff.contains(cx, cy) {
+                    return (5 << 24) | 2; // Diff
+                }
+                if g.btn_flip.contains(cx, cy) {
+                    return (5 << 24) | 3; // Flip
+                }
+            }
+            AppSlot::Checkers => {
+                let g = checkers::checkers_geom(client_w, client_h);
+                if layout::Rect::new(g.board_x, g.board_y, g.grid_px, g.grid_px).contains(cx, cy) {
+                    let v_col = (cx - g.board_x) / g.cell;
+                    let v_row = (cy - g.board_y) / g.cell;
+                    if (0..8).contains(&v_col) && (0..8).contains(&v_row) {
+                        let row = if wm.checkers.flipped { 7 - v_row } else { v_row };
+                        let col = if wm.checkers.flipped { 7 - v_col } else { v_col };
+                        if let Some(sq) = checkers_sm::coord_to_index(row, col) {
+                            return (3 << 24) | (sq as u32);
+                        }
+                    }
+                }
+                if g.btn_new.contains(cx, cy) {
+                    return (5 << 24) | 0; // New Game
+                }
+                if g.btn_mode.contains(cx, cy) {
+                    return (5 << 24) | 1; // Mode
+                }
+                if g.btn_diff.contains(cx, cy) {
+                    return (5 << 24) | 2; // Diff
+                }
+                if g.btn_flip.contains(cx, cy) {
+                    return (5 << 24) | 3; // Flip
+                }
+            }
+            AppSlot::Mines => {
+                let g = mines::mines_geom(client_w, client_h);
+                if layout::Rect::new(g.board_x, g.board_y, g.grid_px, g.grid_px).contains(cx, cy) {
+                    let rel_x = cx - g.board_x;
+                    let rel_y = cy - g.board_y;
+                    let stride = g.cell + g.gap;
+                    let col = rel_x / stride;
+                    let row = rel_y / stride;
+                    if (0..8).contains(&col)
+                        && (0..8).contains(&row)
+                        && (rel_x % stride) < g.cell
+                        && (rel_y % stride) < g.cell
+                    {
+                        let cell = (row * 8 + col) as u32;
+                        return (4 << 24) | cell;
+                    }
+                }
+                if g.btn_mode.contains(cx, cy) {
+                    return (5 << 24) | 1; // Mode
+                }
+                if g.btn_seed.contains(cx, cy) {
+                    return (5 << 24) | 0; // Seed / New Game
+                }
+                if g.btn_rule.contains(cx, cy) {
+                    return (5 << 24) | 4; // Rule
+                }
+                if g.btn_mp.contains(cx, cy) {
+                    return (5 << 24) | 5; // MP
+                }
+            }
+            _ => {}
+        }
+
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn app_semantic_coord(kind: u32, id: u32) -> u32 {
+    unsafe {
+        let wm = &*GUEST.wm.get();
+        let client_w = if wm.width > 0 { wm.width } else { 1280 };
+        let client_h = if wm.height > 0 { (wm.height - wm::TITLE_H).max(1) } else { 720 - wm::TITLE_H };
+
+        match kind {
+            1 => {
+                // TitleBar / Home Menu
+                let layout = wm::WmLayout::new(client_w);
+                if id == 0 {
+                    // Home button
+                    let r = layout.header_rect(wm::MenuId::Home);
+                    let cx = (r.x + r.w / 2) as u32;
+                    let cy = (r.y + r.h / 2) as u32;
+                    return (cx << 16) | (cy & 0xFFFF);
+                }
+                // Drawer menu item
+                let items_len = wm::AppSlot::APP_COUNT + 1; // apps + test pattern
+                if (id as usize) < items_len {
+                    let ir = layout.menu_item_rect(wm::MenuId::Home, id as usize, items_len, client_w);
+                    let cx = (ir.x + ir.w / 2) as u32;
+                    let cy = (ir.y + ir.h / 2) as u32;
+                    return (cx << 16) | (cy & 0xFFFF);
+                }
+            }
+            2 => {
+                // Chess square (0..63)
+                if id < 64 {
+                    let g = chess::chess_geom(client_w, client_h);
+                    let sq = id as u8;
+                    let f = chess_sm::square_file(sq) as i32;
+                    let r = chess_sm::square_rank(sq) as i32;
+                    let v_col = if wm.chess.flipped { 7 - f } else { f };
+                    let v_row = if wm.chess.flipped { r } else { 7 - r };
+                    let cx = (g.board_x + v_col * g.cell + g.cell / 2) as u32;
+                    let cy = (wm::TITLE_H + g.board_y + v_row * g.cell + g.cell / 2) as u32;
+                    return (cx << 16) | (cy & 0xFFFF);
+                }
+            }
+            3 => {
+                // Checkers square (0..31)
+                if id < 32 {
+                    let g = checkers::checkers_geom(client_w, client_h);
+                    let (row, col) = checkers_sm::index_to_coord(id as u8);
+                    let v_row = if wm.checkers.flipped { 7 - row } else { row };
+                    let v_col = if wm.checkers.flipped { 7 - col } else { col };
+                    let cx = (g.board_x + v_col * g.cell + g.cell / 2) as u32;
+                    let cy = (wm::TITLE_H + g.board_y + v_row * g.cell + g.cell / 2) as u32;
+                    return (cx << 16) | (cy & 0xFFFF);
+                }
+            }
+            4 => {
+                // Mines cell (0..63)
+                if id < 64 {
+                    let g = mines::mines_geom(client_w, client_h);
+                    let row = (id / 8) as i32;
+                    let col = (id % 8) as i32;
+                    let stride = g.cell + g.gap;
+                    let cx = (g.board_x + col * stride + g.cell / 2) as u32;
+                    let cy = (wm::TITLE_H + g.board_y + row * stride + g.cell / 2) as u32;
+                    return (cx << 16) | (cy & 0xFFFF);
+                }
+            }
+            5 => {
+                // Buttons: 0=NewGame/Seed, 1=Mode, 2=Diff, 3=Flip, 4=Rule, 5=Mp
+                match wm.active_app {
+                    AppSlot::Chess => {
+                        let g = chess::chess_geom(client_w, client_h);
+                        let r = match id {
+                            0 => g.btn_new,
+                            1 => g.btn_mode,
+                            2 => g.btn_diff,
+                            3 => g.btn_flip,
+                            _ => g.btn_new,
+                        };
+                        let cx = (r.x + r.w / 2) as u32;
+                        let cy = (wm::TITLE_H + r.y + r.h / 2) as u32;
+                        return (cx << 16) | (cy & 0xFFFF);
+                    }
+                    AppSlot::Checkers => {
+                        let g = checkers::checkers_geom(client_w, client_h);
+                        let r = match id {
+                            0 => g.btn_new,
+                            1 => g.btn_mode,
+                            2 => g.btn_diff,
+                            3 => g.btn_flip,
+                            _ => g.btn_new,
+                        };
+                        let cx = (r.x + r.w / 2) as u32;
+                        let cy = (wm::TITLE_H + r.y + r.h / 2) as u32;
+                        return (cx << 16) | (cy & 0xFFFF);
+                    }
+                    AppSlot::Mines => {
+                        let g = mines::mines_geom(client_w, client_h);
+                        let r = match id {
+                            0 => g.btn_seed,
+                            1 => g.btn_mode,
+                            4 => g.btn_rule,
+                            5 => g.btn_mp,
+                            _ => g.btn_seed,
+                        };
+                        let cx = (r.x + r.w / 2) as u32;
+                        let cy = (wm::TITLE_H + r.y + r.h / 2) as u32;
+                        return (cx << 16) | (cy & 0xFFFF);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+
+        0
+    }
 }
 
 #[no_mangle]
@@ -1522,5 +1783,63 @@ mod tests {
         assert_eq!(app_chess_apply_rx(1, seat, action, from, to, promo), 1);
         assert_eq!(app_chess_turn(), 2);
         assert_eq!(app_chess_state_hash(), p1_hash_after);
+    }
+
+    #[test]
+    fn semantic_reflection_queries_across_resolutions() {
+        let _g = crate::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        app_set_session(1);
+
+        // 1. Test at 1280x720
+        assert_eq!(app_init(1280, 720), 1);
+
+        // Title bar Home button
+        let hit_home = app_semantic_hit(20, 16);
+        assert_eq!(hit_home >> 24, 1);
+        let coord_home = app_semantic_coord(1, 0);
+        let cx = (coord_home >> 16) as i32;
+        let cy = (coord_home & 0xFFFF) as i32;
+        assert_eq!(cy, wm::TITLE_H / 2);
+        assert_eq!(cx, wm::HOME_BTN_W / 2);
+
+        // Open Chess (Ctrl+6)
+        assert_eq!(app_key_mods(16, 2), CLICK_CHANGED);
+        assert_eq!(app_selected(), 6);
+
+        // e2 square: square 12
+        let coord_e2 = app_semantic_coord(2, 12);
+        let e2_x = (coord_e2 >> 16) as i32;
+        let e2_y = (coord_e2 & 0xFFFF) as i32;
+        assert_eq!(app_semantic_hit(e2_x, e2_y), (2 << 24) | 12);
+
+        // New Game button: kind 5, id 0
+        let coord_btn = app_semantic_coord(5, 0);
+        let btn_x = (coord_btn >> 16) as i32;
+        let btn_y = (coord_btn & 0xFFFF) as i32;
+        assert_eq!(app_semantic_hit(btn_x, btn_y), (5 << 24) | 0);
+
+        // 2. Test at Mobile Portrait 390x844
+        assert_eq!(app_init(390, 844), 1);
+        assert_eq!(app_key_mods(16, 2), CLICK_CHANGED); // Open Chess
+        let coord_e2_mob = app_semantic_coord(2, 12);
+        let mob_x = (coord_e2_mob >> 16) as i32;
+        let mob_y = (coord_e2_mob & 0xFFFF) as i32;
+        assert_eq!(app_semantic_hit(mob_x, mob_y), (2 << 24) | 12);
+
+        // 3. Test Mines at 1280x720
+        assert_eq!(app_init(1280, 720), 1);
+        assert_eq!(app_key_mods(14, 2), CLICK_CHANGED); // Open Mines
+        let coord_cell0 = app_semantic_coord(4, 0);
+        let c0_x = (coord_cell0 >> 16) as i32;
+        let c0_y = (coord_cell0 & 0xFFFF) as i32;
+        assert_eq!(app_semantic_hit(c0_x, c0_y), (4 << 24) | 0);
+
+        // 4. Test Checkers at 1280x720
+        assert_eq!(app_init(1280, 720), 1);
+        assert_eq!(app_key_mods(15, 2), CLICK_CHANGED); // Open Checkers
+        let coord_chk0 = app_semantic_coord(3, 0);
+        let chk0_x = (coord_chk0 >> 16) as i32;
+        let chk0_y = (coord_chk0 & 0xFFFF) as i32;
+        assert_eq!(app_semantic_hit(chk0_x, chk0_y), (3 << 24) | 0);
     }
 }

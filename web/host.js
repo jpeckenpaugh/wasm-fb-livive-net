@@ -37,6 +37,14 @@ import {
 } from './adapters/mines.js';
 import { AutoPilotRunner } from './autopilot.js';
 import { MISSIONS } from './missions.js';
+import {
+  TrajectoryRecorder,
+  TrajectoryPlayer,
+  exportTrajectoryJson,
+  downloadTrajectoryFile,
+  importTrajectoryJson,
+  trajectoryToAutoPilotMission,
+} from './trajectory.js';
 
 const DEFAULT_W = 1280;
 const DEFAULT_H = 720;
@@ -703,6 +711,15 @@ const hostMem = document.getElementById('h-mem');
 const hostBlits = document.getElementById('h-frames');
 const hostSnaps = document.getElementById('h-snaps');
 const hostUptime = document.getElementById('h-uptime');
+const hostStatsPill = document.getElementById('host-stats-pill');
+const hostStatsDrawer = document.getElementById('host-stats-drawer');
+const hostGuestsPill = document.getElementById('h-guests-pill');
+const hostUptimePill = document.getElementById('h-uptime-pill');
+const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+const toggleInspectorBtn = document.getElementById('toggle-inspector-btn');
+const closeInspectorBtn = document.getElementById('close-inspector-btn');
+const inspectorPane = document.getElementById('inspector-pane');
+const sidebarEl = document.getElementById('sidebar');
 const brokerDrawer = document.getElementById('broker-drawer');
 const brokerResetBtn = document.getElementById('broker-reset-btn');
 const brokerHideBtn = document.getElementById('broker-hide-btn');
@@ -1143,6 +1160,7 @@ function setStatus(text, ok = false) {
 function updateHostStats() {
   hostModule.textContent = moduleBytes ? fmtBytes(moduleBytes) : '—';
   hostGuests.textContent = guests.length;
+  if (hostGuestsPill) hostGuestsPill.textContent = String(guests.length);
   if (hostMatches) hostMatches.textContent = broker.tables.matches.length;
   const reserved = guests.reduce((sum, guest) => sum + (guest.heapBytes || 0), 0);
   hostMem.textContent = reserved ? fmtBytes(reserved) : '0 B';
@@ -1205,15 +1223,33 @@ const buildPanelHtml = (vm) => {
   const b = vm.buildInfo;
   const gameEngines = b.checkersBuild ? `${b.checkersBuild} · ${b.minesBuild}` : b.minesBuild;
   return `
-  <div class="panel-banner">
-    <span><b>${vm.name}</b> · ${gameEngines} (<a class="commit-link" href="${b.githubUrl}" target="_blank" rel="noopener noreferrer" title="${b.notes}">↗ ${b.gitCommit}</a>)</span>
-    <div style="display:flex; align-items:center; gap:6px;">
-      <span class="seat-pill" data-stat="seat-pill">Solo · ${vm.width}×${vm.height}</span>
-      <button class="panel-banner-btn" data-action="fullscreen" type="button" title="Full Screen (Zen overlay)">⤢ full screen</button>
+  <header class="vm-chassis-header">
+    <div class="vm-header-left">
+      <span class="vm-status-tag"><span class="dot running"></span> RUNNING</span>
+      <span class="vm-id-badge">${vm.name}</span>
+      <span class="vm-build-label">${gameEngines} (<a class="commit-link" href="${b.githubUrl}" target="_blank" rel="noopener noreferrer" title="${b.notes}">↗ ${b.gitCommit}</a>)</span>
     </div>
-  </div>
+    <div class="vm-header-right">
+      <span class="seat-pill" data-stat="seat-pill">Solo · ${vm.width}×${vm.height}</span>
+      <button class="vm-action-btn" data-action="fullscreen" type="button" title="Full Screen (Zen overlay)">⤢ Fullscreen</button>
+      <button class="vm-action-btn" data-action="snap" type="button" title="Capture Framebuffer Snapshot">📷 Snapshot</button>
+      <button class="vm-action-btn btn-danger" data-action="destroy" type="button" title="Terminate / Power Off VM">✕ Terminate</button>
+    </div>
+  </header>
   <div class="screen"><canvas tabindex="0" width="${vm.width}" height="${vm.height}"></canvas></div>
-  <dl class="vm-stats">
+  <footer class="vm-chassis-footer">
+    <div class="vm-telemetry-summary">
+      <span>Heap: <b data-summary="mem">0 B</b></span>
+      <span>·</span>
+      <span>Render: <b data-summary="render">0.00 ms</b></span>
+      <span>·</span>
+      <span>Blit: <b data-summary="blit">0.00 ms</b></span>
+      <span>·</span>
+      <span>Hash: <b data-summary="hash">0x00000000</b></span>
+    </div>
+    <button class="vm-metrics-toggle" data-action="toggle-metrics" type="button" title="Toggle detailed hypervisor metrics">▾ Inspect Metrics</button>
+  </footer>
+  <dl class="vm-stats" hidden>
     <div class="cell"><dt>state</dt><dd class="state" data-stat="state">running</dd></div>
     <div class="cell"><dt>build</dt><dd data-stat="build">${b.shortLabel} (<a class="commit-link" href="${b.githubUrl}" target="_blank" rel="noopener noreferrer">↗ ${b.gitCommit}</a>)</dd></div>
     <div class="cell"><dt>mines engine</dt><dd data-stat="mines-build">${b.minesBuild}</dd></div>
@@ -1301,6 +1337,10 @@ function statNode(guest, key) {
   return guest.panel.querySelector(`[data-stat="${key}"]`);
 }
 
+function summaryNode(guest, key) {
+  return guest.panel.querySelector(`[data-summary="${key}"]`);
+}
+
 function updateGuestStats(guest) {
   const bootNode = statNode(guest, 'boot');
   if (bootNode) bootNode.textContent = `${fmtMs(guest.boot)} / ${fmtMs(guest.last.render)}`;
@@ -1312,6 +1352,17 @@ function updateGuestStats(guest) {
   if (hashNode) hashNode.textContent = fmtHex32(guest.fbHash);
   const memNode = statNode(guest, 'mem');
   if (memNode) memNode.textContent = fmtBytes(guest.heapBytes);
+
+  // Update concise footer telemetry summary
+  const sumMem = summaryNode(guest, 'mem');
+  if (sumMem) sumMem.textContent = fmtBytes(guest.heapBytes);
+  const sumRender = summaryNode(guest, 'render');
+  if (sumRender) sumRender.textContent = fmtMs(guest.last.render);
+  const sumBlit = summaryNode(guest, 'blit');
+  if (sumBlit) sumBlit.textContent = fmtMs(guest.last.blit);
+  const sumHash = summaryNode(guest, 'hash');
+  if (sumHash) sumHash.textContent = fmtHex32(guest.fbHash);
+
   updateGuestBanner(guest);
 }
 
@@ -1366,7 +1417,7 @@ function destroyGuest(guest) {
 
 function recordSnapshotCard(snap) {
   snapshots.unshift(snap);
-  snapDrawer.hidden = false;
+  openInspectorSection(snapDrawer);
   updateHostStats();
 
   const card = document.createElement('div');
@@ -1470,11 +1521,41 @@ async function createGuest(opts = {}) {
   panelsEl.append(vm.panel);
 
   vm.canvas = vm.panel.querySelector('canvas');
+
+  // Wire chassis action buttons
   const bannerFsBtn = vm.panel.querySelector('[data-action="fullscreen"]');
   if (bannerFsBtn) {
     bannerFsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleFullscreen(vm);
+    });
+  }
+
+  const chassisSnapBtn = vm.panel.querySelector('[data-action="snap"]');
+  if (chassisSnapBtn) {
+    chassisSnapBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      captureSnapshot(vm, false);
+    });
+  }
+
+  const chassisDestroyBtn = vm.panel.querySelector('[data-action="destroy"]');
+  if (chassisDestroyBtn) {
+    chassisDestroyBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      destroyGuest(vm);
+    });
+  }
+
+  const metricsToggleBtn = vm.panel.querySelector('[data-action="toggle-metrics"]');
+  if (metricsToggleBtn) {
+    metricsToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const statsGrid = vm.panel.querySelector('.vm-stats');
+      if (statsGrid) {
+        statsGrid.hidden = !statsGrid.hidden;
+        metricsToggleBtn.textContent = statsGrid.hidden ? '▾ Inspect Metrics' : '▴ Collapse Metrics';
+      }
     });
   }
   guests.push(vm);
@@ -1537,6 +1618,9 @@ async function createGuest(opts = {}) {
       const t0 = performance.now();
       const rc = exports.app_click(x, y);
       const t1 = performance.now();
+      if (trajectoryRecorder.isRecording() && trajectoryRecorder.guest?.id === vm.id) {
+        trajectoryRecorder.recordEvent('click', { x, y });
+      }
       if (rc !== 0) {
         blitToCanvas(t0, t1);
         serviceMinesMultiplayer(vm);
@@ -1643,6 +1727,10 @@ async function createGuest(opts = {}) {
         ? exports.app_key_mods(code, mods)
         : exports.app_key(code);
       const t1 = performance.now();
+
+      if (trajectoryRecorder.isRecording() && trajectoryRecorder.guest?.id === vm.id) {
+        trajectoryRecorder.recordEvent('key', { code, mods });
+      }
 
       if (rc === 0) return;
       event.preventDefault();
@@ -1758,7 +1846,7 @@ async function joinNetworkMatch(matchId, seat = 2) {
 
   broker.connectSse(matchId);
   updateGuestBanner(g);
-  brokerDrawer.hidden = false;
+  openInspectorSection(brokerDrawer);
   broker.renderDrawer();
   updateHostStats();
 
@@ -1815,7 +1903,7 @@ async function createNetworkMatch(game = 'checkers') {
 
   broker.connectSse(match.id);
   updateGuestBanner(g);
-  brokerDrawer.hidden = false;
+  openInspectorSection(brokerDrawer);
   broker.renderDrawer();
   updateHostStats();
 
@@ -1916,7 +2004,7 @@ const netJoinP2Btn = document.getElementById('net-join-p2-btn');
 
 if (netMatchBtn) {
   netMatchBtn.addEventListener('click', () => {
-    brokerDrawer.hidden = false;
+    openInspectorSection(brokerDrawer);
     const panel = document.getElementById('net-broker-panel');
     if (panel) {
       panel.scrollIntoView({ behavior: 'smooth' });
@@ -1966,10 +2054,23 @@ patternToggle.addEventListener('change', () => {
   }
 });
 
+if (hostStatsPill && hostStatsDrawer) {
+  hostStatsPill.addEventListener('click', () => {
+    if (hostStatsDrawer.hidden) {
+      openInspectorSection(hostStatsDrawer);
+    } else {
+      hostStatsDrawer.hidden = true;
+    }
+  });
+}
+
 setInterval(() => {
-  hostUptime.textContent = fmtDuration(performance.now() - bootAt);
+  const uptimeStr = fmtDuration(performance.now() - bootAt);
+  if (hostUptime) hostUptime.textContent = uptimeStr;
+  if (hostUptimePill) hostUptimePill.textContent = uptimeStr;
 }, 1000);
-hostUptime.textContent = '00:00:00';
+if (hostUptime) hostUptime.textContent = '00:00:00';
+if (hostUptimePill) hostUptimePill.textContent = '00:00:00';
 updateHostStats();
 
 document.addEventListener('visibilitychange', () => {
@@ -1983,6 +2084,13 @@ const autoPilotRunner = new AutoPilotRunner({
   createGuest: (opts) => createGuest(opts),
   captureSnapshot: (g, alreadyRecorded) => captureSnapshot(g, alreadyRecorded),
   setStatus: (msg, ok) => setStatus(msg, ok),
+});
+
+/* Trajectory Recording & Playback Engine */
+const trajectoryRecorder = new TrajectoryRecorder();
+const trajectoryPlayer = new TrajectoryPlayer({
+  getGuest: () => guests.find((candidate) => candidate.id === activeId) || guests[0],
+  getGuests: () => guests,
 });
 
 const autoPilotBtn = document.getElementById('autopilot-btn');
@@ -2084,9 +2192,10 @@ autoPilotRunner.onReportComplete = (report) => {
 
 if (autoPilotBtn && autoPilotPanel) {
   autoPilotBtn.addEventListener('click', () => {
-    autoPilotPanel.hidden = !autoPilotPanel.hidden;
-    if (!autoPilotPanel.hidden) {
-      autoPilotPanel.scrollIntoView({ behavior: 'smooth' });
+    if (autoPilotPanel.hidden) {
+      openInspectorSection(autoPilotPanel);
+    } else {
+      autoPilotPanel.hidden = true;
     }
   });
 }
@@ -2153,6 +2262,385 @@ if (apCancelBtn) {
       apTimerInterval = null;
     }
     updateAutoPilotControls('cancelled');
+  });
+}
+
+/* ---------------- Trajectory Recording & Playback UI Wiring ---------------- */
+const recordBtn = document.getElementById('record-btn');
+const trajDrawerBtn = document.getElementById('traj-drawer-btn');
+const trajectoryDrawer = document.getElementById('trajectory-drawer');
+const trajHideBtn = document.getElementById('traj-hide-btn');
+
+const trajRunnerState = document.getElementById('traj-runner-state');
+const trajStatusBadge = document.getElementById('traj-status-badge');
+const trajActionsStat = document.getElementById('traj-actions-stat');
+const trajDurationStat = document.getElementById('traj-duration-stat');
+const trajParityBadge = document.getElementById('traj-parity-badge');
+const trajTargetStat = document.getElementById('traj-target-stat');
+const trajRecordedResStat = document.getElementById('traj-recorded-res-stat');
+const trajModeBadge = document.getElementById('traj-mode-badge');
+const trajModeGroup = document.getElementById('traj-mode-group');
+
+const trajSaveBtn = document.getElementById('traj-save-btn');
+const trajLoadBtn = document.getElementById('traj-load-btn');
+const trajFileInput = document.getElementById('traj-file-input');
+const trajConvertBtn = document.getElementById('traj-convert-btn');
+
+const trajStepBtn = document.getElementById('traj-step-btn');
+const trajPlayBtn = document.getElementById('traj-play-btn');
+const trajPauseBtn = document.getElementById('traj-pause-btn');
+const trajStopBtn = document.getElementById('traj-stop-btn');
+const trajSpeedGroup = document.getElementById('traj-speed-group');
+
+const trajActionLabel = document.getElementById('traj-action-label');
+const trajProgressPct = document.getElementById('traj-progress-pct');
+const trajTimelineFill = document.getElementById('traj-timeline-fill');
+const trajEventsList = document.getElementById('traj-events-list');
+
+let lastTrajectoryData = null;
+let currentPlaybackSpeed = 1.0;
+let recPulseInterval = null;
+
+function formatMsDuration(ms) {
+  const totalSecs = Math.floor(ms / 1000);
+  const m = Math.floor(totalSecs / 60).toString().padStart(2, '0');
+  const s = (totalSecs % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function updateRecordButtonUI(isRecording) {
+  if (!recordBtn) return;
+  if (isRecording) {
+    recordBtn.classList.add('recording-active');
+    if (recPulseInterval) clearInterval(recPulseInterval);
+    recPulseInterval = setInterval(() => {
+      if (trajectoryRecorder.isRecording()) {
+        const dur = formatMsDuration(trajectoryRecorder.getDuration());
+        const count = trajectoryRecorder.getActionCount();
+        recordBtn.textContent = `⏺ REC ${dur} · ${count} act`;
+      }
+    }, 500);
+    const dur = formatMsDuration(trajectoryRecorder.getDuration());
+    const count = trajectoryRecorder.getActionCount();
+    recordBtn.textContent = `⏺ REC ${dur} · ${count} act`;
+  } else {
+    recordBtn.classList.remove('recording-active');
+    if (recPulseInterval) {
+      clearInterval(recPulseInterval);
+      recPulseInterval = null;
+    }
+    recordBtn.textContent = '⏺ record';
+  }
+}
+
+function updateTrajectoryDrawerUI() {
+  const data = lastTrajectoryData || trajectoryRecorder.exportData();
+  const count = data?.events?.length || 0;
+  const duration = data?.metadata?.durationMs || 0;
+  const targetId = data?.metadata?.guestId != null ? data.metadata.guestId : (activeId != null ? activeId : '—');
+
+  if (trajActionsStat) trajActionsStat.textContent = count;
+  if (trajDurationStat) trajDurationStat.textContent = `${duration}ms`;
+  if (trajTargetStat) trajTargetStat.textContent = targetId;
+
+  const recRes = data?.metadata?.recordedResolution || data?.metadata?.resolution;
+  if (trajRecordedResStat) {
+    trajRecordedResStat.textContent = recRes ? `${recRes.width}×${recRes.height}` : '—';
+  }
+
+  // Update mode pill
+  const activeGuest = guests.find((cand) => cand.id === activeId) || guests[0];
+  const resMatch = recRes && activeGuest && activeGuest.width === recRes.width && activeGuest.height === recRes.height;
+  const currentMode = trajectoryPlayer.getPlaybackMode();
+
+  if (trajModeBadge) {
+    if (currentMode === 'semantic' || (currentMode === 'auto' && !resMatch)) {
+      trajModeBadge.className = 'traj-badge ok';
+      trajModeBadge.textContent = '🧠 Semantic (Adaptive)';
+    } else {
+      trajModeBadge.className = 'traj-badge neutral';
+      trajModeBadge.textContent = '🎯 Physical 1:1';
+    }
+  }
+
+  // Update hash parity badge
+  if (trajParityBadge) {
+    if (trajectoryPlayer.hashDivergenceCount > 0) {
+      trajParityBadge.className = 'traj-badge diverged';
+      trajParityBadge.textContent = `${trajectoryPlayer.hashDivergenceCount} DIVERGED`;
+    } else {
+      trajParityBadge.className = 'traj-badge ok';
+      trajParityBadge.textContent = '100% VERIFIED';
+    }
+  }
+
+  // Populate events list
+  if (trajEventsList && data && data.events) {
+    trajEventsList.replaceChildren();
+    if (data.events.length === 0) {
+      const li = document.createElement('li');
+      li.textContent = 'No events recorded yet. Click [⏺ record] to record interactions.';
+      trajEventsList.appendChild(li);
+    } else {
+      data.events.forEach((ev, idx) => {
+        const li = document.createElement('li');
+        const hashHex = `0x${(ev.hash >>> 0).toString(16).padStart(8, '0')}`;
+        const clientHex = ev.clientHash != null ? ` · client=0x${(ev.clientHash >>> 0).toString(16).padStart(8, '0')}` : '';
+        let desc = '';
+        if (ev.type === 'click') desc = `Click (${ev.x}, ${ev.y})`;
+        else if (ev.type === 'key') desc = `Key code=${ev.code} mods=${ev.mods || 0}`;
+        else if (ev.type === 'openApp') desc = `OpenApp slot=${ev.slot}`;
+        else if (ev.type === 'seedMines') desc = `SeedMines seed=${ev.seed} strikes=${ev.maxStrikes}`;
+        else desc = `${ev.type} ${JSON.stringify(ev)}`;
+
+        li.textContent = `[#${idx + 1}] dt=${ev.dt}ms · ${desc} · hash=${hashHex}${clientHex}`;
+        li.dataset.idx = idx;
+        trajEventsList.appendChild(li);
+      });
+    }
+  }
+}
+
+// Player event callbacks
+trajectoryPlayer.onStateChange = (state) => {
+  if (trajRunnerState) trajRunnerState.textContent = state;
+  if (trajStatusBadge) {
+    trajStatusBadge.textContent = state.toUpperCase();
+    if (state === 'playing') {
+      trajStatusBadge.className = 'traj-badge ok';
+    } else if (state === 'paused') {
+      trajStatusBadge.className = 'traj-badge neutral';
+    } else if (state === 'completed') {
+      trajStatusBadge.className = 'traj-badge ok';
+    } else {
+      trajStatusBadge.className = 'traj-badge neutral';
+    }
+  }
+
+  if (trajPlayBtn) trajPlayBtn.disabled = state === 'playing';
+  if (trajPauseBtn) trajPauseBtn.disabled = state !== 'playing';
+  if (trajStepBtn) trajStepBtn.disabled = state === 'playing';
+  if (trajStopBtn) trajStopBtn.disabled = state === 'idle';
+};
+
+trajectoryPlayer.onProgress = ({ index, total, percent, divergences }) => {
+  if (trajTimelineFill) {
+    trajTimelineFill.style.width = `${percent.toFixed(1)}%`;
+  }
+  if (trajProgressPct) {
+    trajProgressPct.textContent = `${Math.round(percent)}%`;
+  }
+  if (trajActionLabel) {
+    trajActionLabel.textContent = `Action ${index}/${total} · ${divergences} divergence(s)`;
+  }
+  if (trajParityBadge) {
+    if (divergences > 0) {
+      trajParityBadge.className = 'traj-badge diverged';
+      trajParityBadge.textContent = `${divergences} DIVERGED`;
+    } else {
+      trajParityBadge.className = 'traj-badge ok';
+      trajParityBadge.textContent = '100% VERIFIED';
+    }
+  }
+
+  // Highlight current event in list
+  if (trajEventsList && trajEventsList.children) {
+    const items = trajEventsList.children;
+    for (let i = 0; i < items.length; i++) {
+      if (i === index - 1) {
+        items[i].classList.add('current');
+        items[i].scrollIntoView({ block: 'nearest' });
+      } else {
+        items[i].classList.remove('current');
+      }
+    }
+  }
+};
+
+trajectoryPlayer.onHashDivergence = ({ index, expectedHex, actualHex }) => {
+  if (trajEventsList && trajEventsList.children[index]) {
+    trajEventsList.children[index].classList.add('diverged');
+  }
+  setStatus(`Trajectory Hash Divergence at event #${index + 1}: expected ${expectedHex}, got ${actualHex}`, false);
+};
+
+trajectoryPlayer.onComplete = ({ divergences, total }) => {
+  setStatus(`Trajectory playback finished: ${total} events replayed with ${divergences} divergences.`, divergences === 0);
+};
+
+// UI Element Event Handlers
+if (recordBtn) {
+  recordBtn.addEventListener('click', () => {
+    if (trajectoryRecorder.isRecording()) {
+      // Stop recording
+      const data = trajectoryRecorder.stop();
+      updateRecordButtonUI(false);
+      lastTrajectoryData = data;
+      trajectoryPlayer.load(data);
+      updateTrajectoryDrawerUI();
+      if (trajectoryDrawer) {
+        openInspectorSection(trajectoryDrawer);
+      }
+      setStatus(`Trajectory recording saved: ${data.events.length} actions captured.`, true);
+    } else {
+      // Start recording active guest
+      const g = guests.find((cand) => cand.id === activeId) || guests[0];
+      if (!g) {
+        setStatus('Cannot start recording: No active guest VM', false);
+        return;
+      }
+      trajectoryRecorder.start(g);
+      updateRecordButtonUI(true);
+      setStatus(`⏺ Recording started on guest ${g.name} (${g.width}×${g.height})`, true);
+    }
+  });
+}
+
+if (trajDrawerBtn && trajectoryDrawer) {
+  trajDrawerBtn.addEventListener('click', () => {
+    if (trajectoryDrawer.hidden) {
+      updateTrajectoryDrawerUI();
+      openInspectorSection(trajectoryDrawer);
+    } else {
+      trajectoryDrawer.hidden = true;
+    }
+  });
+}
+
+if (trajHideBtn && trajectoryDrawer) {
+  trajHideBtn.addEventListener('click', () => {
+    trajectoryDrawer.hidden = true;
+  });
+}
+
+if (trajPlayBtn) {
+  trajPlayBtn.addEventListener('click', () => {
+    if (!lastTrajectoryData) {
+      setStatus('No trajectory loaded to play', false);
+      return;
+    }
+    trajectoryPlayer.play(currentPlaybackSpeed);
+  });
+}
+
+if (trajPauseBtn) {
+  trajPauseBtn.addEventListener('click', () => {
+    trajectoryPlayer.pause();
+  });
+}
+
+if (trajStopBtn) {
+  trajStopBtn.addEventListener('click', () => {
+    trajectoryPlayer.stop();
+  });
+}
+
+if (trajStepBtn) {
+  trajStepBtn.addEventListener('click', () => {
+    if (!lastTrajectoryData) {
+      setStatus('No trajectory loaded to step', false);
+      return;
+    }
+    trajectoryPlayer.stepForward();
+  });
+}
+
+if (trajSpeedGroup) {
+  trajSpeedGroup.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-speed]');
+    if (!btn) return;
+    const speed = parseFloat(btn.dataset.speed);
+    currentPlaybackSpeed = speed;
+    Array.from(trajSpeedGroup.children).forEach((b) => b.classList.remove('active-speed'));
+    btn.classList.add('active-speed');
+    if (trajectoryPlayer.state === 'playing') {
+      trajectoryPlayer.speed = speed;
+    }
+  });
+}
+
+if (trajModeGroup) {
+  trajModeGroup.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-mode]');
+    if (!btn) return;
+    const mode = btn.dataset.mode;
+    trajectoryPlayer.setPlaybackMode(mode);
+    Array.from(trajModeGroup.children).forEach((b) => b.classList.remove('active-speed'));
+    btn.classList.add('active-speed');
+    updateTrajectoryDrawerUI();
+  });
+}
+
+trajectoryPlayer.onModeChange = () => {
+  updateTrajectoryDrawerUI();
+};
+
+if (trajSaveBtn) {
+  trajSaveBtn.addEventListener('click', () => {
+    const data = lastTrajectoryData || trajectoryRecorder.exportData();
+    if (!data || !data.events || data.events.length === 0) {
+      setStatus('No trajectory events to save', false);
+      return;
+    }
+    const fname = downloadTrajectoryFile(data);
+    setStatus(`Trajectory saved to ${fname}`, true);
+  });
+}
+
+if (trajLoadBtn && trajFileInput) {
+  trajLoadBtn.addEventListener('click', () => {
+    trajFileInput.click();
+  });
+
+  trajFileInput.addEventListener('change', (ev) => {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const data = importTrajectoryJson(text);
+        lastTrajectoryData = data;
+        trajectoryPlayer.load(data);
+        updateTrajectoryDrawerUI();
+        setStatus(`Loaded trajectory with ${data.events.length} events from ${file.name}`, true);
+      } catch (err) {
+        console.error('Failed to import trajectory:', err);
+        setStatus(`Error loading trajectory: ${err.message}`, false);
+      }
+    };
+    reader.readAsText(file);
+    trajFileInput.value = '';
+  });
+}
+
+if (trajConvertBtn) {
+  trajConvertBtn.addEventListener('click', () => {
+    const data = lastTrajectoryData || trajectoryRecorder.exportData();
+    if (!data || !data.events || data.events.length === 0) {
+      setStatus('No trajectory events to convert', false);
+      return;
+    }
+    const mission = trajectoryToAutoPilotMission(data);
+    MISSIONS.push(mission);
+
+    // Add option to apMissionSelect
+    const apMissionSelect = document.getElementById('ap-mission-select');
+    if (apMissionSelect) {
+      const opt = document.createElement('option');
+      opt.value = mission.id;
+      opt.textContent = `[Trajectory] ${mission.name}`;
+      opt.selected = true;
+      apMissionSelect.appendChild(opt);
+    }
+
+    // Open Auto Pilot Panel
+    const autoPilotPanel = document.getElementById('autopilot-panel');
+    if (autoPilotPanel) {
+      openInspectorSection(autoPilotPanel);
+    }
+
+    setStatus(`Converted trajectory to Auto Pilot mission "${mission.name}"!`, true);
   });
 }
 
@@ -2241,7 +2729,84 @@ window.__appliance = {
     getReport: () => autoPilotRunner.getReport(),
     inspectState: () => autoPilotRunner.inspectState(),
   },
+  trajectory: {
+    startRecord: (guestId) => {
+      const g = (guestId != null ? guests.find((cand) => cand.id === guestId) : null) || guests.find((cand) => cand.id === activeId) || guests[0];
+      if (!g) throw new Error('startRecord: guest not found');
+      trajectoryRecorder.start(g);
+      updateRecordButtonUI(true);
+      return { recording: true, guestId: g.id };
+    },
+    stopRecord: () => {
+      const data = trajectoryRecorder.stop();
+      updateRecordButtonUI(false);
+      lastTrajectoryData = data;
+      trajectoryPlayer.load(data);
+      updateTrajectoryDrawerUI();
+      return data;
+    },
+    download: (filename) => {
+      const data = lastTrajectoryData || trajectoryRecorder.exportData();
+      return downloadTrajectoryFile(data, filename);
+    },
+    play: (speed = 1.0) => trajectoryPlayer.play(speed),
+    pause: () => trajectoryPlayer.pause(),
+    step: () => trajectoryPlayer.stepForward(),
+    stop: () => trajectoryPlayer.stop(),
+    load: (jsonOrData) => {
+      const data = typeof jsonOrData === 'string' ? importTrajectoryJson(jsonOrData) : jsonOrData;
+      lastTrajectoryData = data;
+      trajectoryPlayer.load(data);
+      updateTrajectoryDrawerUI();
+      return data;
+    },
+    exportJson: () => exportTrajectoryJson(lastTrajectoryData || trajectoryRecorder.exportData()),
+    getData: () => lastTrajectoryData || trajectoryRecorder.exportData(),
+    convertToMission: (opts) => {
+      const data = lastTrajectoryData || trajectoryRecorder.exportData();
+      return trajectoryToAutoPilotMission(data, opts);
+    },
+  },
 };
+
+function openInspectorSection(sectionEl) {
+  if (inspectorPane) {
+    inspectorPane.classList.remove('collapsed');
+  }
+  if (toggleInspectorBtn) {
+    toggleInspectorBtn.classList.add('active-toggle');
+  }
+  if (sectionEl) {
+    sectionEl.hidden = false;
+    sectionEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function initLayoutControls() {
+  if (toggleSidebarBtn && sidebarEl) {
+    toggleSidebarBtn.addEventListener('click', () => {
+      const isCollapsed = sidebarEl.classList.toggle('collapsed');
+      toggleSidebarBtn.classList.toggle('active-toggle', !isCollapsed);
+    });
+  }
+
+  if (toggleInspectorBtn && inspectorPane) {
+    toggleInspectorBtn.addEventListener('click', () => {
+      const isCollapsed = inspectorPane.classList.toggle('collapsed');
+      toggleInspectorBtn.classList.toggle('active-toggle', !isCollapsed);
+    });
+  }
+
+  if (closeInspectorBtn && inspectorPane) {
+    closeInspectorBtn.addEventListener('click', () => {
+      inspectorPane.classList.add('collapsed');
+      if (toggleInspectorBtn) {
+        toggleInspectorBtn.classList.remove('active-toggle');
+      }
+    });
+  }
+}
+initLayoutControls();
 
 setStatus('booting Test Appliance Orchestration Console…', true);
 loadRegistry()

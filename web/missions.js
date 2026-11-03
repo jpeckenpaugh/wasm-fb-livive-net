@@ -291,6 +291,176 @@ export const MISSIONS = [
       },
     ],
   },
+  {
+    id: 'chess-checkmate-6-moves',
+    name: 'Chess - Checkmate in 6 Moves (vs AI)',
+    description: 'Executes a Scholar-style Checkmate in 6 moves against the Minimax AI, asserting in-check and terminal Checkmate status.',
+    steps: [
+      {
+        action: 'boot',
+        opts: { width: 1280, height: 720 },
+        desc: 'Ensure guest VM is initialized at 1280×720',
+      },
+      {
+        action: 'openApp',
+        slot: 'chess',
+        desc: 'Open Classic Chess application',
+      },
+      {
+        action: 'assert',
+        check: (guest) => guest.exports?.app_selected() === 6,
+        desc: 'Assert active application is Chess (slot 6)',
+      },
+      {
+        action: 'assert',
+        check: (guest) => guest.exports?.app_chess_turn && guest.exports.app_chess_turn() === 1,
+        desc: 'Assert Chess turn is White (Player 1)',
+      },
+      // Move 1: Na3 (b1: 273, 648 -> a3: 170, 489)
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'b1',
+        x: 273,
+        y: 648,
+        desc: 'Select Knight at b1 (Move 1)',
+      },
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'a3',
+        x: 170,
+        y: 489,
+        desc: 'Play 1. Na3',
+      },
+      {
+        action: 'wait',
+        ms: 300,
+        desc: 'Wait for AI reply',
+      },
+      // Move 2: e4 (e2: 480, 561 -> e4: 484, 414)
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'e2',
+        x: 480,
+        y: 561,
+        desc: 'Select Pawn at e2 (Move 2)',
+      },
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'e4',
+        x: 484,
+        y: 414,
+        desc: 'Play 2. e4',
+      },
+      {
+        action: 'wait',
+        ms: 300,
+        desc: 'Wait for AI reply',
+      },
+      // Move 3: Qf3 (d1: 402, 630 -> f3: 549, 483)
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'd1',
+        x: 402,
+        y: 630,
+        desc: 'Select Queen at d1 (Move 3)',
+      },
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'f3',
+        x: 549,
+        y: 483,
+        desc: 'Play 3. Qf3',
+      },
+      {
+        action: 'wait',
+        ms: 300,
+        desc: 'Wait for AI reply',
+      },
+      // Move 4: Bc4 (f1: 552, 646 -> c4: 332, 402)
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'f1',
+        x: 552,
+        y: 646,
+        desc: 'Select Bishop at f1 (Move 4)',
+      },
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'c4',
+        x: 332,
+        y: 402,
+        desc: 'Play 4. Bc4',
+      },
+      {
+        action: 'wait',
+        ms: 300,
+        desc: 'Wait for AI reply',
+      },
+      // Move 5: Qxf7+ (f3: 562, 475 -> f7: 550, 184) - Check!
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'f3',
+        x: 562,
+        y: 475,
+        desc: 'Select Queen at f3 (Move 5)',
+      },
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'f7',
+        x: 550,
+        y: 184,
+        desc: 'Play 5. Qxf7+ (Check!)',
+      },
+      {
+        action: 'wait',
+        ms: 300,
+        desc: 'Wait for AI reply',
+      },
+      // Move 6: Bxe6# (c4: 327, 420 -> e6: 477, 263)
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'c4',
+        x: 327,
+        y: 420,
+        desc: 'Select Bishop at c4 (Move 6)',
+      },
+      {
+        action: 'clickSquare',
+        game: 'chess',
+        square: 'e6',
+        x: 477,
+        y: 263,
+        desc: 'Play 6. Bxe6# (Checkmate!)',
+      },
+      // Assert status and turn
+      {
+        action: 'assert',
+        check: (guest) => guest.exports?.app_chess_status && guest.exports.app_chess_status() === 2,
+        desc: 'Assert GameStatus is Checkmate (app_chess_status() === 2)',
+      },
+      {
+        action: 'assert',
+        check: (guest) => guest.exports?.app_chess_turn && guest.exports.app_chess_turn() === 2,
+        desc: 'Assert Black has no moves and is mated (app_chess_turn() === 2)',
+      },
+      {
+        action: 'snapshot',
+        label: 'Chess - Checkmate Victory in 6 Moves',
+        desc: 'Capture victory snapshot with terminal Checkmate',
+      },
+    ],
+  },
 ];
 
 export function getMissionById(id) {
