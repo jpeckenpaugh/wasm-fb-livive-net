@@ -1,0 +1,254 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>mines.livive.net — RL Minesweeper arcade cabinet</title>
+    <meta name="description" content="A retro arcade cabinet for 8x8 Minesweeper: play deterministic seeds, watch an ONNX RL policy reason with a live action mask and confidence heatmap, or race it side by side.">
+    <meta name="theme-color" content="#0a0a14">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="src/style.css">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+<style type="text/css">::-webkit-scrollbar{display:none!important}html{scroll-behavior:auto!important}*{animation-duration:0s!important;transition-duration:0s!important}</style></head>
+  <body>
+    <div class="scanlines" aria-hidden="true"></div>
+
+    <div class="cabinet">
+      <header class="marquee">
+        <h1>MINES<span class="dot">.livive.net</span></h1>
+        <p class="tagline">8×8 · 10 mines · deterministic seeds · human vs ONNX RL</p>
+      </header>
+
+      <section class="console" aria-label="Cabinet controls">
+        <div class="tabs" role="tablist" aria-label="Game mode">
+          <button id="tab-play" class="tab active" role="tab" aria-selected="true" aria-controls="panel-play" tabindex="0" data-mode="play">
+            PLAY
+          </button>
+          <button id="tab-ai" class="tab" role="tab" aria-selected="false" aria-controls="panel-ai" tabindex="-1" data-mode="ai">
+            AI
+          </button>
+          <button id="tab-race" class="tab" role="tab" aria-selected="false" aria-controls="panel-race" tabindex="-1" data-mode="race">
+            RACE
+          </button>
+          <button id="tab-concurrent" class="tab" role="tab" aria-selected="false" aria-controls="panel-concurrent" tabindex="-1" data-mode="concurrent">
+            CONCURRENT
+          </button>
+          <button id="tab-models" class="tab" role="tab" aria-selected="false" aria-controls="panel-models" tabindex="-1" data-mode="models">
+            MODELS
+          </button>
+        </div>
+
+        <span id="copy-status" class="sr-only" role="status" aria-live="polite"></span>
+
+        <div class="control-cluster">
+          <label class="field" for="seed-input">
+            <span class="field-label">SEED</span>
+            <input id="seed-input" type="number" min="0" step="1" inputmode="numeric">
+          </label>
+          <button id="new-seed" class="btn" type="button">NEW</button>
+          <button id="copy-link" class="btn" type="button">LINK</button>
+        </div>
+
+        <div class="control-cluster">
+          <label class="field field-checkpoint" for="checkpoint">
+            <span class="field-label">CHECKPOINT</span>
+            <select id="checkpoint"><option value="m0">M0 · Uniform baseline</option><option value="m1">M1 · Basic-rule imitation</option><option value="m2">M2 · Subset-solver imitation</option><option value="m3">M3 · Wide + deep imitation</option><option value="m4">M4 · Long-trained small imitation</option><option value="m5">M5 · Self-play (win reward)</option><option value="m6">M6 · Self-play (detonation-averse)</option><option value="m7">M7 · Wide-kernel ablation (5x5)</option><option value="m8">M8 · Shallow ablation (single conv)</option></select>
+          </label>
+          <span id="backend-badge" class="badge badge-real">ONNX checkpoints live</span>
+        </div>
+
+        <div class="control-cluster tools">
+          <button id="flag-toggle" class="btn toggle" type="button">
+            FLAG MODE <span id="flag-state">OFF</span>
+          </button>
+          <button id="heat-toggle" class="btn toggle on" type="button">
+            HEATMAP <span id="heat-state">ON</span>
+          </button>
+          <button id="mask-toggle" class="btn toggle on" type="button">
+            MASK <span id="mask-state">ON</span>
+          </button>
+        </div>
+      </section>
+
+      <div id="boot-error" class="boot-error" role="alert" hidden=""></div>
+
+      <main>
+        <!-- ============================ PLAY ============================ -->
+        <section class="panel stage" id="panel-play" role="tabpanel" aria-labelledby="tab-play" data-panel="play">
+          <div class="board-frame">
+            <div id="play-board" class="board" role="grid" aria-label="Play board" aria-rowcount="8" aria-colcount="8" style="--w: 8;"><div class="board-row" role="row"><button type="button" class="cell" data-index="0" role="gridcell" aria-label="cell A1, hidden" tabindex="0"></button><button type="button" class="cell" data-index="1" role="gridcell" aria-label="cell B1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="2" role="gridcell" aria-label="cell C1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="3" role="gridcell" aria-label="cell D1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="4" role="gridcell" aria-label="cell E1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="5" role="gridcell" aria-label="cell F1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="6" role="gridcell" aria-label="cell G1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="7" role="gridcell" aria-label="cell H1, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="8" role="gridcell" aria-label="cell A2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="9" role="gridcell" aria-label="cell B2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="10" role="gridcell" aria-label="cell C2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="11" role="gridcell" aria-label="cell D2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="12" role="gridcell" aria-label="cell E2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="13" role="gridcell" aria-label="cell F2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="14" role="gridcell" aria-label="cell G2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="15" role="gridcell" aria-label="cell H2, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="16" role="gridcell" aria-label="cell A3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="17" role="gridcell" aria-label="cell B3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="18" role="gridcell" aria-label="cell C3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="19" role="gridcell" aria-label="cell D3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="20" role="gridcell" aria-label="cell E3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="21" role="gridcell" aria-label="cell F3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="22" role="gridcell" aria-label="cell G3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="23" role="gridcell" aria-label="cell H3, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="24" role="gridcell" aria-label="cell A4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="25" role="gridcell" aria-label="cell B4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="26" role="gridcell" aria-label="cell C4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="27" role="gridcell" aria-label="cell D4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="28" role="gridcell" aria-label="cell E4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="29" role="gridcell" aria-label="cell F4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="30" role="gridcell" aria-label="cell G4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="31" role="gridcell" aria-label="cell H4, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="32" role="gridcell" aria-label="cell A5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="33" role="gridcell" aria-label="cell B5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="34" role="gridcell" aria-label="cell C5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="35" role="gridcell" aria-label="cell D5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="36" role="gridcell" aria-label="cell E5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="37" role="gridcell" aria-label="cell F5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="38" role="gridcell" aria-label="cell G5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="39" role="gridcell" aria-label="cell H5, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="40" role="gridcell" aria-label="cell A6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="41" role="gridcell" aria-label="cell B6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="42" role="gridcell" aria-label="cell C6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="43" role="gridcell" aria-label="cell D6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="44" role="gridcell" aria-label="cell E6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="45" role="gridcell" aria-label="cell F6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="46" role="gridcell" aria-label="cell G6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="47" role="gridcell" aria-label="cell H6, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="48" role="gridcell" aria-label="cell A7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="49" role="gridcell" aria-label="cell B7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="50" role="gridcell" aria-label="cell C7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="51" role="gridcell" aria-label="cell D7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="52" role="gridcell" aria-label="cell E7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="53" role="gridcell" aria-label="cell F7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="54" role="gridcell" aria-label="cell G7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="55" role="gridcell" aria-label="cell H7, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="56" role="gridcell" aria-label="cell A8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="57" role="gridcell" aria-label="cell B8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="58" role="gridcell" aria-label="cell C8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="59" role="gridcell" aria-label="cell D8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="60" role="gridcell" aria-label="cell E8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="61" role="gridcell" aria-label="cell F8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="62" role="gridcell" aria-label="cell G8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="63" role="gridcell" aria-label="cell H8, hidden" tabindex="-1"></button></div></div>
+          </div>
+          <div class="hud-panel">
+            <!-- Live region contains only STATUS; the clock lives outside it so
+                 the 250ms tick never spams assistive tech. -->
+            <aside class="hud" aria-live="polite">
+              <div class="hud-status">
+                <span class="hud-label">STATUS</span>
+                <span id="play-status" class="hud-value" data-state="ready">READY</span>
+              </div>
+            </aside>
+            <div class="hud-status">
+              <span class="hud-label">MINES</span>
+              <span id="play-mines" class="hud-value">10</span>
+            </div>
+            <div class="hud-status">
+              <span class="hud-label">FLAGS</span>
+              <span id="play-flags" class="hud-value">0</span>
+            </div>
+            <div class="hud-status">
+              <span class="hud-label">MOVES</span>
+              <span id="play-moves" class="hud-value">0</span>
+            </div>
+            <div class="hud-status">
+              <span class="hud-label">TIME</span>
+              <span id="play-time" class="hud-value">00:00</span>
+            </div>
+            <button id="play-reset" class="btn wide" type="button">RESET BOARD</button>
+            <p class="hint">
+              Click / tap to reveal · right-click or long-press to flag ·
+              arrows + Enter + F on keyboard. First click is always safe.
+            </p>
+          </div>
+        </section>
+
+        <!-- ============================== AI ============================ -->
+        <section class="panel stage" id="panel-ai" role="tabpanel" aria-labelledby="tab-ai" data-panel="ai" hidden="">
+          <div class="board-frame">
+            <div id="ai-board" class="board" role="grid" aria-label="AI board" aria-rowcount="8" aria-colcount="8" style="--w: 8;"><div class="board-row" role="row"><button type="button" class="cell" data-index="0" role="gridcell" aria-label="cell A1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="1" role="gridcell" aria-label="cell B1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="2" role="gridcell" aria-label="cell C1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="3" role="gridcell" aria-label="cell D1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="4" role="gridcell" aria-label="cell E1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="5" role="gridcell" aria-label="cell F1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="6" role="gridcell" aria-label="cell G1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="7" role="gridcell" aria-label="cell H1, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="8" role="gridcell" aria-label="cell A2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="9" role="gridcell" aria-label="cell B2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="10" role="gridcell" aria-label="cell C2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="11" role="gridcell" aria-label="cell D2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="12" role="gridcell" aria-label="cell E2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="13" role="gridcell" aria-label="cell F2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="14" role="gridcell" aria-label="cell G2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="15" role="gridcell" aria-label="cell H2, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="16" role="gridcell" aria-label="cell A3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="17" role="gridcell" aria-label="cell B3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="18" role="gridcell" aria-label="cell C3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="19" role="gridcell" aria-label="cell D3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="20" role="gridcell" aria-label="cell E3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="21" role="gridcell" aria-label="cell F3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="22" role="gridcell" aria-label="cell G3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="23" role="gridcell" aria-label="cell H3, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="24" role="gridcell" aria-label="cell A4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="25" role="gridcell" aria-label="cell B4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="26" role="gridcell" aria-label="cell C4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="27" role="gridcell" aria-label="cell D4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="28" role="gridcell" aria-label="cell E4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="29" role="gridcell" aria-label="cell F4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="30" role="gridcell" aria-label="cell G4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="31" role="gridcell" aria-label="cell H4, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="32" role="gridcell" aria-label="cell A5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="33" role="gridcell" aria-label="cell B5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="34" role="gridcell" aria-label="cell C5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="35" role="gridcell" aria-label="cell D5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="36" role="gridcell" aria-label="cell E5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="37" role="gridcell" aria-label="cell F5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="38" role="gridcell" aria-label="cell G5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="39" role="gridcell" aria-label="cell H5, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="40" role="gridcell" aria-label="cell A6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="41" role="gridcell" aria-label="cell B6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="42" role="gridcell" aria-label="cell C6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="43" role="gridcell" aria-label="cell D6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="44" role="gridcell" aria-label="cell E6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="45" role="gridcell" aria-label="cell F6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="46" role="gridcell" aria-label="cell G6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="47" role="gridcell" aria-label="cell H6, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="48" role="gridcell" aria-label="cell A7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="49" role="gridcell" aria-label="cell B7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="50" role="gridcell" aria-label="cell C7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="51" role="gridcell" aria-label="cell D7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="52" role="gridcell" aria-label="cell E7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="53" role="gridcell" aria-label="cell F7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="54" role="gridcell" aria-label="cell G7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="55" role="gridcell" aria-label="cell H7, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="56" role="gridcell" aria-label="cell A8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="57" role="gridcell" aria-label="cell B8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="58" role="gridcell" aria-label="cell C8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="59" role="gridcell" aria-label="cell D8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="60" role="gridcell" aria-label="cell E8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="61" role="gridcell" aria-label="cell F8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="62" role="gridcell" aria-label="cell G8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="63" role="gridcell" aria-label="cell H8, hidden" tabindex="-1"></button></div></div>
+          </div>
+          <div class="hud-panel">
+            <!-- Only STATUS is announced; MOVE/TIME/PICKED update during autoplay
+                 and would otherwise flood the live region. -->
+            <aside class="hud" aria-live="polite">
+              <div class="hud-status">
+                <span class="hud-label">STATUS</span>
+                <span id="ai-status" class="hud-value" data-state="ready">READY</span>
+              </div>
+            </aside>
+            <div class="hud-status">
+              <span class="hud-label">MOVE</span>
+              <span id="ai-moves" class="hud-value">0</span>
+            </div>
+            <div class="hud-status">
+              <span class="hud-label">TIME</span>
+              <span id="ai-time" class="hud-value">00:00</span>
+            </div>
+            <div class="hud-status">
+              <span class="hud-label">PICKED</span>
+              <span id="ai-action" class="hud-value">—</span>
+            </div>
+            <div class="hud-status">
+              <span class="hud-label">CONFIDENCE</span>
+              <span id="ai-confidence" class="hud-value">—</span>
+            </div>
+            <div class="dist">
+              <span class="hud-label">TOP MOVES</span>
+              <div id="ai-dist" class="dist-list"></div>
+            </div>
+            <p class="hint overlay-legend">cyan = P(reveal) · ring = legal · dim = masked</p>
+            <div class="ai-controls">
+              <button id="ai-play" class="btn wide" type="button" data-state="idle">PLAY</button>
+              <div class="ai-buttons">
+                <button id="ai-step" class="btn" type="button">STEP</button>
+                <button id="ai-reset" class="btn" type="button">RESET</button>
+              </div>
+              <label class="field range" for="ai-speed">
+                <span class="field-label">SPEED</span>
+                <input id="ai-speed" type="range" min="100" max="1100" step="50" value="820">
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================= RACE =========================== -->
+        <section class="panel race" id="panel-race" role="tabpanel" aria-labelledby="tab-race" data-panel="race" hidden="">
+          <div class="race-grid">
+            <div class="race-side">
+              <h2 class="race-title">YOU</h2>
+              <div id="race-human" class="board" role="grid" aria-label="Your board" aria-rowcount="8" aria-colcount="8" style="--w: 8;"><div class="board-row" role="row"><button type="button" class="cell" data-index="0" role="gridcell" aria-label="cell A1, hidden" tabindex="0"></button><button type="button" class="cell" data-index="1" role="gridcell" aria-label="cell B1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="2" role="gridcell" aria-label="cell C1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="3" role="gridcell" aria-label="cell D1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="4" role="gridcell" aria-label="cell E1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="5" role="gridcell" aria-label="cell F1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="6" role="gridcell" aria-label="cell G1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="7" role="gridcell" aria-label="cell H1, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="8" role="gridcell" aria-label="cell A2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="9" role="gridcell" aria-label="cell B2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="10" role="gridcell" aria-label="cell C2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="11" role="gridcell" aria-label="cell D2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="12" role="gridcell" aria-label="cell E2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="13" role="gridcell" aria-label="cell F2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="14" role="gridcell" aria-label="cell G2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="15" role="gridcell" aria-label="cell H2, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="16" role="gridcell" aria-label="cell A3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="17" role="gridcell" aria-label="cell B3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="18" role="gridcell" aria-label="cell C3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="19" role="gridcell" aria-label="cell D3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="20" role="gridcell" aria-label="cell E3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="21" role="gridcell" aria-label="cell F3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="22" role="gridcell" aria-label="cell G3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="23" role="gridcell" aria-label="cell H3, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="24" role="gridcell" aria-label="cell A4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="25" role="gridcell" aria-label="cell B4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="26" role="gridcell" aria-label="cell C4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="27" role="gridcell" aria-label="cell D4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="28" role="gridcell" aria-label="cell E4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="29" role="gridcell" aria-label="cell F4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="30" role="gridcell" aria-label="cell G4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="31" role="gridcell" aria-label="cell H4, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="32" role="gridcell" aria-label="cell A5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="33" role="gridcell" aria-label="cell B5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="34" role="gridcell" aria-label="cell C5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="35" role="gridcell" aria-label="cell D5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="36" role="gridcell" aria-label="cell E5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="37" role="gridcell" aria-label="cell F5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="38" role="gridcell" aria-label="cell G5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="39" role="gridcell" aria-label="cell H5, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="40" role="gridcell" aria-label="cell A6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="41" role="gridcell" aria-label="cell B6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="42" role="gridcell" aria-label="cell C6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="43" role="gridcell" aria-label="cell D6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="44" role="gridcell" aria-label="cell E6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="45" role="gridcell" aria-label="cell F6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="46" role="gridcell" aria-label="cell G6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="47" role="gridcell" aria-label="cell H6, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="48" role="gridcell" aria-label="cell A7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="49" role="gridcell" aria-label="cell B7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="50" role="gridcell" aria-label="cell C7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="51" role="gridcell" aria-label="cell D7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="52" role="gridcell" aria-label="cell E7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="53" role="gridcell" aria-label="cell F7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="54" role="gridcell" aria-label="cell G7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="55" role="gridcell" aria-label="cell H7, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="56" role="gridcell" aria-label="cell A8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="57" role="gridcell" aria-label="cell B8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="58" role="gridcell" aria-label="cell C8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="59" role="gridcell" aria-label="cell D8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="60" role="gridcell" aria-label="cell E8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="61" role="gridcell" aria-label="cell F8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="62" role="gridcell" aria-label="cell G8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="63" role="gridcell" aria-label="cell H8, hidden" tabindex="-1"></button></div></div>
+              <p id="race-human-hud" class="race-hud">READY · 10 mines · 0 moves · 00:00</p>
+            </div>
+            <div class="race-side">
+              <h2 class="race-title">AI</h2>
+              <div id="race-ai" class="board" role="grid" aria-label="AI board" aria-rowcount="8" aria-colcount="8" style="--w: 8;"><div class="board-row" role="row"><button type="button" class="cell" data-index="0" role="gridcell" aria-label="cell A1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="1" role="gridcell" aria-label="cell B1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="2" role="gridcell" aria-label="cell C1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="3" role="gridcell" aria-label="cell D1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="4" role="gridcell" aria-label="cell E1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="5" role="gridcell" aria-label="cell F1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="6" role="gridcell" aria-label="cell G1, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="7" role="gridcell" aria-label="cell H1, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="8" role="gridcell" aria-label="cell A2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="9" role="gridcell" aria-label="cell B2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="10" role="gridcell" aria-label="cell C2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="11" role="gridcell" aria-label="cell D2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="12" role="gridcell" aria-label="cell E2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="13" role="gridcell" aria-label="cell F2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="14" role="gridcell" aria-label="cell G2, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="15" role="gridcell" aria-label="cell H2, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="16" role="gridcell" aria-label="cell A3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="17" role="gridcell" aria-label="cell B3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="18" role="gridcell" aria-label="cell C3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="19" role="gridcell" aria-label="cell D3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="20" role="gridcell" aria-label="cell E3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="21" role="gridcell" aria-label="cell F3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="22" role="gridcell" aria-label="cell G3, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="23" role="gridcell" aria-label="cell H3, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="24" role="gridcell" aria-label="cell A4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="25" role="gridcell" aria-label="cell B4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="26" role="gridcell" aria-label="cell C4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="27" role="gridcell" aria-label="cell D4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="28" role="gridcell" aria-label="cell E4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="29" role="gridcell" aria-label="cell F4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="30" role="gridcell" aria-label="cell G4, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="31" role="gridcell" aria-label="cell H4, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="32" role="gridcell" aria-label="cell A5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="33" role="gridcell" aria-label="cell B5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="34" role="gridcell" aria-label="cell C5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="35" role="gridcell" aria-label="cell D5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="36" role="gridcell" aria-label="cell E5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="37" role="gridcell" aria-label="cell F5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="38" role="gridcell" aria-label="cell G5, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="39" role="gridcell" aria-label="cell H5, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="40" role="gridcell" aria-label="cell A6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="41" role="gridcell" aria-label="cell B6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="42" role="gridcell" aria-label="cell C6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="43" role="gridcell" aria-label="cell D6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="44" role="gridcell" aria-label="cell E6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="45" role="gridcell" aria-label="cell F6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="46" role="gridcell" aria-label="cell G6, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="47" role="gridcell" aria-label="cell H6, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="48" role="gridcell" aria-label="cell A7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="49" role="gridcell" aria-label="cell B7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="50" role="gridcell" aria-label="cell C7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="51" role="gridcell" aria-label="cell D7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="52" role="gridcell" aria-label="cell E7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="53" role="gridcell" aria-label="cell F7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="54" role="gridcell" aria-label="cell G7, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="55" role="gridcell" aria-label="cell H7, hidden" tabindex="-1"></button></div><div class="board-row" role="row"><button type="button" class="cell" data-index="56" role="gridcell" aria-label="cell A8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="57" role="gridcell" aria-label="cell B8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="58" role="gridcell" aria-label="cell C8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="59" role="gridcell" aria-label="cell D8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="60" role="gridcell" aria-label="cell E8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="61" role="gridcell" aria-label="cell F8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="62" role="gridcell" aria-label="cell G8, hidden" tabindex="-1"></button><button type="button" class="cell" data-index="63" role="gridcell" aria-label="cell H8, hidden" tabindex="-1"></button></div></div>
+              <p id="race-ai-hud" class="race-hud">READY · 10 mines · 0 moves · 00:00</p>
+            </div>
+          </div>
+          <div class="race-bar">
+            <button id="race-start" class="btn wide" type="button">START RACE</button>
+            <button id="race-reset" class="btn" type="button">RESET</button>
+          </div>
+          <div id="race-result" class="race-result" aria-live="polite"></div>
+        </section>
+
+        <!-- ========================== CONCURRENT ======================== -->
+        <section class="panel concurrent" id="panel-concurrent" role="tabpanel" aria-labelledby="tab-concurrent" data-panel="concurrent" hidden="">
+          <div class="scoreboard">
+            <div class="score-total">
+              <span class="score-k">TOTAL POINTS</span>
+              <span id="concurrent-total" class="score-value">0</span>
+            </div>
+            <div class="score-counts" role="group" aria-label="Outcome counts">
+              <div class="score-count" data-kind="cleared">
+                <span id="concurrent-cleared" class="score-n">0</span>
+                <span class="score-k">CLEARED</span>
+              </div>
+              <div class="score-count" data-kind="detonated">
+                <span id="concurrent-detonated" class="score-n">0</span>
+                <span class="score-k">DETONATED</span>
+              </div>
+              <div class="score-count" data-kind="stuck">
+                <span id="concurrent-stuck" class="score-n">0</span>
+                <span class="score-k">STUCK</span>
+              </div>
+            </div>
+            <div class="concurrent-controls">
+              <button id="concurrent-start" class="btn wide" type="button">START</button>
+              <button id="concurrent-reset" class="btn" type="button">RESET</button>
+              <label class="field range" for="concurrent-speed">
+                <span class="field-label">SPEED</span>
+                <input id="concurrent-speed" type="range" min="100" max="1000" step="50" value="950">
+              </label>
+            </div>
+          </div>
+
+          <p class="concurrent-hint">
+            Every checkpoint plays the identical board (<code>?seed=</code>) in lockstep.
+            <span class="legend-cleared">cleared</span> ·
+            <span class="legend-detonated">detonated</span> ·
+            <span class="legend-stuck">stuck</span>
+          </p>
+
+          <div id="concurrent-grid" class="concurrent-grid"></div>
+
+          <div class="leaderboard">
+            <h2 class="panel-title">LEADERBOARD</h2>
+            <ol id="concurrent-leaderboard" class="leader-list"></ol>
+          </div>
+          <p id="concurrent-live" class="sr-only" role="status" aria-live="polite"></p>
+        </section>
+
+        <!-- ============================ MODELS ========================== -->
+        <section class="panel models" id="panel-models" role="tabpanel" aria-labelledby="tab-models" data-panel="models" hidden="">
+          <h2 class="panel-title">MODEL CHECKPOINTS</h2>
+          <p class="models-intro">
+            Every ONNX policy in the manifest: how it was made, how it differs, its
+            architecture and training config, file size, and its fixed-seed evaluation.
+          </p>
+          <div id="models-list" class="models-list" role="list"></div>
+          <p id="models-note" class="hint" role="status"></p>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <p>
+          Deterministic seeds · first-click-safe 8×8/10 engine ·
+          <a href="https://github.com/jpeckenpaugh/mines-livive-net">source</a>
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="src/app.js"></script>
+  
+
+</body></html>

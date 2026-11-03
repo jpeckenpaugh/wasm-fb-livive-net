@@ -1,0 +1,66 @@
+{
+  "schema": "wasm-fb.web-capture/1",
+  "captureId": "afd75d6e04e34fa4",
+  "site": {
+    "id": "mines-sm.livive.net",
+    "label": "mines-sm.livive.net"
+  },
+  "request": {
+    "url": "https://mines-sm.livive.net/",
+    "viewport": {
+      "width": 1280,
+      "height": 688,
+      "dpr": 1
+    },
+    "scrollY": 0,
+    "clip": null
+  },
+  "result": {
+    "finalUrl": "https://mines-sm.livive.net/",
+    "status": 200,
+    "title": "mine-sm — Minesweeper state machine harness",
+    "capturedAt": "2026-11-03T09:09:48.543Z",
+    "renderMs": 1180,
+    "settled": true,
+    "colorScheme": "dark",
+    "reducedMotion": true,
+    "blockedRequests": 0
+  },
+  "artifacts": [
+    {
+      "path": "index.html",
+      "bytes": 17447,
+      "sha256": "f0e9e07045db400161bd8998daa6a60330e2ff833dbd1d4360b208a6ea12d57b"
+    },
+    {
+      "path": "rendered.html",
+      "bytes": 24857,
+      "sha256": "06abedf43ac634a8fcc5da08cd9aa56f75070673430fe9fe73b86610d64b94ce"
+    },
+    {
+      "path": "page.png",
+      "bytes": 94107,
+      "sha256": "37eefe3e17b47c82a88042ccf43ade7c66111f783d8bb6c7624f659af71a2628"
+    },
+    {
+      "path": "text.txt",
+      "bytes": 2271,
+      "sha256": "d7c0742194ad345c8796b13b4ebff63ae5bbab626f3ebce74c2dea4e04542de1"
+    },
+    {
+      "path": "headers.txt",
+      "bytes": 684,
+      "sha256": "637ee4e888a851153f781c9884301c13de8a3c2ac02d3519e1999bb38839cf8f"
+    },
+    {
+      "path": "console.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "network.json",
+      "bytes": 151,
+      "sha256": "5ed66943e6f6d4eb97bae8209e6235ab92de94ee35ff5dd890494d1a65f436ba"
+    }
+  ]
+}

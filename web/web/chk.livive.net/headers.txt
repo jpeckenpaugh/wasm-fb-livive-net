@@ -1,0 +1,24 @@
+HTTP 200
+FINAL_URL=https://chk.livive.net/
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 542
+cache-control: max-age=600
+content-encoding: gzip
+content-length: 7717
+content-type: text/html; charset=utf-8
+date: Tue, 03 Nov 2026 09:09:49 GMT
+etag: W/"6ad4ab07-991a"
+expires: Tue, 03 Nov 2026 06:47:03 GMT
+last-modified: Sun, 18 Oct 2026 11:18:31 GMT
+server: GitHub.com
+vary: Accept-Encoding
+via: 1.1 varnish
+x-cache: HIT
+x-cache-hits: 0
+x-fastly-request-id: 986624ff81b9826d6b6c4afbc5c857ec7a569806
+x-github-edge-region: iad
+x-github-request-id: B3C8:C009F:302A6AD:3366755:6AE9810F
+x-proxy-cache: MISS
+x-served-by: cache-jax2030032-JAX
+x-timer: S1793696990.659617,VS0,VE1

@@ -1,0 +1,30 @@
+[
+  {
+    "url": "https://gm.livive.net/",
+    "status": 200
+  },
+  {
+    "url": "https://gm.livive.net/index.png",
+    "status": 200
+  },
+  {
+    "url": "https://gm.livive.net/index.js",
+    "status": 200
+  },
+  {
+    "url": "https://gm.livive.net/index.pck",
+    "status": 200
+  },
+  {
+    "url": "https://gm.livive.net/index.wasm",
+    "status": 200
+  },
+  {
+    "url": "https://gm.livive.net/index.icon.png",
+    "status": 200
+  },
+  {
+    "url": "blob:https://gm.livive.net/8f31d33e-fc92-48fd-9a3e-7491e50c4705",
+    "status": 200
+  }
+]

@@ -1,0 +1,86 @@
+[
+  {
+    "url": "https://chk.livive.net/",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/styles.css",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/main.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/controller.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/renderer.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/llm/dashboard.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/llm/debug_inspector.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/state.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/rules.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/ai.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/llm/personas.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/llm/model_registry.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/players/minimax_player.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/llm/web_llm_service.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/workers/llm_bridge.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/llm/prompts.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/players/llm_player.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/players/human_player.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/llm/gpu_check.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/players/base_player.js",
+    "status": 200
+  },
+  {
+    "url": "https://chk.livive.net/src/llm/parser.js",
+    "status": 200
+  }
+]

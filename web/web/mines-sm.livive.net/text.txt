@@ -1,0 +1,218 @@
+mine-sm
+
+A deterministic, no_std 8×8 Minesweeper state machine for reinforcement learning. This page is a browser harness: play the board, inspect the agent-facing observation and action mask, auto-play a guaranteed winning or losing line, and run the conformance checks that validate this JS mirror against the Rust engine. Source & docs.
+
+SEED
+BOMBS
+MAX STRIKES
+New game
+Reveal
+Flag
+Click to act; right-click to flag. Flag mode flips left-click.
+State: playing
+Moves: 0
+Strikes: 0/1
+Flags: 0
+Revealed: 0/64
+New game: seed 42, 10 bombs, max_strikes 1.
+AUTO-PLAY (GROUND TRUTH, NEVER GUESSES)
+Play winning line
+Play losing line
+Detonate a bomb
+The winning line repeatedly opens the lowest hidden safe cell; the losing line opens a numbered cell then a bomb.
+OBSERVATION (AGENT INPUT)
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+·
+−1 hidden · −0.5 flagged · −2 detonated · 0.0–0.8 = adjacent bombs / 10
+ACTION MASK (1 = LEGAL REVEAL)
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+CONFORMANCE CHECKS
+Run
+PASS
+seed 42 / 10 bombs -> layout
+got 0x8004401020340048
+PASS
+seed 6 / 1 bombs -> layout
+got 0x0000000000000001
+PASS
+seed 1 / 5 bombs -> layout
+got 0x0200008040000802
+PASS
+seed 7 / 3 bombs -> layout
+got 0x0000000010800004
+PASS
+seed 0 / 0 bombs -> layout
+got 0x0000000000000000
+PASS
+win trace [0]
+got [1,62]
+PASS
+win trace [1]
+got [1,1,61]
+PASS
+win trace [3]
+got [63]
+PASS
+win trace [27]
+got [63]
+PASS
+win trace [0,9]
+got [1,1,59,1]
+PASS
+win trace [0,1]
+got [1,61]
+PASS
+win trace [0,63]
+got [1,61]
+PASS
+win trace [0,1,8,9]
+got [1,59]
+PASS
+win trace [0,9,18,27]
+got [1,1,57,1]
+PASS
+win trace [18,19,20,26,28]
+got [58,1]
+PASS
+win trace [18,19,20,26,28,34,35,36]
+got [55,1]
+PASS
+safe first click (all 64 single-bomb boards)
+PASS
+safe first click survives a preceding flag (all 64 single-bomb boards)
+PASS
+bomb-free board wins on first reveal
+PASS
+adjacency 8 encodes as 0.8
+PASS
+shielded ladder: survive twice, lose on 3rd
+PASS
+terminal loss zeroes the action mask
+PASS
+full-mine fixture detonates and never wins
+23/23 checks passed.

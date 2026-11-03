@@ -1,0 +1,24 @@
+HTTP 200
+FINAL_URL=https://www.livive.net/
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 542
+cache-control: max-age=600
+content-encoding: gzip
+content-length: 125768
+content-type: text/html; charset=utf-8
+date: Tue, 03 Nov 2026 09:09:45 GMT
+etag: W/"6ad84d80-73904"
+expires: Tue, 03 Nov 2026 06:46:58 GMT
+last-modified: Wed, 21 Oct 2026 05:28:32 GMT
+server: GitHub.com
+vary: Accept-Encoding
+via: 1.1 varnish
+x-cache: HIT
+x-cache-hits: 2
+x-fastly-request-id: 73539648f81e4636e753a110827067799b0e8acf
+x-github-edge-region: iad
+x-github-request-id: 1738:37A3BE:455E89:4A984C:6AE9810A
+x-proxy-cache: MISS
+x-served-by: cache-jax2030027-JAX
+x-timer: S1793696986.752457,VS0,VE0

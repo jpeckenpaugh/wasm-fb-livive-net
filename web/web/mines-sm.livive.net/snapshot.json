@@ -1,0 +1,112 @@
+{
+  "manifest": {
+    "schema": "wasm-fb.web-capture/1",
+    "captureId": "afd75d6e04e34fa4",
+    "site": {
+      "id": "mines-sm.livive.net",
+      "label": "mines-sm.livive.net"
+    },
+    "request": {
+      "url": "https://mines-sm.livive.net/",
+      "viewport": {
+        "width": 1280,
+        "height": 688,
+        "dpr": 1
+      },
+      "scrollY": 0,
+      "clip": null
+    },
+    "result": {
+      "finalUrl": "https://mines-sm.livive.net/",
+      "status": 200,
+      "title": "mine-sm — Minesweeper state machine harness",
+      "capturedAt": "2026-11-03T09:09:48.543Z",
+      "renderMs": 1180,
+      "settled": true,
+      "colorScheme": "dark",
+      "reducedMotion": true,
+      "blockedRequests": 0
+    },
+    "artifacts": [
+      {
+        "path": "index.html",
+        "bytes": 17447,
+        "sha256": "f0e9e07045db400161bd8998daa6a60330e2ff833dbd1d4360b208a6ea12d57b"
+      },
+      {
+        "path": "rendered.html",
+        "bytes": 24857,
+        "sha256": "06abedf43ac634a8fcc5da08cd9aa56f75070673430fe9fe73b86610d64b94ce"
+      },
+      {
+        "path": "page.png",
+        "bytes": 94107,
+        "sha256": "37eefe3e17b47c82a88042ccf43ade7c66111f783d8bb6c7624f659af71a2628"
+      },
+      {
+        "path": "text.txt",
+        "bytes": 2271,
+        "sha256": "d7c0742194ad345c8796b13b4ebff63ae5bbab626f3ebce74c2dea4e04542de1"
+      },
+      {
+        "path": "headers.txt",
+        "bytes": 684,
+        "sha256": "637ee4e888a851153f781c9884301c13de8a3c2ac02d3519e1999bb38839cf8f"
+      },
+      {
+        "path": "console.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "network.json",
+        "bytes": 151,
+        "sha256": "5ed66943e6f6d4eb97bae8209e6235ab92de94ee35ff5dd890494d1a65f436ba"
+      }
+    ]
+  },
+  "context": "SCOPE=web://mines-sm.livive.net/\nGENERATOR=wasm-fb.web-capture/1 (baked)\nURL=https://mines-sm.livive.net/\nFINAL_URL=https://mines-sm.livive.net/\nSTATUS=200\nTITLE=mine-sm — Minesweeper state machine harness\nVIEWPORT=1280x688\nCAPTURED=2026-11-03T09:09:48.543Z\nROLE=Pre-baked static capture\nSUMMARY=Read-only capture",
+  "text": "mine-sm\n\nA deterministic, no_std 8×8 Minesweeper state machine for reinforcement learning. This page is a browser harness: play the board, inspect the agent-facing observation and action mask, auto-play a guaranteed winning or losing line, and run the conformance checks that validate this JS mirror against the Rust engine. Source & docs.\n\nSEED\nBOMBS\nMAX STRIKES\nNew game\nReveal\nFlag\nClick to act; right-click to flag. Flag mode flips left-click.\nState: playing\nMoves: 0\nStrikes: 0/1\nFlags: 0\nRevealed: 0/64\nNew game: seed 42, 10 bombs, max_strikes 1.\nAUTO-PLAY (GROUND TRUTH, NEVER GUESSES)\nPlay winning line\nPlay losing line\nDetonate a bomb\nThe winning line repeatedly opens the lowest hidden safe cell; the losing line opens a numbered cell then a bomb.\nOBSERVATION (AGENT INPUT)\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n·\n−1 hidden · −0.5 flagged · −2 detonated · 0.0–0.8 = adjacent bombs / 10\nACTION MASK (1 = LEGAL REVEAL)\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\nCONFORMANCE CHECKS\nRun\nPASS\nseed 42 / 10 bombs -> layout\ngot 0x8004401020340048\nPASS\nseed 6 / 1 bombs -> layout\ngot 0x0000000000000001\nPASS\nseed 1 / 5 bombs -> layout\ngot 0x0200008040000802\nPASS\nseed 7 / 3 bombs -> layout\ngot 0x0000000010800004\nPASS\nseed 0 / 0 bombs -> layout\ngot 0x0000000000000000\nPASS\nwin trace [0]\ngot [1,62]\nPASS\nwin trace [1]\ngot [1,1,61]\nPASS\nwin trace [3]\ngot [63]\nPASS\nwin trace [27]\ngot [63]\nPASS\nwin trace [0,9]\ngot [1,1,59,1]\nPASS\nwin trace [0,1]\ngot [1,61]\nPASS\nwin trace [0,63]\ngot [1,61]\nPASS\nwin trace [0,1,8,9]\ngot [1,59]\nPASS\nwin trace [0,9,18,27]\ngot [1,1,57,1]\nPASS\nwin trace [18,19,20,26,28]\ngot [58,1]\nPASS\nwin trace [18,19,20,26,28,34,35,36]\ngot [55,1]\nPASS\nsafe first click (all 64 single-bomb boards)\nPASS\nsafe first click survives a preceding flag (all 64 single-bomb boards)\nPASS\nbomb-free board wins on first reveal\nPASS\nadjacency 8 encodes as 0.8\nPASS\nshielded ladder: survive twice, lose on 3rd\nPASS\nterminal loss zeroes the action mask\nPASS\nfull-mine fixture detonates and never wins\n23/23 checks passed.",
+  "artifacts": {
+    "index.html": {
+      "path": "index.html",
+      "bytes": 17447,
+      "url": "./web/mines-sm.livive.net/index.html"
+    },
+    "rendered.html": {
+      "path": "rendered.html",
+      "bytes": 24857,
+      "url": "./web/mines-sm.livive.net/rendered.html"
+    },
+    "page.png": {
+      "path": "page.png",
+      "bytes": 94107,
+      "url": "./web/mines-sm.livive.net/page.png"
+    },
+    "text.txt": {
+      "path": "text.txt",
+      "bytes": 2271,
+      "url": "./web/mines-sm.livive.net/text.txt"
+    },
+    "headers.txt": {
+      "path": "headers.txt",
+      "bytes": 684,
+      "url": "./web/mines-sm.livive.net/headers.txt"
+    },
+    "console.txt": {
+      "path": "console.txt",
+      "bytes": 0,
+      "url": "./web/mines-sm.livive.net/console.txt"
+    },
+    "network.json": {
+      "path": "network.json",
+      "bytes": 151,
+      "url": "./web/mines-sm.livive.net/network.json"
+    },
+    "capture.json": {
+      "path": "capture.json",
+      "bytes": 1692,
+      "url": "./web/mines-sm.livive.net/capture.json"
+    }
+  }
+}

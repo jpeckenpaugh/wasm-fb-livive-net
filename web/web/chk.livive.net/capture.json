@@ -1,0 +1,66 @@
+{
+  "schema": "wasm-fb.web-capture/1",
+  "captureId": "2595695db55f43a3",
+  "site": {
+    "id": "chk.livive.net",
+    "label": "chk.livive.net"
+  },
+  "request": {
+    "url": "https://chk.livive.net/",
+    "viewport": {
+      "width": 1280,
+      "height": 688,
+      "dpr": 1
+    },
+    "scrollY": 0,
+    "clip": null
+  },
+  "result": {
+    "finalUrl": "https://chk.livive.net/",
+    "status": 200,
+    "title": "Classic Checkers & AI Arena",
+    "capturedAt": "2026-11-03T09:09:51.168Z",
+    "renderMs": 1804,
+    "settled": true,
+    "colorScheme": "dark",
+    "reducedMotion": true,
+    "blockedRequests": 0
+  },
+  "artifacts": [
+    {
+      "path": "index.html",
+      "bytes": 39194,
+      "sha256": "4179c4ea95e2d3121b3831dff55a3c5e83bb3845776448d1706b374cf51d1db5"
+    },
+    {
+      "path": "rendered.html",
+      "bytes": 45804,
+      "sha256": "8db7802492166d2bb6d48201db0f8caf313ee4dce04f6a3b5a542b4fa35dd4c9"
+    },
+    {
+      "path": "page.png",
+      "bytes": 316393,
+      "sha256": "79ce99adc088174d5f16bd13ac23cf559493939f3996c392ae7106168453deca"
+    },
+    {
+      "path": "text.txt",
+      "bytes": 626,
+      "sha256": "210f5466de4869159a916c1f28f8c3022f788d37d91320cb2affe51f35ecaecb"
+    },
+    {
+      "path": "headers.txt",
+      "bytes": 679,
+      "sha256": "ded0fb81b2e95df17a4ce95f2a814d5d927956a71f1b40ab5a0ff35cad6a178d"
+    },
+    {
+      "path": "console.txt",
+      "bytes": 32,
+      "sha256": "c51d516d0f1e10bf2374e4813839483df80cee1fcea2fbd0d2958b45755843a7"
+    },
+    {
+      "path": "network.json",
+      "bytes": 1756,
+      "sha256": "a7b2077ec36cece711d73716ef74f8b950136ebae71026113882ec027ef79bc1"
+    }
+  ]
+}

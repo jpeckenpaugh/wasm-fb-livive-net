@@ -1,0 +1,30 @@
+⚡ WEBGPU 60FPS WEB WORKER ARCHITECTURE
+Classic Checkers
+
+English Draughts with Client-Side WebLLM Neural Intelligence
+
+3D
+🎲 Switch to 3D Client (Godot 4) →
+👤
+Player vs Minimax
+Instant play, alpha-beta search, zero download
+🤖
+Player vs LLM AI
+Live streaming banter & neural move selection
+⚔️
+AI vs AI Arena
+Spectate model vs model or LLM vs Minimax
+👥
+Pass & Play
+Local 2-player on the same board
+MINIMAX SEARCH DEPTH:
+Easy (Depth 2)
+Medium (Depth 4)
+Hard (Depth 6 - Minimax Master)
+PLAY AS:
+Red (Moves First)
+Black (Moves Second)
+⚔️
+Launch Match
+🧠 Hardware Status & Model Manager
+🔍 Debug Inspector

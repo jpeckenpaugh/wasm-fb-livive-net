@@ -1,0 +1,24 @@
+HTTP 200
+FINAL_URL=https://mines.livive.net/
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 542
+cache-control: max-age=600
+content-encoding: gzip
+content-length: 2925
+content-type: text/html; charset=utf-8
+date: Tue, 03 Nov 2026 09:09:45 GMT
+etag: W/"6ad4aaf0-324d"
+expires: Tue, 03 Nov 2026 06:46:58 GMT
+last-modified: Sun, 18 Oct 2026 11:18:08 GMT
+server: GitHub.com
+vary: Accept-Encoding
+via: 1.1 varnish
+x-cache: HIT
+x-cache-hits: 0
+x-fastly-request-id: 6f294024dbf96724a465b42c7f4d7b8870f91525
+x-github-edge-region: iad
+x-github-request-id: 888A:1C0A0A:3252FC9:358ED38:6AE98108
+x-proxy-cache: MISS
+x-served-by: cache-jax2030038-JAX
+x-timer: S1793696986.716642,VS0,VE1

@@ -1,0 +1,66 @@
+{
+  "schema": "wasm-fb.web-capture/1",
+  "captureId": "de8f255f55c44223",
+  "site": {
+    "id": "mines.livive.net",
+    "label": "mines.livive.net"
+  },
+  "request": {
+    "url": "https://mines.livive.net/",
+    "viewport": {
+      "width": 1280,
+      "height": 688,
+      "dpr": 1
+    },
+    "scrollY": 0,
+    "clip": null
+  },
+  "result": {
+    "finalUrl": "https://mines.livive.net/",
+    "status": 200,
+    "title": "mines.livive.net — RL Minesweeper arcade cabinet",
+    "capturedAt": "2026-11-03T09:09:47.358Z",
+    "renderMs": 1898,
+    "settled": true,
+    "colorScheme": "dark",
+    "reducedMotion": true,
+    "blockedRequests": 0
+  },
+  "artifacts": [
+    {
+      "path": "index.html",
+      "bytes": 12877,
+      "sha256": "b53d22b315a56498f5c93b85cff4ef7e58878dc3d5f4180757a968162d991197"
+    },
+    {
+      "path": "rendered.html",
+      "bytes": 44808,
+      "sha256": "9a37def4ab10bddf5db945c2f6269adbeec0403a1de57ae19529ffb693bdf51f"
+    },
+    {
+      "path": "page.png",
+      "bytes": 177697,
+      "sha256": "213dde572b43bed5c9b66a135f71d0869f8b4ad3546a0d4c02728c146fe87a16"
+    },
+    {
+      "path": "text.txt",
+      "bytes": 718,
+      "sha256": "c0d5b3b13c21cd269f1ff1a1bdaee07bf0154347c8a078d837f893b170445dcc"
+    },
+    {
+      "path": "headers.txt",
+      "bytes": 682,
+      "sha256": "62472215cff023d17bad3c35f883e7b13b491c37d261fa8d0daceabd3e7e8a1b"
+    },
+    {
+      "path": "console.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "network.json",
+      "bytes": 1381,
+      "sha256": "6e771fadcd876386fc2e91831bd2a235390db3ac8499eb1bb1b72f608bcdbcee"
+    }
+  ]
+}

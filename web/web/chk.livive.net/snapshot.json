@@ -1,0 +1,112 @@
+{
+  "manifest": {
+    "schema": "wasm-fb.web-capture/1",
+    "captureId": "2595695db55f43a3",
+    "site": {
+      "id": "chk.livive.net",
+      "label": "chk.livive.net"
+    },
+    "request": {
+      "url": "https://chk.livive.net/",
+      "viewport": {
+        "width": 1280,
+        "height": 688,
+        "dpr": 1
+      },
+      "scrollY": 0,
+      "clip": null
+    },
+    "result": {
+      "finalUrl": "https://chk.livive.net/",
+      "status": 200,
+      "title": "Classic Checkers & AI Arena",
+      "capturedAt": "2026-11-03T09:09:51.168Z",
+      "renderMs": 1804,
+      "settled": true,
+      "colorScheme": "dark",
+      "reducedMotion": true,
+      "blockedRequests": 0
+    },
+    "artifacts": [
+      {
+        "path": "index.html",
+        "bytes": 39194,
+        "sha256": "4179c4ea95e2d3121b3831dff55a3c5e83bb3845776448d1706b374cf51d1db5"
+      },
+      {
+        "path": "rendered.html",
+        "bytes": 45804,
+        "sha256": "8db7802492166d2bb6d48201db0f8caf313ee4dce04f6a3b5a542b4fa35dd4c9"
+      },
+      {
+        "path": "page.png",
+        "bytes": 316393,
+        "sha256": "79ce99adc088174d5f16bd13ac23cf559493939f3996c392ae7106168453deca"
+      },
+      {
+        "path": "text.txt",
+        "bytes": 626,
+        "sha256": "210f5466de4869159a916c1f28f8c3022f788d37d91320cb2affe51f35ecaecb"
+      },
+      {
+        "path": "headers.txt",
+        "bytes": 679,
+        "sha256": "ded0fb81b2e95df17a4ce95f2a814d5d927956a71f1b40ab5a0ff35cad6a178d"
+      },
+      {
+        "path": "console.txt",
+        "bytes": 32,
+        "sha256": "c51d516d0f1e10bf2374e4813839483df80cee1fcea2fbd0d2958b45755843a7"
+      },
+      {
+        "path": "network.json",
+        "bytes": 1756,
+        "sha256": "a7b2077ec36cece711d73716ef74f8b950136ebae71026113882ec027ef79bc1"
+      }
+    ]
+  },
+  "context": "SCOPE=web://chk.livive.net/\nGENERATOR=wasm-fb.web-capture/1 (baked)\nURL=https://chk.livive.net/\nFINAL_URL=https://chk.livive.net/\nSTATUS=200\nTITLE=Classic Checkers & AI Arena\nVIEWPORT=1280x688\nCAPTURED=2026-11-03T09:09:51.168Z\nROLE=Pre-baked static capture\nSUMMARY=Read-only capture",
+  "text": "⚡ WEBGPU 60FPS WEB WORKER ARCHITECTURE\nClassic Checkers\n\nEnglish Draughts with Client-Side WebLLM Neural Intelligence\n\n3D\n🎲 Switch to 3D Client (Godot 4) →\n👤\nPlayer vs Minimax\nInstant play, alpha-beta search, zero download\n🤖\nPlayer vs LLM AI\nLive streaming banter & neural move selection\n⚔️\nAI vs AI Arena\nSpectate model vs model or LLM vs Minimax\n👥\nPass & Play\nLocal 2-player on the same board\nMINIMAX SEARCH DEPTH:\nEasy (Depth 2)\nMedium (Depth 4)\nHard (Depth 6 - Minimax Master)\nPLAY AS:\nRed (Moves First)\nBlack (Moves Second)\n⚔️\nLaunch Match\n🧠 Hardware Status & Model Manager\n🔍 Debug Inspector",
+  "artifacts": {
+    "index.html": {
+      "path": "index.html",
+      "bytes": 39194,
+      "url": "./web/chk.livive.net/index.html"
+    },
+    "rendered.html": {
+      "path": "rendered.html",
+      "bytes": 45804,
+      "url": "./web/chk.livive.net/rendered.html"
+    },
+    "page.png": {
+      "path": "page.png",
+      "bytes": 316393,
+      "url": "./web/chk.livive.net/page.png"
+    },
+    "text.txt": {
+      "path": "text.txt",
+      "bytes": 626,
+      "url": "./web/chk.livive.net/text.txt"
+    },
+    "headers.txt": {
+      "path": "headers.txt",
+      "bytes": 679,
+      "url": "./web/chk.livive.net/headers.txt"
+    },
+    "console.txt": {
+      "path": "console.txt",
+      "bytes": 32,
+      "url": "./web/chk.livive.net/console.txt"
+    },
+    "network.json": {
+      "path": "network.json",
+      "bytes": 1756,
+      "url": "./web/chk.livive.net/network.json"
+    },
+    "capture.json": {
+      "path": "capture.json",
+      "bytes": 1656,
+      "url": "./web/chk.livive.net/capture.json"
+    }
+  }
+}

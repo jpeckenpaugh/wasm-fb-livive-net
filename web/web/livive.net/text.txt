@@ -1,0 +1,468 @@
+LV
+LIVIVE
+AI/ML
+Vision
+Dev Tools
+Education
+Games
+Language Tools
+Web Apps
+48 Projects
+JP
+LV
+FEATURED GAMES ORIGINAL · PLAYABLE IN BROWSER
+GAME PENDING
+Games
+•
+Playable in Browser
+•
+Updated 2w ago
+•
+Press 'G' for Sandbox Power-Ups
+
+Clear every enemy wave before your ammo runs dry—or hit 'G' to unleash unlimited sandbox power-ups.
+
+Play Live
+🎬
+Press 'G' in-game for Sandbox Power-Ups
+🕹️
+5 Visual Themes & Custom Loadouts
+Featured
+14 visual showcases across all categories · shuffled
+❮
+TOP
+PICK
+Live
+Driver Hub Prototype
+Web Apps & Prototypes
+Play
+TOP
+PICK
+Live
+Snow CUAD
+Dev Tools
+Play
+TOP
+PICK
+Live
+Sprites · Model-to-Sprite Workshop
+Dev Tools
+Play
+TOP
+PICK
+Live
+Heron's Fountain — 2D Simulation
+Web Apps & Prototypes
+Play
+TOP
+PICK
+Live
+Game Pending
+Games
+Play
+TOP
+PICK
+Live
+State Machine 3
+AI/ML Experiments
+Play
+TOP
+PICK
+Repo
+fast-ttt
+Education & Teaching
+Source
+TOP
+PICK
+Live
+Northstar RAG POC
+AI/ML Experiments
+Play
+TOP
+PICK
+Live
+English · Hindi & Kannada Language Tutor
+Language Tools
+Play
+TOP
+PICK
+Live
+Training vs. Inference
+Education & Teaching
+Play
+TOP
+PICK
+Live
+Lokarta
+Games
+Play
+TOP
+PICK
+Live
+Oblique · 2.5D World Sandbox
+Web Apps & Prototypes
+Play
+TOP
+PICK
+Live
+C3PA Explorer
+Web Apps & Prototypes
+Play
+TOP
+PICK
+Live
+nexttext
+Language Tools
+Play
+❯
+Recently Updated
+Latest commits & deployments first
+❮
+TOP
+PICK
+Live
+Age of Mycology
+Featured
+Play Now
+TOP
+PICK
+Live
+Classic Checkers & AI Arena
+Featured
+Play Now
+TOP
+PICK
+Live
+EuchreGame
+Featured
+Play Now
+TOP
+PICK
+Live
+Lokarta
+Featured
+Play Now
+TOP
+PICK
+Live
+LunarLander Policy Lab
+Featured
+Play Now
+TOP
+PICK
+Live
+Minesweeper RL Arcade
+Featured
+Play Now
+TOP
+PICK
+Live
+Peer-to-peer Tic-Tac-Toe
+Featured
+Play Now
+TOP
+PICK
+Live
+Threat Sweep
+Featured
+Play Now
+TOP
+PICK
+Live
+Northstar RAG POC
+Featured
+Play Now
+TOP
+PICK
+Live
+State Machine 3
+Featured
+Play Now
+TOP
+PICK
+Live
+English / Hebrew Language Tutor
+Featured
+Play Now
+TOP
+PICK
+Live
+English · Hindi & Kannada Language Tutor
+Featured
+Play Now
+❯
+Games
+10 playable · 10 total
+❮
+TOP
+PICK
+Live
+Age of Mycology
+Featured
+Play Now
+TOP
+PICK
+Live
+Classic Checkers & AI Arena
+Featured
+Play Now
+TOP
+PICK
+Live
+EuchreGame
+Featured
+Play Now
+TOP
+PICK
+Live
+Game Pending
+Featured
+Play Now
+TOP
+PICK
+Live
+Lokarta
+Featured
+Play Now
+TOP
+PICK
+Live
+LunarLander Policy Lab
+Featured
+Play Now
+TOP
+PICK
+Live
+Minesweeper RL Arcade
+Featured
+Play Now
+TOP
+PICK
+Live
+Peer-to-peer Tic-Tac-Toe
+Featured
+Play Now
+TOP
+PICK
+Live
+Threat Sweep
+Featured
+Play Now
+TOP
+PICK
+Live
+Vibe Tic-Tac-Toe
+Featured
+Play Now
+❯
+AI/ML Experiments
+5 playable · 9 total
+❮
+TOP
+PICK
+Live
+Northstar RAG POC
+Featured
+Play Now
+TOP
+PICK
+Live
+State Machine 3
+Featured
+Play Now
+TOP
+PICK
+Live
+TROT — Transparent Rust ONNX Trainer
+Featured
+Play Now
+TOP
+PICK
+Live
+mine-sm — Minesweeper RL Environment
+Featured
+Play Now
+Live
+Seekdepth.org
+Playable Now
+Repo
+Closed-System Speech POC
+Repo
+Compiled Domain Expertise (CDE)
+Repo
+QSBC — Quantized Semantic Bottleneck Classifier
+Repo
+RAG Data Synthesizer
+❯
+Computer Vision
+2 playable · 2 total
+❮
+TOP
+PICK
+Live
+fourcast · Four Visual Paradigms
+Featured
+Play Now
+TOP
+PICK
+Live
+OCR · Four Classifiers from Scratch
+Featured
+Play Now
+❯
+Language Tools
+5 playable · 7 total
+❮
+TOP
+PICK
+Live
+English / Hebrew Language Tutor
+Featured
+Play Now
+TOP
+PICK
+Live
+English · Hindi & Kannada Language Tutor
+Featured
+Play Now
+TOP
+PICK
+Live
+nexttext
+Featured
+Play Now
+TOP
+PICK
+Live
+You Don't Say
+Featured
+Play Now
+Repo
+apertiasm-en-es
+Repo
+C3PA Sentence-Level Candidate Parser
+Live
+Chatterbox · Voice-Clone Studio
+Playable Now
+❯
+Dev Tools
+3 playable · 6 total
+❮
+Live
+Snowflake Compliance Demo
+Playable Now
+TOP
+PICK
+Live
+Snow CUAD
+Featured
+Play Now
+TOP
+PICK
+Live
+Sprites · Model-to-Sprite Workshop
+Featured
+Play Now
+Repo
+Roblox API Database
+Repo
+Gemini CLI Agent Bootstrap
+Repo
+Open Code Workflows
+❯
+Education & Teaching
+2 playable · 5 total
+❮
+TOP
+PICK
+Live
+Training vs. Inference
+Featured
+Play Now
+Repo
+Docker SQL Lessons
+TOP
+PICK
+Repo
+fast-ttt
+Featured
+Play Now
+Repo
+Python Classes Demo
+TOP
+PICK
+Live
+WebAssembly Architectural Realities
+Featured
+Play Now
+❯
+Web Apps & Prototypes
+9 playable · 9 total
+❮
+TOP
+PICK
+Live
+C3PA Explorer
+Featured
+Play Now
+TOP
+PICK
+Live
+Company Hub
+Featured
+Play Now
+TOP
+PICK
+Live
+Driver Hub Prototype
+Featured
+Play Now
+TOP
+PICK
+Live
+Executive Assistant
+Featured
+Play Now
+TOP
+PICK
+Live
+Heron's Fountain — 2D Simulation
+Featured
+Play Now
+TOP
+PICK
+Live
+Oblique · 2.5D World Sandbox
+Featured
+Play Now
+TOP
+PICK
+Live
+Robot Motion Studio
+Featured
+Play Now
+TOP
+PICK
+Live
+Video Content Factory
+Featured
+Play Now
+TOP
+PICK
+Live
+tech.livive.net
+Featured
+Play Now
+❯
+LIVIVE
+•
+Interactive Streaming Portfolio
+•
+Cookie Preferences
+© 2026 Jarad Peckenpaugh. All rights reserved.
+Privacy & Analytics Consent
+
+We use Google Analytics with Consent Mode v2 to understand how visitors explore projects and demos. You can opt in to analytics cookies or continue with necessary essentials only.
+
+Accept All
+Necessary Only

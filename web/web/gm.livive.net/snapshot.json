@@ -1,0 +1,112 @@
+{
+  "manifest": {
+    "schema": "wasm-fb.web-capture/1",
+    "captureId": "0682dfab25894cda",
+    "site": {
+      "id": "gm.livive.net",
+      "label": "gm.livive.net"
+    },
+    "request": {
+      "url": "https://gm.livive.net/",
+      "viewport": {
+        "width": 1280,
+        "height": 688,
+        "dpr": 1
+      },
+      "scrollY": 0,
+      "clip": null
+    },
+    "result": {
+      "finalUrl": "https://gm.livive.net/",
+      "status": 200,
+      "title": "Gem Miner — Geode Claim",
+      "capturedAt": "2026-11-03T09:09:52.478Z",
+      "renderMs": 3929,
+      "settled": true,
+      "colorScheme": "dark",
+      "reducedMotion": true,
+      "blockedRequests": 0
+    },
+    "artifacts": [
+      {
+        "path": "index.html",
+        "bytes": 5439,
+        "sha256": "0ef43b087edac92fee59c6c20c1edfe2e2aca05859f75957b0adf08410593dd7"
+      },
+      {
+        "path": "rendered.html",
+        "bytes": 5799,
+        "sha256": "73c0341fa9d56c142a38cbe11701130aadaf11ad818049d6c0e5878a63823d88"
+      },
+      {
+        "path": "page.png",
+        "bytes": 214863,
+        "sha256": "7ddb557075eea6c3c7bda10f914e2befff65302dc1b194c450bd8fd0106c42f9"
+      },
+      {
+        "path": "text.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "headers.txt",
+        "bytes": 678,
+        "sha256": "6547bfa8f2268e9f930760bf409fad870ea29e8375af5ab451117257f5f9a288"
+      },
+      {
+        "path": "console.txt",
+        "bytes": 286,
+        "sha256": "dedd247720a912cc197eafc3c54b0ede19e8d481faa126690446b4e30f7d244e"
+      },
+      {
+        "path": "network.json",
+        "bytes": 541,
+        "sha256": "a91e77845b8aa6c9c782356ea8aef16588dc8a07dbd589b78ffbdecc43df3d5f"
+      }
+    ]
+  },
+  "context": "SCOPE=web://gm.livive.net/\nGENERATOR=wasm-fb.web-capture/1 (baked)\nURL=https://gm.livive.net/\nFINAL_URL=https://gm.livive.net/\nSTATUS=200\nTITLE=Gem Miner — Geode Claim\nVIEWPORT=1280x688\nCAPTURED=2026-11-03T09:09:52.478Z\nROLE=Pre-baked static capture\nSUMMARY=Read-only capture",
+  "text": "",
+  "artifacts": {
+    "index.html": {
+      "path": "index.html",
+      "bytes": 5439,
+      "url": "./web/gm.livive.net/index.html"
+    },
+    "rendered.html": {
+      "path": "rendered.html",
+      "bytes": 5799,
+      "url": "./web/gm.livive.net/rendered.html"
+    },
+    "page.png": {
+      "path": "page.png",
+      "bytes": 214863,
+      "url": "./web/gm.livive.net/page.png"
+    },
+    "text.txt": {
+      "path": "text.txt",
+      "bytes": 0,
+      "url": "./web/gm.livive.net/text.txt"
+    },
+    "headers.txt": {
+      "path": "headers.txt",
+      "bytes": 678,
+      "url": "./web/gm.livive.net/headers.txt"
+    },
+    "console.txt": {
+      "path": "console.txt",
+      "bytes": 286,
+      "url": "./web/gm.livive.net/console.txt"
+    },
+    "network.json": {
+      "path": "network.json",
+      "bytes": 541,
+      "url": "./web/gm.livive.net/network.json"
+    },
+    "capture.json": {
+      "path": "capture.json",
+      "bytes": 1646,
+      "url": "./web/gm.livive.net/capture.json"
+    }
+  }
+}

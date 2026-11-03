@@ -1,0 +1,24 @@
+HTTP 200
+FINAL_URL=https://gm.livive.net/
+accept-ranges: bytes
+access-control-allow-origin: *
+age: 541
+cache-control: max-age=600
+content-encoding: gzip
+content-length: 2186
+content-type: text/html; charset=utf-8
+date: Tue, 03 Nov 2026 09:09:48 GMT
+etag: W/"6ae05b95-153f"
+expires: Tue, 03 Nov 2026 06:47:00 GMT
+last-modified: Tue, 27 Oct 2026 08:06:45 GMT
+server: GitHub.com
+vary: Accept-Encoding
+via: 1.1 varnish
+x-cache: HIT
+x-cache-hits: 0
+x-fastly-request-id: 97f4164770de2f1596a2c8c1a4c6fa0ffd587e2f
+x-github-edge-region: iad
+x-github-request-id: 5458:F4B7C:32B2595:35EE894:6AE9810B
+x-proxy-cache: MISS
+x-served-by: cache-jax2030023-JAX
+x-timer: S1793696989.750474,VS0,VE1

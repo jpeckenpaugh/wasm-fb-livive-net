@@ -1,0 +1,42 @@
+MINES
+.livive.net
+
+8×8 · 10 MINES · DETERMINISTIC SEEDS · HUMAN VS ONNX RL
+
+PLAY
+AI
+RACE
+CONCURRENT
+MODELS
+SEED
+NEW
+LINK
+CHECKPOINT
+M0 · Uniform baseline
+M1 · Basic-rule imitation
+M2 · Subset-solver imitation
+M3 · Wide + deep imitation
+M4 · Long-trained small imitation
+M5 · Self-play (win reward)
+M6 · Self-play (detonation-averse)
+M7 · Wide-kernel ablation (5x5)
+M8 · Shallow ablation (single conv)
+ONNX checkpoints live
+FLAG MODE OFF
+HEATMAP ON
+MASK ON
+STATUS
+READY
+MINES
+10
+FLAGS
+0
+MOVES
+0
+TIME
+00:00
+RESET BOARD
+
+Click / tap to reveal · right-click or long-press to flag · arrows + Enter + F on keyboard. First click is always safe.
+
+Deterministic seeds · first-click-safe 8×8/10 engine · source

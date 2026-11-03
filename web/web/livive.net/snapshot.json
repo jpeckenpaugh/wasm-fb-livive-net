@@ -1,0 +1,112 @@
+{
+  "manifest": {
+    "schema": "wasm-fb.web-capture/1",
+    "captureId": "92b800a48fcd497d",
+    "site": {
+      "id": "livive.net",
+      "label": "livive.net"
+    },
+    "request": {
+      "url": "https://livive.net/",
+      "viewport": {
+        "width": 1280,
+        "height": 688,
+        "dpr": 1
+      },
+      "scrollY": 0,
+      "clip": null
+    },
+    "result": {
+      "finalUrl": "https://www.livive.net/",
+      "status": 200,
+      "title": "Livive — Projects to Stream",
+      "capturedAt": "2026-11-03T09:09:49.352Z",
+      "renderMs": 3892,
+      "settled": true,
+      "colorScheme": "dark",
+      "reducedMotion": true,
+      "blockedRequests": 0
+    },
+    "artifacts": [
+      {
+        "path": "index.html",
+        "bytes": 473348,
+        "sha256": "74985e89c35798bfb20f65e9b9389ff1949646df3f1b0c565b4c67fd18855d09"
+      },
+      {
+        "path": "rendered.html",
+        "bytes": 536302,
+        "sha256": "52430d0ca9e0e6b9c5b7afcdaa91e72051edfb74dc634789814b53b35d32ee8b"
+      },
+      {
+        "path": "page.png",
+        "bytes": 469588,
+        "sha256": "950f8e78bc54e169cafc5e0994f3d5999df05bace0bf37064e5f96b4986f70ae"
+      },
+      {
+        "path": "text.txt",
+        "bytes": 4972,
+        "sha256": "2d03ad5ef3a9f375b57782b29322ead7cff633bbdcc6e71bdf98b7ff16712ac2"
+      },
+      {
+        "path": "headers.txt",
+        "bytes": 681,
+        "sha256": "569f7788c73cce70b5cfddc098c67304d38bac02acad85b7931f17471215bda3"
+      },
+      {
+        "path": "console.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "network.json",
+        "bytes": 3699,
+        "sha256": "3e6ec798eded1834ed0a9fa10c2d771de10e38c8e0416681f21030449a205460"
+      }
+    ]
+  },
+  "context": "SCOPE=web://livive.net/\nGENERATOR=wasm-fb.web-capture/1 (baked)\nURL=https://livive.net/\nFINAL_URL=https://www.livive.net/\nSTATUS=200\nTITLE=Livive — Projects to Stream\nVIEWPORT=1280x688\nCAPTURED=2026-11-03T09:09:49.352Z\nROLE=Pre-baked static capture\nSUMMARY=Read-only capture",
+  "text": "LV\nLIVIVE\nAI/ML\nVision\nDev Tools\nEducation\nGames\nLanguage Tools\nWeb Apps\n48 Projects\nJP\nLV\nFEATURED GAMES ORIGINAL · PLAYABLE IN BROWSER\nGAME PENDING\nGames\n•\nPlayable in Browser\n•\nUpdated 2w ago\n•\nPress 'G' for Sandbox Power-Ups\n\nClear every enemy wave before your ammo runs dry—or hit 'G' to unleash unlimited sandbox power-ups.\n\nPlay Live\n🎬\nPress 'G' in-game for Sandbox Power-Ups\n🕹️\n5 Visual Themes & Custom Loadouts\nFeatured\n14 visual showcases across all categories · shuffled\n❮\nTOP\nPICK\nLive\nDriver Hub Prototype\nWeb Apps & Prototypes\nPlay\nTOP\nPICK\nLive\nSnow CUAD\nDev Tools\nPlay\nTOP\nPICK\nLive\nSprites · Model-to-Sprite Workshop\nDev Tools\nPlay\nTOP\nPICK\nLive\nHeron's Fountain — 2D Simulation\nWeb Apps & Prototypes\nPlay\nTOP\nPICK\nLive\nGame Pending\nGames\nPlay\nTOP\nPICK\nLive\nState Machine 3\nAI/ML Experiments\nPlay\nTOP\nPICK\nRepo\nfast-ttt\nEducation & Teaching\nSource\nTOP\nPICK\nLive\nNorthstar RAG POC\nAI/ML Experiments\nPlay\nTOP\nPICK\nLive\nEnglish · Hindi & Kannada Language Tutor\nLanguage Tools\nPlay\nTOP\nPICK\nLive\nTraining vs. Inference\nEducation & Teaching\nPlay\nTOP\nPICK\nLive\nLokarta\nGames\nPlay\nTOP\nPICK\nLive\nOblique · 2.5D World Sandbox\nWeb Apps & Prototypes\nPlay\nTOP\nPICK\nLive\nC3PA Explorer\nWeb Apps & Prototypes\nPlay\nTOP\nPICK\nLive\nnexttext\nLanguage Tools\nPlay\n❯\nRecently Updated\nLatest commits & deployments first\n❮\nTOP\nPICK\nLive\nAge of Mycology\nFeatured\nPlay Now\nTOP\nPICK\nLive\nClassic Checkers & AI Arena\nFeatured\nPlay Now\nTOP\nPICK\nLive\nEuchreGame\nFeatured\nPlay Now\nTOP\nPICK\nLive\nLokarta\nFeatured\nPlay Now\nTOP\nPICK\nLive\nLunarLander Policy Lab\nFeatured\nPlay Now\nTOP\nPICK\nLive\nMinesweeper RL Arcade\nFeatured\nPlay Now\nTOP\nPICK\nLive\nPeer-to-peer Tic-Tac-Toe\nFeatured\nPlay Now\nTOP\nPICK\nLive\nThreat Sweep\nFeatured\nPlay Now\nTOP\nPICK\nLive\nNorthstar RAG POC\nFeatured\nPlay Now\nTOP\nPICK\nLive\nState Machine 3\nFeatured\nPlay Now\nTOP\nPICK\nLive\nEnglish / Hebrew Language Tutor\nFeatured\nPlay Now\nTOP\nPICK\nLive\nEnglish · Hindi & Kannada Language Tutor\nFeatured\nPlay Now\n❯\nGames\n10 playable · 10 total\n❮\nTOP\nPICK\nLive\nAge of Mycology\nFeatured\nPlay Now\nTOP\nPICK\nLive\nClassic Checkers & AI Arena\nFeatured\nPlay Now\nTOP\nPICK\nLive\nEuchreGame\nFeatured\nPlay Now\nTOP\nPICK\nLive\nGame Pending\nFeatured\nPlay Now\nTOP\nPICK\nLive\nLokarta\nFeatured\nPlay Now\nTOP\nPICK\nLive\nLunarLander Policy Lab\nFeatured\nPlay Now\nTOP\nPICK\nLive\nMinesweeper RL Arcade\nFeatured\nPlay Now\nTOP\nPICK\nLive\nPeer-to-peer Tic-Tac-Toe\nFeatured\nPlay Now\nTOP\nPICK\nLive\nThreat Sweep\nFeatured\nPlay Now\nTOP\nPICK\nLive\nVibe Tic-Tac-Toe\nFeatured\nPlay Now\n❯\nAI/ML Experiments\n5 playable · 9 total\n❮\nTOP\nPICK\nLive\nNorthstar RAG POC\nFeatured\nPlay Now\nTOP\nPICK\nLive\nState Machine 3\nFeatured\nPlay Now\nTOP\nPICK\nLive\nTROT — Transparent Rust ONNX Trainer\nFeatured\nPlay Now\nTOP\nPICK\nLive\nmine-sm — Minesweeper RL Environment\nFeatured\nPlay Now\nLive\nSeekdepth.org\nPlayable Now\nRepo\nClosed-System Speech POC\nRepo\nCompiled Domain Expertise (CDE)\nRepo\nQSBC — Quantized Semantic Bottleneck Classifier\nRepo\nRAG Data Synthesizer\n❯\nComputer Vision\n2 playable · 2 total\n❮\nTOP\nPICK\nLive\nfourcast · Four Visual Paradigms\nFeatured\nPlay Now\nTOP\nPICK\nLive\nOCR · Four Classifiers from Scratch\nFeatured\nPlay Now\n❯\nLanguage Tools\n5 playable · 7 total\n❮\nTOP\nPICK\nLive\nEnglish / Hebrew Language Tutor\nFeatured\nPlay Now\nTOP\nPICK\nLive\nEnglish · Hindi & Kannada Language Tutor\nFeatured\nPlay Now\nTOP\nPICK\nLive\nnexttext\nFeatured\nPlay Now\nTOP\nPICK\nLive\nYou Don't Say\nFeatured\nPlay Now\nRepo\napertiasm-en-es\nRepo\nC3PA Sentence-Level Candidate Parser\nLive\nChatterbox · Voice-Clone Studio\nPlayable Now\n❯\nDev Tools\n3 playable · 6 total\n❮\nLive\nSnowflake Compliance Demo\nPlayable Now\nTOP\nPICK\nLive\nSnow CUAD\nFeatured\nPlay Now\nTOP\nPICK\nLive\nSprites · Model-to-Sprite Workshop\nFeatured\nPlay Now\nRepo\nRoblox API Database\nRepo\nGemini CLI Agent Bootstrap\nRepo\nOpen Code Workflows\n❯\nEducation & Teaching\n2 playable · 5 total\n❮\nTOP\nPICK\nLive\nTraining vs. Inference\nFeatured\nPlay Now\nRepo\nDocker SQL Lessons\nTOP\nPICK\nRepo\nfast-ttt\nFeatured\nPlay Now\nRepo\nPython Classes Demo\nTOP\nPICK\nLive\nWebAssembly Architectural Realities\nFeatured\nPlay Now\n❯\nWeb Apps & Prototypes\n9 playable · 9 total\n❮\nTOP\nPICK\nLive\nC3PA Explorer\nFeatured\nPlay Now\nTOP\nPICK\nLive\nCompany Hub\nFeatured\nPlay Now\nTOP\nPICK\nLive\nDriver Hub Prototype\nFeatured\nPlay Now\nTOP\nPICK\nLive\nExecutive Assistant\nFeatured\nPlay Now\nTOP\nPICK\nLive\nHeron's Fountain — 2D Simulation\nFeatured\nPlay Now\nTOP\nPICK\nLive\nOblique · 2.5D World Sandbox\nFeatured\nPlay Now\nTOP\nPICK\nLive\nRobot Motion Studio\nFeatured\nPlay Now\nTOP\nPICK\nLive\nVideo Content Factory\nFeatured\nPlay Now\nTOP\nPICK\nLive\ntech.livive.net\nFeatured\nPlay Now\n❯\nLIVIVE\n•\nInteractive Streaming Portfolio\n•\nCookie Preferences\n© 2026 Jarad Peckenpaugh. All rights reserved.\nPrivacy & Analytics Consent\n\nWe use Google Analytics with Consent Mode v2 to understand how visitors explore projects and demos. You can opt in to analytics cookies or continue with necessary essentials only.\n\nAccept All\nNecessary Only",
+  "artifacts": {
+    "index.html": {
+      "path": "index.html",
+      "bytes": 473348,
+      "url": "./web/livive.net/index.html"
+    },
+    "rendered.html": {
+      "path": "rendered.html",
+      "bytes": 536302,
+      "url": "./web/livive.net/rendered.html"
+    },
+    "page.png": {
+      "path": "page.png",
+      "bytes": 469588,
+      "url": "./web/livive.net/page.png"
+    },
+    "text.txt": {
+      "path": "text.txt",
+      "bytes": 4972,
+      "url": "./web/livive.net/text.txt"
+    },
+    "headers.txt": {
+      "path": "headers.txt",
+      "bytes": 681,
+      "url": "./web/livive.net/headers.txt"
+    },
+    "console.txt": {
+      "path": "console.txt",
+      "bytes": 0,
+      "url": "./web/livive.net/console.txt"
+    },
+    "network.json": {
+      "path": "network.json",
+      "bytes": 3699,
+      "url": "./web/livive.net/network.json"
+    },
+    "capture.json": {
+      "path": "capture.json",
+      "bytes": 1648,
+      "url": "./web/livive.net/capture.json"
+    }
+  }
+}

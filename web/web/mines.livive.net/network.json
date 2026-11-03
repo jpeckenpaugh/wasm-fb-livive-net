@@ -1,0 +1,62 @@
+[
+  {
+    "url": "https://mines.livive.net/",
+    "status": 200
+  },
+  {
+    "url": "https://mines.livive.net/src/style.css",
+    "status": 200
+  },
+  {
+    "url": "https://mines.livive.net/src/app.js",
+    "status": 200
+  },
+  {
+    "url": "https://mines.livive.net/src/engine.js",
+    "status": 200
+  },
+  {
+    "url": "https://mines.livive.net/src/ui.js",
+    "status": 200
+  },
+  {
+    "url": "https://mines.livive.net/src/contract.js",
+    "status": 200
+  },
+  {
+    "url": "https://fonts.googleapis.com/css2?redacted",
+    "status": 200
+  },
+  {
+    "url": "https://mines.livive.net/src/featurize.js",
+    "status": 200
+  },
+  {
+    "url": "https://mines.livive.net/src/policy.js",
+    "status": 200
+  },
+  {
+    "url": "https://mines.livive.net/models/manifest.json",
+    "status": 200
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/pressstart2p/v16/e3t4euO8T-267oIAQAu6jDQyK3nVivNm4I81.woff2",
+    "status": 200
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.wasm.min.mjs",
+    "status": 200
+  },
+  {
+    "url": "https://mines.livive.net/models/policy-m0.onnx",
+    "status": 200
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort-wasm-simd-threaded.mjs",
+    "status": 200
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort-wasm-simd-threaded.wasm",
+    "status": 200
+  }
+]

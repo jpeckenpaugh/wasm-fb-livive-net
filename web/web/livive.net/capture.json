@@ -1,0 +1,66 @@
+{
+  "schema": "wasm-fb.web-capture/1",
+  "captureId": "92b800a48fcd497d",
+  "site": {
+    "id": "livive.net",
+    "label": "livive.net"
+  },
+  "request": {
+    "url": "https://livive.net/",
+    "viewport": {
+      "width": 1280,
+      "height": 688,
+      "dpr": 1
+    },
+    "scrollY": 0,
+    "clip": null
+  },
+  "result": {
+    "finalUrl": "https://www.livive.net/",
+    "status": 200,
+    "title": "Livive — Projects to Stream",
+    "capturedAt": "2026-11-03T09:09:49.352Z",
+    "renderMs": 3892,
+    "settled": true,
+    "colorScheme": "dark",
+    "reducedMotion": true,
+    "blockedRequests": 0
+  },
+  "artifacts": [
+    {
+      "path": "index.html",
+      "bytes": 473348,
+      "sha256": "74985e89c35798bfb20f65e9b9389ff1949646df3f1b0c565b4c67fd18855d09"
+    },
+    {
+      "path": "rendered.html",
+      "bytes": 536302,
+      "sha256": "52430d0ca9e0e6b9c5b7afcdaa91e72051edfb74dc634789814b53b35d32ee8b"
+    },
+    {
+      "path": "page.png",
+      "bytes": 469588,
+      "sha256": "950f8e78bc54e169cafc5e0994f3d5999df05bace0bf37064e5f96b4986f70ae"
+    },
+    {
+      "path": "text.txt",
+      "bytes": 4972,
+      "sha256": "2d03ad5ef3a9f375b57782b29322ead7cff633bbdcc6e71bdf98b7ff16712ac2"
+    },
+    {
+      "path": "headers.txt",
+      "bytes": 681,
+      "sha256": "569f7788c73cce70b5cfddc098c67304d38bac02acad85b7931f17471215bda3"
+    },
+    {
+      "path": "console.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "network.json",
+      "bytes": 3699,
+      "sha256": "3e6ec798eded1834ed0a9fa10c2d771de10e38c8e0416681f21030449a205460"
+    }
+  ]
+}

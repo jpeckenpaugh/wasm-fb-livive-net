@@ -303,7 +303,6 @@ async function decodeBlobToRgba(blob) {
 
 async function captureSite(site, width, height, opts = {}) {
   const cfg = await loadWebConfig();
-  if (!cfg || !cfg.captureEndpoint) throw new Error('capture service is not configured');
   const viewport = { width, height: Math.max(1, height - TITLE_H), dpr: 1 };
   const key = `${site.id}@${viewport.width}x${viewport.height}`;
   const maxAge = (site.maxAgeMinutes || 15) * 60_000;
@@ -312,6 +311,24 @@ async function captureSite(site, width, height, opts = {}) {
   if (hit?.promise) return hit.promise;
 
   const promise = (async () => {
+    // 1. Try pre-baked static snapshot first if not forcing a refresh
+    if (!opts.force) {
+      try {
+        const bakedRes = await fetch(`./web/${site.id}/snapshot.json`, { cache: 'default' });
+        if (bakedRes.ok) {
+          const snapshot = await bakedRes.json();
+          snapshot.at = Date.now();
+          webCaptureCache.set(key, { snapshot, at: Date.now() });
+          return snapshot;
+        }
+      } catch {
+        /* Fall back to live capture endpoint if static snapshot fails */
+      }
+    }
+
+    // 2. Fall back to live capture service endpoint (e.g. Docker container or local server)
+    if (!cfg || !cfg.captureEndpoint) throw new Error('capture service is not configured');
+
     const res = await fetch(cfg.captureEndpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
