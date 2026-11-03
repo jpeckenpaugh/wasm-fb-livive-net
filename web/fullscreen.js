@@ -43,24 +43,48 @@ export function updateFullscreenHud(guest) {
   }
   if (fsHudPill) {
     if (guest.mpSeat && guest.mpMatchId) {
+      let outcomeSuffix = '';
+      if (guest.exports) {
+        if (guest.mpGame === 'checkers' && guest.exports.app_checkers_winner) {
+          const w = guest.exports.app_checkers_winner();
+          if (w > 0) {
+            outcomeSuffix = w === 3 ? ' · 🤝 DRAW' : w === guest.mpSeat ? ' · 👍 🏆 VICTORY' : ' · 👎 ✕ DEFEAT';
+          }
+        } else if (guest.mpGame === 'chess' && guest.exports.app_chess_status) {
+          const st = guest.exports.app_chess_status();
+          if (st === 2) {
+            const loser = guest.exports.app_chess_turn ? guest.exports.app_chess_turn() : 1;
+            const winner = loser === 1 ? 2 : 1;
+            outcomeSuffix = winner === guest.mpSeat ? ' · 👍 🏆 CHECKMATE! VICTORY' : ' · 👎 ✕ CHECKMATE! DEFEAT';
+          } else if (st === 3 || st === 4) {
+            outcomeSuffix = ' · 🤝 DRAW';
+          }
+        } else if (guest.exports.app_mines_winner) {
+          const w = guest.exports.app_mines_winner();
+          if (w > 0) {
+            outcomeSuffix = w === 3 ? ' · 🤝 DRAW' : w === guest.mpSeat ? ' · 👍 🏆 VICTORY' : ' · 👎 ✕ DEFEAT';
+          }
+        }
+      }
+
       if (guest.mpGame === 'chess' && guest.exports?.app_chess_turn) {
         const turn = guest.exports.app_chess_turn();
         const white = guest.exports.app_chess_white_count ? guest.exports.app_chess_white_count() : 16;
         const blk = guest.exports.app_chess_black_count ? guest.exports.app_chess_black_count() : 16;
-        const turnBadge = guest.mpSeat === turn ? '🟢 Your Turn' : '⏳ Opponent Turn';
-        fsHudPill.textContent = `Match #${guest.mpMatchId} · Chess Seat P${guest.mpSeat} · Turn P${turn} (${white}W:${blk}B) · ${turnBadge}`;
+        const turnBadge = outcomeSuffix ? outcomeSuffix : (guest.mpSeat === turn ? ' · 🟢 Your Turn' : ' · ⏳ Opponent Turn');
+        fsHudPill.textContent = `Match #${guest.mpMatchId} · Chess Seat P${guest.mpSeat} · Turn P${turn} (${white}W:${blk}B)${turnBadge}`;
       } else if (guest.mpGame === 'checkers' && guest.exports?.app_checkers_turn) {
         const turn = guest.exports.app_checkers_turn();
         const red = guest.exports.app_checkers_red_count ? guest.exports.app_checkers_red_count() : 12;
         const blk = guest.exports.app_checkers_black_count ? guest.exports.app_checkers_black_count() : 12;
-        const turnBadge = guest.mpSeat === turn ? '🟢 Your Turn' : '⏳ Opponent Turn';
-        fsHudPill.textContent = `Match #${guest.mpMatchId} · Checkers Seat P${guest.mpSeat} · Turn P${turn} (${red}R:${blk}B) · ${turnBadge}`;
+        const turnBadge = outcomeSuffix ? outcomeSuffix : (guest.mpSeat === turn ? ' · 🟢 Your Turn' : ' · ⏳ Opponent Turn');
+        fsHudPill.textContent = `Match #${guest.mpMatchId} · Checkers Seat P${guest.mpSeat} · Turn P${turn} (${red}R:${blk}B)${turnBadge}`;
       } else {
         const turn = guest.exports?.app_mines_turn ? guest.exports.app_mines_turn() : 1;
         const p1 = guest.exports?.app_mines_p1_score ? guest.exports.app_mines_p1_score() : 0;
         const p2 = guest.exports?.app_mines_p2_score ? guest.exports.app_mines_p2_score() : 0;
-        const turnBadge = guest.mpSeat === turn ? '🟢 Your Turn' : '⏳ Opponent Turn';
-        fsHudPill.textContent = `Match #${guest.mpMatchId} · Mines Seat P${guest.mpSeat} · Turn P${turn} (${p1}:${p2}) · ${turnBadge}`;
+        const turnBadge = outcomeSuffix ? outcomeSuffix : (guest.mpSeat === turn ? ' · 🟢 Your Turn' : ' · ⏳ Opponent Turn');
+        fsHudPill.textContent = `Match #${guest.mpMatchId} · Mines Seat P${guest.mpSeat} · Turn P${turn} (${p1}:${p2})${turnBadge}`;
       }
     } else {
       fsHudPill.textContent = `${guest.buildInfo.shortLabel} · ${_selectionLabel(guest)}`;

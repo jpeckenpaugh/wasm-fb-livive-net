@@ -1225,7 +1225,8 @@ const buildPanelHtml = (vm) => {
   return `
   <header class="vm-chassis-header">
     <div class="vm-header-left">
-      <span class="vm-status-tag"><span class="dot running"></span> RUNNING</span>
+      <span class="vm-status-tag" data-stat="status-tag"><span class="dot running"></span> RUNNING</span>
+      <span class="outcome-badge" data-stat="outcome-badge" hidden></span>
       <span class="vm-id-badge">${vm.name}</span>
       <span class="actor-badge human" data-stat="actor-badge">👤 Human</span>
       <span class="vm-build-label">${gameEngines} (<a class="commit-link" href="${b.githubUrl}" target="_blank" rel="noopener noreferrer" title="${b.notes}">↗ ${b.gitCommit}</a>)</span>
@@ -1237,7 +1238,10 @@ const buildPanelHtml = (vm) => {
       <button class="vm-action-btn btn-danger icon-only" data-action="destroy" type="button" title="Terminate / Power Off VM">✕</button>
     </div>
   </header>
-  <div class="screen"><canvas tabindex="0" width="${vm.width}" height="${vm.height}"></canvas></div>
+  <div class="screen">
+    <div class="screen-outcome-overlay" data-stat="screen-outcome" hidden></div>
+    <canvas tabindex="0" width="${vm.width}" height="${vm.height}"></canvas>
+  </div>
   <footer class="vm-chassis-footer">
     <div class="vm-telemetry-summary">
       <span>Heap: <b data-summary="mem">0 B</b></span>
@@ -1282,6 +1286,53 @@ function computeActorForGuest(guest) {
   return { cls: 'human', label: '👤 Human' };
 }
 
+function computeGuestOutcome(guest) {
+  if (!guest || !guest.exports) return null;
+
+  // 1. Checkers: winner 0=InPlay, 1=Red, 2=Black, 3=Draw
+  if (guest.mpGame === 'checkers' || (!guest.mpGame && guest.exports.app_checkers_winner)) {
+    if (guest.exports.app_checkers_winner) {
+      const w = guest.exports.app_checkers_winner();
+      if (w > 0) {
+        const seat = guest.mpSeat || 1;
+        if (w === 3) return { outcome: 'draw', label: 'DRAW', bannerText: '🤝 DRAW GAME' };
+        if (w === seat) return { outcome: 'winner', label: 'VICTORY', bannerText: '👍 🏆 VICTORY!' };
+        return { outcome: 'loser', label: 'DEFEAT', bannerText: '👎 ✕ DEFEAT' };
+      }
+    }
+  }
+
+  // 2. Chess: status 0=InPlay, 1=Check, 2=Checkmate, 3=Stalemate, 4=Draw50Move
+  if (guest.mpGame === 'chess' || (!guest.mpGame && guest.exports.app_chess_status)) {
+    if (guest.exports.app_chess_status) {
+      const st = guest.exports.app_chess_status();
+      if (st === 2) {
+        // Checkmate: turn() is the mated player (loser)
+        const loserSeat = guest.exports.app_chess_turn ? guest.exports.app_chess_turn() : 1;
+        const winnerSeat = loserSeat === 1 ? 2 : 1;
+        const seat = guest.mpSeat || 1;
+        if (seat === winnerSeat) return { outcome: 'winner', label: 'CHECKMATE · VICTORY', bannerText: '👍 🏆 CHECKMATE! VICTORY' };
+        return { outcome: 'loser', label: 'CHECKMATE · DEFEAT', bannerText: '👎 ✕ CHECKMATE! DEFEAT' };
+      } else if (st === 3 || st === 4) {
+        return { outcome: 'draw', label: 'DRAW', bannerText: st === 3 ? '🤝 STALEMATE (DRAW)' : '🤝 DRAW (50-MOVE)' };
+      }
+    }
+  }
+
+  // 3. Minesweeper: winner 0=InPlay, 1=P1, 2=P2, 3=Draw
+  if (guest.exports.app_mines_winner) {
+    const w = guest.exports.app_mines_winner();
+    if (w > 0) {
+      const seat = guest.mpSeat || 1;
+      if (w === 3) return { outcome: 'draw', label: 'DRAW', bannerText: '🤝 DRAW' };
+      if (w === seat) return { outcome: 'winner', label: 'VICTORY', bannerText: '👍 🏆 VICTORY!' };
+      return { outcome: 'loser', label: 'DEFEAT', bannerText: '👎 ✕ DEFEAT' };
+    }
+  }
+
+  return null;
+}
+
 function updateGuestBanner(guest) {
   const pill = guest?.panel?.querySelector('[data-stat="seat-pill"]');
   let infoText = '';
@@ -1312,6 +1363,39 @@ function updateGuestBanner(guest) {
     const actor = computeActorForGuest(guest);
     actorBadge.className = `actor-badge ${actor.cls}`;
     actorBadge.textContent = actor.label;
+  }
+
+  // Update Game Outcome (Victory 👍 🏆 vs Defeat 👎 ✕)
+  const outcomeInfo = computeGuestOutcome(guest);
+  const statusTag = guest?.panel?.querySelector('[data-stat="status-tag"]');
+  const outcomeBadge = guest?.panel?.querySelector('[data-stat="outcome-badge"]');
+  const screenOutcome = guest?.panel?.querySelector('[data-stat="screen-outcome"]');
+  const panel = guest?.panel;
+
+  if (outcomeInfo) {
+    if (statusTag) statusTag.hidden = true;
+    if (outcomeBadge) {
+      outcomeBadge.hidden = false;
+      outcomeBadge.className = `outcome-badge outcome-${outcomeInfo.outcome}`;
+      const badgeIcon = outcomeInfo.outcome === 'winner' ? '👍 🏆' : outcomeInfo.outcome === 'loser' ? '👎 ✕' : '🤝';
+      outcomeBadge.textContent = `${badgeIcon} ${outcomeInfo.label}`;
+    }
+    if (screenOutcome) {
+      screenOutcome.hidden = false;
+      screenOutcome.className = `screen-outcome-overlay outcome-${outcomeInfo.outcome}`;
+      screenOutcome.textContent = outcomeInfo.bannerText;
+    }
+    if (panel) {
+      panel.classList.toggle('winner-panel', outcomeInfo.outcome === 'winner');
+      panel.classList.toggle('loser-panel', outcomeInfo.outcome === 'loser');
+    }
+  } else {
+    if (statusTag) statusTag.hidden = false;
+    if (outcomeBadge) outcomeBadge.hidden = true;
+    if (screenOutcome) screenOutcome.hidden = true;
+    if (panel) {
+      panel.classList.remove('winner-panel', 'loser-panel');
+    }
   }
 
   if (getFullscreenGuest() === guest) {

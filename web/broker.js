@@ -477,6 +477,14 @@ export class FastApiSqliteBroker {
             ? `${m.p1_score}R : ${m.p2_score}B`
             : `${m.p1_score} : ${m.p2_score}`;
       const hashOrSeed = (game === 'chess' || game === 'checkers') ? (m.state_hash || '—') : `seed ${m.seed}`;
+      let statusFormatted = m.status;
+      if (m.winner_seat === 1) {
+        statusFormatted = `<span style="color:#fef08a; font-weight:700;">👍 🏆 P1 WON</span>`;
+      } else if (m.winner_seat === 2) {
+        statusFormatted = `<span style="color:#fef08a; font-weight:700;">👍 🏆 P2 WON</span>`;
+      } else if (m.winner_seat === 3) {
+        statusFormatted = `<span style="color:#e2e8f0; font-weight:700;">🤝 DRAW</span>`;
+      }
       tr.innerHTML = `
         <td><b>#${m.id}</b></td>
         <td>${game}</td>
@@ -485,7 +493,7 @@ export class FastApiSqliteBroker {
         <td>${scoreLabel}</td>
         <td>${hashOrSeed}</td>
         <td>${m.seq}</td>
-        <td>${m.status}</td>`;
+        <td>${statusFormatted}</td>`;
       tbody.append(tr);
     }
 
