@@ -1,0 +1,100 @@
+{
+  "id": "system-audit",
+  "name": "System Audit",
+  "description": "Audit System App navigation across About, Fonts (with specimen inspect) and Themes (switching palette)",
+  "steps": [
+    {
+      "action": "boot",
+      "opts": {
+        "width": 1280,
+        "height": 720
+      },
+      "desc": "Ensure guest VM is initialized at 1280×720"
+    },
+    {
+      "action": "openApp",
+      "slot": "system",
+      "desc": "Open System Settings application"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert active application is System (slot 1)",
+      "assertType": "app_selected",
+      "expected": 1
+    },
+    {
+      "action": "key",
+      "code": 11,
+      "desc": "Navigate to About section"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert active section is About (page 0)",
+      "assertType": "app_active_page",
+      "expected": 0
+    },
+    {
+      "action": "snapshot",
+      "label": "System Audit - About Section",
+      "desc": "Capture snapshot of About section"
+    },
+    {
+      "action": "key",
+      "code": 13,
+      "desc": "Navigate to Fonts section"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert active section is Fonts (page 2)",
+      "assertType": "app_active_page",
+      "expected": 2
+    },
+    {
+      "action": "key",
+      "code": 2,
+      "desc": "Inspect font specimen and switch render mode to Smooth"
+    },
+    {
+      "action": "key",
+      "code": 51,
+      "desc": "Adjust font specimen preview size"
+    },
+    {
+      "action": "snapshot",
+      "label": "System Audit - Fonts Specimen Inspect",
+      "desc": "Capture snapshot of Fonts section specimen inspection"
+    },
+    {
+      "action": "key",
+      "code": 15,
+      "desc": "Navigate to Themes section"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert active section is Themes (page 4)",
+      "assertType": "app_active_page",
+      "expected": 4
+    },
+    {
+      "action": "key",
+      "code": 51,
+      "desc": "Select next theme palette"
+    },
+    {
+      "action": "key",
+      "code": 24,
+      "desc": "Apply selected theme"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert theme palette changed from default",
+      "assertType": "app_theme_not",
+      "expected": 0
+    },
+    {
+      "action": "snapshot",
+      "label": "System Audit - New Theme Applied",
+      "desc": "Capture snapshot with new theme palette applied"
+    }
+  ]
+}

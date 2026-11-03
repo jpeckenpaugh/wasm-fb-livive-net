@@ -1,0 +1,38 @@
+[
+  {
+    "id": "system-audit",
+    "name": "System Audit",
+    "description": "Audit System App navigation across About, Fonts (with specimen inspect) and Themes (switching palette)",
+    "file": "system-audit.json"
+  },
+  {
+    "id": "mines-gold-path",
+    "name": "Minesweeper Known-Seed Victory & Detonation",
+    "description": "Execute deterministic safe sweeps on seed 42 to win, followed by single-click detonation on restart",
+    "file": "mines-gold-path.json"
+  },
+  {
+    "id": "chess-checkers-opening",
+    "name": "Chess & Checkers Opening",
+    "description": "Test dual classical board game engines: 1 move in Checkers, then 1 move in Chess against Minimax AI",
+    "file": "chess-checkers-opening.json"
+  },
+  {
+    "id": "chess-checkmate-6-moves",
+    "name": "Chess - Checkmate in 6 Moves (vs AI)",
+    "description": "Execute Scholar's Mate / Accelerated Queen attack against Chess Minimax AI to achieve checkmate in 6 half-moves",
+    "file": "chess-checkmate-6-moves.json"
+  },
+  {
+    "id": "checkers-2p-entangled-convergence",
+    "name": "Checkers 2P Entangled Convergence",
+    "description": "Mathematically prove zero-drift state convergence across two separate Wasm guest linear memories over 6 opening moves via broker relay",
+    "file": "checkers-2p-entangled-convergence.json"
+  },
+  {
+    "id": "mines-2p-turn-relay",
+    "name": "Minesweeper 2P Turn Relay & Sudden Death",
+    "description": "Verify multiplayer turn-passing, bitboard scoring, and sudden-death elimination across two VMs",
+    "file": "mines-2p-turn-relay.json"
+  }
+]

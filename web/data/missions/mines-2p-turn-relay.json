@@ -1,0 +1,175 @@
+{
+  "id": "mines-2p-turn-relay",
+  "name": "Minesweeper 2P Turn Relay & Sudden Death",
+  "description": "Verify multiplayer turn-passing, bitboard scoring, and sudden-death elimination across two VMs",
+  "steps": [
+    {
+      "action": "boot",
+      "targetVm": "p1",
+      "opts": {
+        "width": 390,
+        "height": 844
+      },
+      "desc": "Ensure vm-01 (Seat P1) is initialized at 390×844 Mobile Portrait"
+    },
+    {
+      "action": "boot",
+      "targetVm": "p2",
+      "opts": {
+        "width": 390,
+        "height": 844
+      },
+      "desc": "Ensure vm-02 (Seat P2) is initialized at 390×844 Mobile Portrait"
+    },
+    {
+      "action": "setSplitView",
+      "targetVm": "p1",
+      "desc": "Enable side-by-side split view mode",
+      "enabled": true
+    },
+    {
+      "action": "openApp",
+      "targetVm": "p1",
+      "slot": "mines",
+      "desc": "Open Minesweeper on vm-01 (Seat P1)"
+    },
+    {
+      "action": "openApp",
+      "targetVm": "p2",
+      "slot": "mines",
+      "desc": "Open Minesweeper on vm-02 (Seat P2)"
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "p1",
+      "desc": "Configure vm-01 as Seat P1 (Seed 42, Max Strikes 1) on Match #101",
+      "game": "mines",
+      "matchId": 101,
+      "seat": 1,
+      "seed": 42,
+      "maxStrikes": 1
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "p2",
+      "desc": "Configure vm-02 as Seat P2 (Seed 42, Max Strikes 1) on Match #101",
+      "game": "mines",
+      "matchId": 101,
+      "seat": 2,
+      "seed": 42,
+      "maxStrikes": 1
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p1",
+      "seat": 1,
+      "desc": "Assert vm-01 turn is P1"
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p2",
+      "seat": 1,
+      "desc": "Assert vm-02 turn is P1"
+    },
+    {
+      "action": "clickCell",
+      "targetVm": "p1",
+      "row": 0,
+      "col": 0,
+      "desc": "P1 (vm-01): Reveal safe cell at (0, 0)"
+    },
+    {
+      "action": "wait",
+      "ms": 200,
+      "desc": "Wait for broker event relay"
+    },
+    {
+      "action": "assert",
+      "targetVm": "p1",
+      "desc": "Assert points awarded to P1 on vm-01",
+      "assertType": "mines_p1_score_gt",
+      "expected": 0
+    },
+    {
+      "action": "assert",
+      "targetVm": "p2",
+      "desc": "Assert points synchronized to P2 on vm-02 via broker RX",
+      "assertType": "mines_p1_score_gt",
+      "expected": 0
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p1",
+      "seat": 2,
+      "desc": "Assert turn passed to P2 on vm-01"
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p2",
+      "seat": 2,
+      "desc": "Assert turn passed to P2 on vm-02"
+    },
+    {
+      "action": "clickCell",
+      "targetVm": "p2",
+      "row": 0,
+      "col": 7,
+      "desc": "P2 (vm-02): Reveal safe cell at (0, 7)"
+    },
+    {
+      "action": "wait",
+      "ms": 200,
+      "desc": "Wait for broker event relay"
+    },
+    {
+      "action": "assert",
+      "targetVm": "p2",
+      "desc": "Assert points awarded to P2 on vm-02",
+      "assertType": "mines_p2_score_gt",
+      "expected": 0
+    },
+    {
+      "action": "assert",
+      "targetVm": "p1",
+      "desc": "Assert points synchronized to P1 on vm-01 via broker RX",
+      "assertType": "mines_p2_score_gt",
+      "expected": 0
+    },
+    {
+      "action": "splitSnapshot",
+      "label": "Minesweeper 2P Turn Relay - Safe Paths Dual View",
+      "desc": "Capture dual-perspective split snapshot of both safe territories"
+    },
+    {
+      "action": "clickCell",
+      "targetVm": "p1",
+      "row": 0,
+      "col": 6,
+      "desc": "P1 (vm-01): Reveal known bomb cell at (0, 6) triggering sudden-death"
+    },
+    {
+      "action": "wait",
+      "ms": 200,
+      "desc": "Wait for broker event relay"
+    },
+    {
+      "action": "assert",
+      "targetVm": "p1",
+      "desc": "Assert sudden-death elimination on vm-01 (Winner is P2)",
+      "assertType": "mines_winner",
+      "expected": 2
+    },
+    {
+      "action": "assert",
+      "targetVm": "p2",
+      "desc": "Assert sudden-death elimination synced to vm-02 (Winner is P2)",
+      "assertType": "mines_winner",
+      "expected": 2
+    },
+    {
+      "action": "splitSnapshot",
+      "label": "Minesweeper 2P Turn Relay - Sudden Death Detonation Dual View",
+      "desc": "Capture final dual-screen snapshot showing synchronized sudden-death detonation"
+    }
+  ]
+}

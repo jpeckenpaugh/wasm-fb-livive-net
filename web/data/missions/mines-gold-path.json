@@ -1,0 +1,97 @@
+{
+  "id": "mines-gold-path",
+  "name": "Minesweeper Known-Seed Victory & Detonation",
+  "description": "Configure Minesweeper with seed 42, reveal known safe cells, flag a known bomb, and detonate",
+  "steps": [
+    {
+      "action": "boot",
+      "opts": {
+        "width": 1280,
+        "height": 720
+      },
+      "desc": "Ensure guest VM is initialized at 1280×720"
+    },
+    {
+      "action": "openApp",
+      "slot": "mines",
+      "desc": "Open Minesweeper application"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert active application is Minesweeper (slot 4)",
+      "assertType": "app_selected",
+      "expected": 4
+    },
+    {
+      "action": "seedMines",
+      "seed": 42,
+      "maxStrikes": 1,
+      "desc": "Configure Minesweeper seed 42 with classic rules"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert Minesweeper seed is 42",
+      "assertType": "mines_seed",
+      "expected": 42
+    },
+    {
+      "action": "clickCell",
+      "row": 0,
+      "col": 0,
+      "desc": "Reveal known safe cell at (0, 0)"
+    },
+    {
+      "action": "assertStatus",
+      "status": "PLAYING",
+      "desc": "Assert Minesweeper game status is PLAYING"
+    },
+    {
+      "action": "clickCell",
+      "row": 0,
+      "col": 7,
+      "desc": "Reveal known safe cell at (0, 7)"
+    },
+    {
+      "action": "snapshot",
+      "label": "Minesweeper - Safe Path Revealed",
+      "desc": "Capture snapshot after revealing safe cells"
+    },
+    {
+      "action": "key",
+      "code": 30,
+      "desc": "Toggle Flag mode on"
+    },
+    {
+      "action": "clickCell",
+      "row": 0,
+      "col": 3,
+      "desc": "Flag known bomb cell at (0, 3)"
+    },
+    {
+      "action": "key",
+      "code": 30,
+      "desc": "Toggle Flag mode off"
+    },
+    {
+      "action": "snapshot",
+      "label": "Minesweeper - Known Bomb Flagged",
+      "desc": "Capture snapshot with known bomb flagged"
+    },
+    {
+      "action": "clickCell",
+      "row": 0,
+      "col": 6,
+      "desc": "Deliberately reveal known bomb cell at (0, 6) to trigger detonation"
+    },
+    {
+      "action": "assertStatus",
+      "status": "EXPLODED",
+      "desc": "Assert Minesweeper game status is EXPLODED (terminal detonation)"
+    },
+    {
+      "action": "snapshot",
+      "label": "Minesweeper - Detonated Game End",
+      "desc": "Capture snapshot of terminal detonation"
+    }
+  ]
+}

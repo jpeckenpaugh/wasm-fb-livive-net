@@ -1,6 +1,6 @@
 /* Auto Pilot Runner: Deterministic Mission Runner, Action Interpreter & State Assertions */
 
-import { MISSIONS, getMissionById } from './missions.js';
+import { MISSIONS, getMissionById, loadMissions } from './missions.js';
 
 const MODS = { Shift: 1, Ctrl: 2, Alt: 4, Meta: 8 };
 
@@ -64,18 +64,24 @@ export class AutoPilotRunner {
 
     const t = String(targetVm).toLowerCase();
     if (t === 'p1' || t === 'seat1' || t === 'seat-1' || t === 'vm-01' || t === 'vm1') {
+      if (forBoot) {
+        return guests[0] || null;
+      }
       return (
         guests.find((g) => g.mpSeat === 1) ||
+        guests[0] ||
         guests.find((g) => g.name === 'vm-01' || g.id === 1) ||
-        (forBoot ? null : guests[0]) ||
         null
       );
     }
     if (t === 'p2' || t === 'seat2' || t === 'seat-2' || t === 'vm-02' || t === 'vm2') {
+      if (forBoot) {
+        return guests[1] || null;
+      }
       return (
         guests.find((g) => g.mpSeat === 2) ||
+        guests[1] ||
         guests.find((g) => g.name === 'vm-02' || g.id === 2) ||
-        (forBoot ? null : guests[1]) ||
         null
       );
     }
@@ -120,6 +126,10 @@ export class AutoPilotRunner {
   async runMission(missionOrId, opts = {}) {
     if (this.state === 'running') {
       this.cancel();
+    }
+
+    if (!MISSIONS || MISSIONS.length === 0) {
+      await loadMissions();
     }
 
     let mission = null;
@@ -291,6 +301,10 @@ export class AutoPilotRunner {
           // If already booted but resolution differs, re-instantiate guest to match resolution
           if ((bootOpts.width && guest.width !== bootOpts.width) ||
               (bootOpts.height && guest.height !== bootOpts.height)) {
+            const preservedSeat = guest.mpSeat;
+            const preservedMatchId = guest.mpMatchId;
+            const preservedGame = guest.mpGame;
+            const preservedActor = guest.actorType;
             if (this.deps.destroyGuest) {
               this.deps.destroyGuest(guest);
             } else if (guest.wrap && guest.panel) {
@@ -299,6 +313,10 @@ export class AutoPilotRunner {
             }
             if (this.deps.createGuest) {
               guest = await this.deps.createGuest(bootOpts);
+              if (preservedSeat) guest.mpSeat = preservedSeat;
+              if (preservedMatchId) guest.mpMatchId = preservedMatchId;
+              if (preservedGame) guest.mpGame = preservedGame;
+              if (preservedActor) guest.actorType = preservedActor;
             }
           }
         }
@@ -596,12 +614,135 @@ export class AutoPilotRunner {
         break;
       }
 
+      case 'setSplitView': {
+        if (typeof window !== 'undefined' && window.__appliance?.setSplitView) {
+          window.__appliance.setSplitView(step.enabled !== false);
+        }
+        break;
+      }
+
+      case 'configureMatch': {
+        if (!guest || !guest.exports) throw new Error('Action configureMatch: guest VM not available');
+        const broker = typeof window !== 'undefined' ? window.__broker : null;
+        const matchId = step.matchId || 101;
+        const game = step.game || 'mines';
+        const seat = step.seat || 1;
+        const seed = step.seed ?? 42;
+        const maxStrikes = step.maxStrikes ?? 1;
+
+        if (broker) {
+          let m = broker.tables.matches.find((x) => x.id === matchId);
+          if (!m) {
+            m = {
+              id: matchId,
+              game,
+              seed,
+              max_strikes: maxStrikes,
+              status: 'PLAYING',
+              turn_seat: 1,
+              p1_vm: 'vm-01',
+              p2_vm: 'vm-02',
+              p1_id: 1,
+              p2_id: 2,
+              p1_score: game === 'chess' ? 16 : game === 'checkers' ? 12 : 0,
+              p2_score: game === 'chess' ? 16 : game === 'checkers' ? 12 : 0,
+              state_hash: game === 'mines' ? `seed:${seed}` : '0x00000000',
+              last_pdn: '—',
+              winner_seat: 0,
+              seq: 0,
+              created_at: broker.nowIso ? broker.nowIso() : new Date().toISOString().slice(11, 19),
+            };
+            broker.tables.matches.unshift(m);
+          }
+          broker.activeMatchId = matchId;
+          broker.renderDrawer();
+          if (typeof window !== 'undefined') {
+            const brokerDrawer = document.getElementById('broker-drawer');
+            if (brokerDrawer) brokerDrawer.hidden = false;
+          }
+        }
+
+        if (game === 'checkers' && guest.exports.app_checkers_set_mp) {
+          guest.exports.app_checkers_set_mp(1, matchId, seat, 1);
+        } else if (game === 'chess' && guest.exports.app_chess_set_mp) {
+          guest.exports.app_chess_set_mp(1, matchId, seat, 0);
+        } else if (guest.exports.app_mines_set_mp) {
+          guest.exports.app_mines_set_mp(1, matchId, seat, seed, maxStrikes);
+        }
+
+        guest.mpSeat = seat;
+        guest.mpMatchId = matchId;
+        guest.mpGame = game;
+        guest.actorType = 'AutoPilot';
+        if (guest.render) guest.render();
+        break;
+      }
+
       case 'assert': {
         if (!guest) throw new Error('Action assert: guest VM not available');
         if (typeof step.check === 'function') {
           const pass = step.check(guest);
           if (!pass) {
             throw new Error(`Assertion failed: ${step.desc || 'custom check returned false'}`);
+          }
+        } else if (step.assertType) {
+          const exp = guest.exports;
+          let pass = false;
+          let actualVal = undefined;
+          switch (step.assertType) {
+            case 'app_selected':
+              actualVal = exp?.app_selected ? exp.app_selected() : -1;
+              pass = actualVal === step.expected;
+              break;
+            case 'app_active_page':
+              actualVal = exp?.app_active_page ? exp.app_active_page() : -1;
+              pass = actualVal === step.expected;
+              break;
+            case 'app_theme_not':
+              actualVal = exp?.app_theme ? exp.app_theme() : 0;
+              pass = actualVal !== step.expected;
+              break;
+            case 'mines_seed':
+              actualVal = exp?.app_mines_seed ? exp.app_mines_seed() >>> 0 : -1;
+              pass = actualVal === step.expected;
+              break;
+            case 'checkers_turn':
+              actualVal = exp?.app_checkers_turn ? exp.app_checkers_turn() : -1;
+              pass = actualVal === step.expected;
+              break;
+            case 'checkers_ai_pending':
+              actualVal = exp?.app_checkers_ai_pending ? exp.app_checkers_ai_pending() : 0;
+              pass = actualVal === step.expected;
+              break;
+            case 'chess_turn':
+              actualVal = exp?.app_chess_turn ? exp.app_chess_turn() : -1;
+              pass = actualVal === step.expected;
+              break;
+            case 'chess_ai_pending':
+              actualVal = exp?.app_chess_ai_pending ? exp.app_chess_ai_pending() : 0;
+              pass = actualVal === step.expected;
+              break;
+            case 'chess_status':
+              actualVal = exp?.app_chess_status ? exp.app_chess_status() : -1;
+              pass = actualVal === step.expected;
+              break;
+            case 'mines_p1_score_gt':
+              actualVal = exp?.app_mines_p1_score ? exp.app_mines_p1_score() : 0;
+              pass = actualVal > step.expected;
+              break;
+            case 'mines_p2_score_gt':
+              actualVal = exp?.app_mines_p2_score ? exp.app_mines_p2_score() : 0;
+              pass = actualVal > step.expected;
+              break;
+            case 'mines_winner':
+              actualVal = exp?.app_mines_winner ? exp.app_mines_winner() : 0;
+              pass = actualVal === step.expected;
+              break;
+            default:
+              throw new Error(`Unknown assertType: ${step.assertType}`);
+          }
+          if (!pass) {
+            throw new Error(`Assertion failed for ${guest.name}: [${step.assertType}] expected ${step.expected}, got ${actualVal}`);
           }
         }
         break;

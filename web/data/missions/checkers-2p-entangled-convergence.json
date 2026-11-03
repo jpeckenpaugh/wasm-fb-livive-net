@@ -1,0 +1,221 @@
+{
+  "id": "checkers-2p-entangled-convergence",
+  "name": "Checkers 2P Entangled Convergence",
+  "description": "Mathematically prove zero-drift state convergence across two separate Wasm guest linear memories over 6 opening moves via broker relay",
+  "steps": [
+    {
+      "action": "boot",
+      "targetVm": "p1",
+      "opts": {
+        "width": 390,
+        "height": 844
+      },
+      "desc": "Ensure vm-01 (Seat P1) is initialized at 390×844 Mobile Portrait"
+    },
+    {
+      "action": "boot",
+      "targetVm": "p2",
+      "opts": {
+        "width": 390,
+        "height": 844
+      },
+      "desc": "Ensure vm-02 (Seat P2) is initialized at 390×844 Mobile Portrait"
+    },
+    {
+      "action": "setSplitView",
+      "targetVm": "p1",
+      "desc": "Enable side-by-side split view mode",
+      "enabled": true
+    },
+    {
+      "action": "openApp",
+      "targetVm": "p1",
+      "slot": "checkers",
+      "desc": "Open Checkers on vm-01 (Seat P1)"
+    },
+    {
+      "action": "openApp",
+      "targetVm": "p2",
+      "slot": "checkers",
+      "desc": "Open Checkers on vm-02 (Seat P2)"
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "p1",
+      "desc": "Configure vm-01 as Seat P1 on 2P Match #201",
+      "game": "checkers",
+      "matchId": 201,
+      "seat": 1
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "p2",
+      "desc": "Configure vm-02 as Seat P2 on 2P Match #201",
+      "game": "checkers",
+      "matchId": 201,
+      "seat": 2
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p1",
+      "seat": 1,
+      "desc": "Assert vm-01 initial turn is Seat P1 (Red)"
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p2",
+      "seat": 1,
+      "desc": "Assert vm-02 initial turn is Seat P1 (Red)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "desc": "Assert initial state hashes of vm-01 and vm-02 match exactly"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 22,
+      "desc": "P1 (vm-01): Select piece at square 22 (PDN 23)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 18,
+      "desc": "P1 (vm-01): Play move 22-18 (PDN 23-19)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "desc": "Assert causal convergence: vm-02 state hash matches vm-01 after Move 1"
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p2",
+      "seat": 2,
+      "desc": "Assert turn passed to Seat P2 (Black) on vm-02"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P2 (vm-02): Select piece at square 10 (PDN 11)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 14,
+      "desc": "P2 (vm-02): Play move 10-14 (PDN 11-15)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p2",
+      "kind": "checkers",
+      "compareToVm": "p1",
+      "desc": "Assert causal convergence: vm-01 state hash matches vm-02 after Move 2"
+    },
+    {
+      "action": "assertTurn",
+      "targetVm": "p1",
+      "seat": 1,
+      "desc": "Assert turn passed back to Seat P1 (Red) on vm-01"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 18,
+      "desc": "P1 (vm-01): Select piece at square 18 (PDN 19)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 15,
+      "desc": "P1 (vm-01): Play move 18-15 (PDN 19-16)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "desc": "Assert causal convergence: vm-02 state hash matches vm-01 after Move 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 11,
+      "desc": "P2 (vm-02): Select piece at square 11 (PDN 12)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 18,
+      "desc": "P2 (vm-02): Play capture jump 11x18 (PDN 12x19)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p2",
+      "kind": "checkers",
+      "compareToVm": "p1",
+      "desc": "Assert causal convergence: vm-01 state hash matches vm-02 after Move 4 jump"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 20,
+      "desc": "P1 (vm-01): Select piece at square 20 (PDN 21)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p1",
+      "game": "checkers",
+      "id": 16,
+      "desc": "P1 (vm-01): Play move 20-16 (PDN 21-17)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p1",
+      "kind": "checkers",
+      "compareToVm": "p2",
+      "desc": "Assert causal convergence: vm-02 state hash matches vm-01 after Move 5"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 6,
+      "desc": "P2 (vm-02): Select piece at square 6 (PDN 7)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "p2",
+      "game": "checkers",
+      "id": 10,
+      "desc": "P2 (vm-02): Play move 6-10 (PDN 7-11)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "p2",
+      "kind": "checkers",
+      "compareToVm": "p1",
+      "desc": "Assert causal convergence: vm-01 and vm-02 converge to 100% identical hash after 6 moves"
+    },
+    {
+      "action": "splitSnapshot",
+      "label": "Checkers 2P Entangled Convergence - 6 Moves Dual View",
+      "desc": "Capture dual-screen side-by-side verification split snapshot"
+    }
+  ]
+}

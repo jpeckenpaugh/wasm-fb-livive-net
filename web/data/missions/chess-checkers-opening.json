@@ -1,0 +1,117 @@
+{
+  "id": "chess-checkers-opening",
+  "name": "Chess & Checkers Opening",
+  "description": "Execute opening moves against the minimax AI in Checkers (11-15) and Chess (e2-e4) and capture AI responses",
+  "steps": [
+    {
+      "action": "boot",
+      "opts": {
+        "width": 1280,
+        "height": 720
+      },
+      "desc": "Ensure guest VM is initialized at 1280×720"
+    },
+    {
+      "action": "openApp",
+      "slot": "checkers",
+      "desc": "Open English Draughts (Checkers) application"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert active application is Checkers (slot 5)",
+      "assertType": "app_selected",
+      "expected": 5
+    },
+    {
+      "action": "assert",
+      "desc": "Assert Checkers turn is Red (Player 1)",
+      "assertType": "checkers_turn",
+      "expected": 1
+    },
+    {
+      "action": "click",
+      "x": 177,
+      "y": 487,
+      "desc": "Select Red piece at square 20"
+    },
+    {
+      "action": "click",
+      "x": 251,
+      "y": 413,
+      "desc": "Move piece to destination square 16"
+    },
+    {
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for Checkers minimax AI to compute and execute reply"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert Checkers turn returned to Red after AI reply",
+      "assertType": "checkers_turn",
+      "expected": 1
+    },
+    {
+      "action": "assert",
+      "desc": "Assert Checkers AI completed response move",
+      "assertType": "checkers_ai_pending",
+      "expected": 0
+    },
+    {
+      "action": "snapshot",
+      "label": "Checkers - Opening Move & AI Reply",
+      "desc": "Capture snapshot of Checkers board after opening exchange"
+    },
+    {
+      "action": "openApp",
+      "slot": "chess",
+      "desc": "Open Classic Chess application"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert active application is Chess (slot 6)",
+      "assertType": "app_selected",
+      "expected": 6
+    },
+    {
+      "action": "assert",
+      "desc": "Assert Chess turn is White (Player 1)",
+      "assertType": "chess_turn",
+      "expected": 1
+    },
+    {
+      "action": "click",
+      "x": 473,
+      "y": 561,
+      "desc": "Select White Pawn at e2"
+    },
+    {
+      "action": "click",
+      "x": 473,
+      "y": 413,
+      "desc": "Play Kings Pawn opening move e2-e4"
+    },
+    {
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for Chess minimax AI to compute and execute reply"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert Chess turn returned to White after AI reply",
+      "assertType": "chess_turn",
+      "expected": 1
+    },
+    {
+      "action": "assert",
+      "desc": "Assert Chess AI completed response move",
+      "assertType": "chess_ai_pending",
+      "expected": 0
+    },
+    {
+      "action": "snapshot",
+      "label": "Chess - Opening Move e2-e4 & AI Reply",
+      "desc": "Capture snapshot of Chess board after e2-e4 and AI response"
+    }
+  ]
+}
