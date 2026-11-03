@@ -56,12 +56,14 @@ Because a transition $\tau_k$ is ~8–16 bytes and executing `apply_hop` / `step
 - **Zero-Bandwidth "Video"**: A 50-turn match with millisecond pacing ($\Delta t_{\text{ms}}$) is ~600 bytes. Re-applying $\vec{\tau}_N$ from $k = 0 \dots N$ reconstructs every intermediate RGBA8888 framebuffer pixel-for-pixel down to the millisecond.
 - **Counterfactual Forking**: At any point in a live match (e.g., Turn `#14`), a human player or an autonomous sub-agent can **fork** $\vec{\tau}_{14}$ into a new guest instance (`vm-03`), inject an alternative move $\tau'_{15}$, run 6-ply Minimax or a Monte Carlo rollout 20 turns into the future in `< 5 ms`, and visually compare the forked universe side-by-side in Split View without mutating the live match on `vm-01` / `vm-02`.
 
-### Law 5 — Actor Agnosticism (Humans, Peers, and Agents Are Identical)
-To the Wasm kernel and the hypervisor bus, every participant is simply an actor emitting valid transitions $\tau_k$:
-- Local human pointer/keyboard input (`app_click`, `app_key_mods`)
-- Built-in `#![no_std]` alpha-beta Minimax AI (`app_checkers_step_ai`)
-- Remote LAN peer over WebRTC `RTCDataChannel` or LAN WebSocket (`app_checkers_apply_rx`, `app_mines_apply_rx`)
-- External LLM / RL policy agent via `window.__appliance`
+### Law 5 — Actor Agnosticism & The Actor Matrix
+To the Wasm kernel and the hypervisor bus, every participant is simply an actor emitting valid transitions $\tau_k$. The chassis surfaces the active driver via real-time **Actor Matrix Badges**:
+- **`[👤 Human]`**: Local physical pointer/keyboard input (`app_click`, `app_key_mods`).
+- **`[🤖 Minimax]`**: Built-in `#![no_std]` alpha-beta Minimax AI (`app_checkers_step_ai`, `app_chess_step_ai`).
+- **`[✈️ AutoPilot]`**: Scripted multi-VM flight plans or autonomous sub-agents executing deterministic trajectories via `window.__appliance.autoPilot`.
+- **`[🌐 Remote Peer]`**: Remote LAN peer over WebRTC `RTCDataChannel` or LAN WebSocket (`app_checkers_apply_rx`, `app_mines_apply_rx`).
+
+Regardless of who drives a seat, each transition updates the FNV-1a hash ledger identically, allowing seamless transitions where AutoPilot opens a game, Minimax responds to counter-attacks, and a human spectator intervenes on any move.
 
 ---
 

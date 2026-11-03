@@ -5,6 +5,6 @@ The *guest* draws every pixel into linear memory; the orchestration console forw
 
 ## Heritage & Apps
 - Originally started as the `wasm-fb` C framebuffer experiment (Clock, Calculator, Calendar, Files & Preview).
-- Modern appliance features bare-metal `#![no_std]` Rust guests, English Draughts (Checkers) with minimax AI, 2-Player turn-based Minesweeper, in-browser SQLite matchmaking broker, and multi-guest split-view orchestration.
+- Modern appliance features bare-metal `#![no_std]` Rust guests, English Draughts (Checkers) and Chess with minimax AI, 2-Player turn-based Minesweeper, in-browser SQLite matchmaking broker, AutoPilot autonomous mission orchestration, and multi-guest split-view orchestration with live Actor Matrix badges (`[👤 Human]`, `[🤖 Minimax]`, `[✈️ AutoPilot]`).
 
 `github.com/jpeckenpaugh`

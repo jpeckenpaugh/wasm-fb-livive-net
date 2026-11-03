@@ -18,18 +18,21 @@ Browser Host (HTML + JS)
 
 This repository serves three routes:
 
-### 1. Appliance v3.1 (Root `/`) — Build Registry, Checkers + Mines 2P Broker & Entangled Hypervisors
+### 1. Appliance v3.1 (Root `/`) — Build Registry, Checkers, Chess & Mines 2P Broker, AutoPilot & Entangled Hypervisors
 Served at `/` (`web/index.html`, `web/host.js`, `web/registry.json`):
-- **Immutable Build Registry (`web/registry.json`)**: Select and instantiate historical and current `.wasm` appliance builds (`build-03` v3.1 Checkers + AI + 2P Broker, `build-02` v3.0 `aea4b4b` 2P Mines, `build-01` v2.0 `7ac8a67` 1P Baseline) per guest tab, with clickable GitHub commit provenance links (`↗ commit`).
+- **Immutable Build Registry (`web/registry.json`)**: Select and instantiate historical and current `.wasm` appliance builds (`build-03` v3.1 Checkers + Chess + AI + 2P Broker, `build-02` v3.0 `aea4b4b` 2P Mines, `build-01` v2.0 `7ac8a67` 1P Baseline) per guest tab, with clickable GitHub commit provenance links (`↗ commit`).
 - **Side-by-Side Split View (`⧉ split view` & `⇄ A/B builds`)**: Compare multiple guests or A/B test Build #3 (`v3.1`) against Build #2 (`aea4b4b`) side-by-side in one click.
-- **English Draughts (Checkers) + Alpha-Beta Minimax AI (`♟️ 2P checkers match`)**: Pure `#![no_std]` 32-square PDN draughts engine (`v2/src/checkers_sm.rs`, `v2/src/checkers.rs`) with mandatory jumps, multi-jump continuation, 2/4/6-ply alpha-beta Minimax + quiescence AI, Seat P2 perspective auto-flip, and 2-guest match brokering.
-- **2-Player Turn-Based Minesweeper (`🎮 2P mines match`)**: Wraps `mine_sm.rs` (`BoardState`) in a 2-player turn-based state machine with Wasm TX/RX mailboxes and an in-browser FastAPI + SQLite match broker (`window.__broker` with live `matches` and `match_events` tables).
+- **AutoPilot & Deterministic Trajectory Engine (`✈️ Auto Pilot` & `⏺ Trajectory`)**: Autonomous flight plan runner (`web/autopilot.js`, `web/missions.js`) with 6 pre-configured mission scenarios (e.g. Checkers 2P Entangled Convergence, Minesweeper 2P Turn Relay, Chess Checkmate in 6 Moves), cross-VM semantic assertions (`assertHash`, `assertTurn`), dual-perspective composite split snapshots, and a live input recorder that converts interactive sessions into reusable JSON flight plans.
+- **Actor Matrix HUD**: Real-time chassis badges indicating guest seat control: `[👤 Human]`, `[🤖 Minimax]`, and `[✈️ AutoPilot]`.
+- **English Draughts (Checkers) + Alpha-Beta Minimax AI (`♟️ 2P checkers match`)**: Pure `#![no_std]` 32-square PDN draughts engine (`v2/src/checkers_sm.rs`, `v2/src/checkers.rs`) with mandatory jumps, multi-jump continuation, 2/4/6-ply alpha-beta Minimax + quiescence AI, Seat P2 perspective auto-flip, dynamic board scaling on high-DPI displays, and 2-guest match brokering.
+- **Chess + Minimax AI (`♔ 2P chess match`)**: Pure `#![no_std]` 64-square chess engine (`v2/src/chess_sm.rs`, `v2/src/chess.rs`) with full legal move generation (castling, en passant, promotion), Minimax evaluation, UCI move relay, and perspective flipping.
+- **2-Player Turn-Based Minesweeper (`🎮 2P mines match`)**: Wraps `mine_sm.rs` (`BoardState`) in a 2-player turn-based state machine with Wasm TX/RX mailboxes, sudden-death detonation, dynamic cell scaling up to 112px, and an in-browser FastAPI + SQLite match broker (`window.__broker` with live `matches` and `match_events` tables).
 - **Peer-to-Peer Entangled Hypervisors & Live Trajectory Branching**: See [**docs/v3-entangled-hypervisors.md**](docs/v3-entangled-hypervisors.md) (and `~/samples/entangled.md` inside the `Files` app) for the architectural manifesto and LAN/WebRTC causal trajectory specification.
 
 ### 2. Appliance v2 (`/v2/`) — Frozen Rust `#![no_std]` Window Manager Baseline
 Located in `v2/` and served at `/v2/`:
-- **Size**: **~156 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
-- **Architecture**: Bare-metal `#![no_std]` Rust (`wasm32-unknown-unknown`), dynamic resolution scaling (360×800 up to 1080p), zero-allocation 2D software rasterizer, and a `FiveSeven` 5×7 bitmap font with Native and Smooth render modes at absolute scales (1× is the 5×7 base in both; Smooth is the default). Shared `theme`, `layout`, `ui`, `fmt`, and `input` modules keep colors, size classes, chrome, formatting, and key/result contracts in one place.
+- **Size**: **~210 KiB `.wasm` binary** (zero baked-in assets; images and code are decoded and staged dynamically from the host).
+- **Architecture**: Bare-metal `#![no_std]` Rust (`wasm32-unknown-unknown`), dynamic resolution scaling (360×800 up to 1080p+, with adaptive cell sizing up to 116px to prevent empty border waste), zero-allocation 2D software rasterizer, and a `FiveSeven` 5×7 bitmap font with Native and Smooth render modes at absolute scales (1× is the 5×7 base in both; Smooth is the default). Shared `theme`, `layout`, `ui`, `fmt`, and `input` modules keep colors, size classes, chrome, formatting, and key/result contracts in one place.
 - **Theme page**: `System → Theme` selects one of ten built-in color themes; `System → Fonts` owns the global render mode and a selectable 1×–8× specimen ladder. See [docs/v2-themes.md](docs/v2-themes.md), [docs/v2-smooth.md](docs/v2-smooth.md), and [docs/glyphs.md](docs/glyphs.md).
 - **Window Manager (`wm.rs`)**: 32px Title Bar with `Home` (`[≡]`) and active-app menus; the App Home drawer is the `Home` dropdown (containing the 4 app tiles plus `Test Pattern`). Mouse and keyboard share one focus model (`F9`/`Alt+D` Home drawer, `F10`/`Alt+M` menu bar, `Tab` client traversal, `Enter`/`Space` activation); see [docs/v2-input.md](docs/v2-input.md).
 - **Applications**:
@@ -49,6 +52,20 @@ Located in `src/` and served at `/v1/`:
 
 ## Run it
 
+### 1. Multiplayer Broker & Web Console (Recommended)
+
+Run the combined static web host and live SSE / SQLite Match Broker:
+
+```bash
+make serve-relay
+# open http://localhost:8080/
+```
+
+- Serves the unified web console at `http://localhost:8080/`.
+- Hosts the FastAPI-style HTTP endpoints (`/api/matches`, `/api/matches/:id/moves`) and Server-Sent Events (`/api/matches/:id/events`) for cross-window / cross-device matchmaking.
+
+### 2. Containerized Production Build
+
 ```bash
 docker compose up --build serve   # http://localhost:8080
 ```
@@ -57,18 +74,17 @@ That builds the wasm module inside the pinned toolchain image (Emscripten
 6.0.13 + Pillow 11.3.0) and serves `web/` with nginx. Nothing is written to the
 host filesystem.
 
-### Optional `web://` snapshots
+### 3. Optional Headless `web://` Capture Service
 
-`web://` is a virtual folder over a small capture service; the appliance itself
-still has no browser or network stack. Run the capture service and the appliance:
+`web://` is a virtual folder over a local Playwright capture service; the appliance itself
+still has no browser or network stack. Run the capture service alongside the web host:
 
 ```bash
-# terminal 1
-make web-capture
+# terminal 1: headless Chrome capture daemon
+make web-capture   # http://127.0.0.1:8787/
 
-# terminal 2
-make serve
-# open http://localhost:8080/v2/
+# terminal 2: web console & match broker
+make serve-relay   # http://localhost:8080/
 ```
 
 Then open `Files → web://` and select `livive.net`, `mines.livive.net`,
