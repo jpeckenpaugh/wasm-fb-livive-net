@@ -461,6 +461,487 @@ export const MISSIONS = [
       },
     ],
   },
+  {
+    id: 'checkers-2p-entangled-convergence',
+    name: 'Checkers 2P Entangled Convergence',
+    description: 'Mathematically prove zero-drift state convergence across two separate Wasm guest linear memories over 6 opening moves via broker relay',
+    steps: [
+      {
+        action: 'boot',
+        targetVm: 'p1',
+        opts: { width: 1280, height: 720 },
+        desc: 'Ensure vm-01 (Seat P1) is initialized at 1280×720',
+      },
+      {
+        action: 'boot',
+        targetVm: 'p2',
+        opts: { width: 1280, height: 720 },
+        desc: 'Ensure vm-02 (Seat P2) is initialized at 1280×720',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p1',
+        check: (guest) => {
+          if (typeof window !== 'undefined' && window.__appliance?.setSplitView) {
+            window.__appliance.setSplitView(true);
+          }
+          return true;
+        },
+        desc: 'Enable side-by-side split view mode',
+      },
+      {
+        action: 'openApp',
+        targetVm: 'p1',
+        slot: 'checkers',
+        desc: 'Open Checkers on vm-01 (Seat P1)',
+      },
+      {
+        action: 'openApp',
+        targetVm: 'p2',
+        slot: 'checkers',
+        desc: 'Open Checkers on vm-02 (Seat P2)',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p1',
+        check: (guest) => {
+          const broker = typeof window !== 'undefined' ? window.__broker : null;
+          if (broker) {
+            let m = broker.tables.matches.find((x) => x.id === 201);
+            if (!m) {
+              m = {
+                id: 201,
+                game: 'checkers',
+                seed: 42,
+                max_strikes: 1,
+                status: 'PLAYING',
+                turn_seat: 1,
+                p1_vm: 'vm-01',
+                p2_vm: 'vm-02',
+                p1_id: 1,
+                p2_id: 2,
+                p1_score: 12,
+                p2_score: 12,
+                state_hash: '0x00000000',
+                last_pdn: '—',
+                winner_seat: 0,
+                seq: 0,
+                created_at: broker.nowIso ? broker.nowIso() : new Date().toISOString().slice(11, 19),
+              };
+              broker.tables.matches.unshift(m);
+            }
+            broker.activeMatchId = 201;
+            broker.renderDrawer();
+            if (typeof window !== 'undefined') {
+              const brokerDrawer = document.getElementById('broker-drawer');
+              if (brokerDrawer) brokerDrawer.hidden = false;
+            }
+          }
+          guest.exports.app_checkers_set_mp(1, 201, 1, 1);
+          guest.mpSeat = 1;
+          guest.mpMatchId = 201;
+          guest.mpGame = 'checkers';
+          guest.actorType = 'AutoPilot';
+          if (guest.render) guest.render();
+          return true;
+        },
+        desc: 'Configure vm-01 as Seat P1 on 2P Match #201',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p2',
+        check: (guest) => {
+          guest.exports.app_checkers_set_mp(1, 201, 2, 1);
+          guest.mpSeat = 2;
+          guest.mpMatchId = 201;
+          guest.mpGame = 'checkers';
+          guest.actorType = 'AutoPilot';
+          if (guest.render) guest.render();
+          return true;
+        },
+        desc: 'Configure vm-02 as Seat P2 on 2P Match #201',
+      },
+      {
+        action: 'assertTurn',
+        targetVm: 'p1',
+        seat: 1,
+        desc: 'Assert vm-01 initial turn is Seat P1 (Red)',
+      },
+      {
+        action: 'assertTurn',
+        targetVm: 'p2',
+        seat: 1,
+        desc: 'Assert vm-02 initial turn is Seat P1 (Red)',
+      },
+      {
+        action: 'assertHash',
+        targetVm: 'p1',
+        kind: 'checkers',
+        compareToVm: 'p2',
+        desc: 'Assert initial state hashes of vm-01 and vm-02 match exactly',
+      },
+      // Move 1: P1 plays 22 -> 18 (PDN 23-19)
+      {
+        action: 'clickSquare',
+        targetVm: 'p1',
+        game: 'checkers',
+        id: 22,
+        desc: 'P1 (vm-01): Select piece at square 22 (PDN 23)',
+      },
+      {
+        action: 'clickSquare',
+        targetVm: 'p1',
+        game: 'checkers',
+        id: 18,
+        desc: 'P1 (vm-01): Play move 22-18 (PDN 23-19)',
+      },
+      {
+        action: 'assertHash',
+        targetVm: 'p1',
+        kind: 'checkers',
+        compareToVm: 'p2',
+        desc: 'Assert causal convergence: vm-02 state hash matches vm-01 after Move 1',
+      },
+      {
+        action: 'assertTurn',
+        targetVm: 'p2',
+        seat: 2,
+        desc: 'Assert turn passed to Seat P2 (Black) on vm-02',
+      },
+      // Move 2: P2 plays 10 -> 14 (PDN 11-15)
+      {
+        action: 'clickSquare',
+        targetVm: 'p2',
+        game: 'checkers',
+        id: 10,
+        desc: 'P2 (vm-02): Select piece at square 10 (PDN 11)',
+      },
+      {
+        action: 'clickSquare',
+        targetVm: 'p2',
+        game: 'checkers',
+        id: 14,
+        desc: 'P2 (vm-02): Play move 10-14 (PDN 11-15)',
+      },
+      {
+        action: 'assertHash',
+        targetVm: 'p2',
+        kind: 'checkers',
+        compareToVm: 'p1',
+        desc: 'Assert causal convergence: vm-01 state hash matches vm-02 after Move 2',
+      },
+      {
+        action: 'assertTurn',
+        targetVm: 'p1',
+        seat: 1,
+        desc: 'Assert turn passed back to Seat P1 (Red) on vm-01',
+      },
+      // Move 3: P1 plays 18 -> 15 (PDN 19-16)
+      {
+        action: 'clickSquare',
+        targetVm: 'p1',
+        game: 'checkers',
+        id: 18,
+        desc: 'P1 (vm-01): Select piece at square 18 (PDN 19)',
+      },
+      {
+        action: 'clickSquare',
+        targetVm: 'p1',
+        game: 'checkers',
+        id: 15,
+        desc: 'P1 (vm-01): Play move 18-15 (PDN 19-16)',
+      },
+      {
+        action: 'assertHash',
+        targetVm: 'p1',
+        kind: 'checkers',
+        compareToVm: 'p2',
+        desc: 'Assert causal convergence: vm-02 state hash matches vm-01 after Move 3',
+      },
+      // Move 4: P2 plays 11 -> 18 (PDN 12x19 jump)
+      {
+        action: 'clickSquare',
+        targetVm: 'p2',
+        game: 'checkers',
+        id: 11,
+        desc: 'P2 (vm-02): Select piece at square 11 (PDN 12)',
+      },
+      {
+        action: 'clickSquare',
+        targetVm: 'p2',
+        game: 'checkers',
+        id: 18,
+        desc: 'P2 (vm-02): Play capture jump 11x18 (PDN 12x19)',
+      },
+      {
+        action: 'assertHash',
+        targetVm: 'p2',
+        kind: 'checkers',
+        compareToVm: 'p1',
+        desc: 'Assert causal convergence: vm-01 state hash matches vm-02 after Move 4 jump',
+      },
+      // Move 5: P1 plays 20 -> 16 (PDN 21-17)
+      {
+        action: 'clickSquare',
+        targetVm: 'p1',
+        game: 'checkers',
+        id: 20,
+        desc: 'P1 (vm-01): Select piece at square 20 (PDN 21)',
+      },
+      {
+        action: 'clickSquare',
+        targetVm: 'p1',
+        game: 'checkers',
+        id: 16,
+        desc: 'P1 (vm-01): Play move 20-16 (PDN 21-17)',
+      },
+      {
+        action: 'assertHash',
+        targetVm: 'p1',
+        kind: 'checkers',
+        compareToVm: 'p2',
+        desc: 'Assert causal convergence: vm-02 state hash matches vm-01 after Move 5',
+      },
+      // Move 6: P2 plays 6 -> 10 (PDN 7-11)
+      {
+        action: 'clickSquare',
+        targetVm: 'p2',
+        game: 'checkers',
+        id: 6,
+        desc: 'P2 (vm-02): Select piece at square 6 (PDN 7)',
+      },
+      {
+        action: 'clickSquare',
+        targetVm: 'p2',
+        game: 'checkers',
+        id: 10,
+        desc: 'P2 (vm-02): Play move 6-10 (PDN 7-11)',
+      },
+      {
+        action: 'assertHash',
+        targetVm: 'p2',
+        kind: 'checkers',
+        compareToVm: 'p1',
+        desc: 'Assert causal convergence: vm-01 and vm-02 converge to 100% identical hash after 6 moves',
+      },
+      {
+        action: 'splitSnapshot',
+        label: 'Checkers 2P Entangled Convergence - 6 Moves Dual View',
+        desc: 'Capture dual-screen side-by-side verification split snapshot',
+      },
+    ],
+  },
+  {
+    id: 'mines-2p-turn-relay',
+    name: 'Minesweeper 2P Turn Relay & Sudden Death',
+    description: 'Verify multiplayer turn-passing, bitboard scoring, and sudden-death elimination across two VMs',
+    steps: [
+      {
+        action: 'boot',
+        targetVm: 'p1',
+        opts: { width: 1280, height: 720 },
+        desc: 'Ensure vm-01 (Seat P1) is initialized at 1280×720',
+      },
+      {
+        action: 'boot',
+        targetVm: 'p2',
+        opts: { width: 1280, height: 720 },
+        desc: 'Ensure vm-02 (Seat P2) is initialized at 1280×720',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p1',
+        check: (guest) => {
+          if (typeof window !== 'undefined' && window.__appliance?.setSplitView) {
+            window.__appliance.setSplitView(true);
+          }
+          return true;
+        },
+        desc: 'Enable side-by-side split view mode',
+      },
+      {
+        action: 'openApp',
+        targetVm: 'p1',
+        slot: 'mines',
+        desc: 'Open Minesweeper on vm-01 (Seat P1)',
+      },
+      {
+        action: 'openApp',
+        targetVm: 'p2',
+        slot: 'mines',
+        desc: 'Open Minesweeper on vm-02 (Seat P2)',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p1',
+        check: (guest) => {
+          const broker = typeof window !== 'undefined' ? window.__broker : null;
+          if (broker) {
+            let m = broker.tables.matches.find((x) => x.id === 101);
+            if (!m) {
+              m = {
+                id: 101,
+                game: 'mines',
+                seed: 42,
+                max_strikes: 1,
+                status: 'PLAYING',
+                turn_seat: 1,
+                p1_vm: 'vm-01',
+                p2_vm: 'vm-02',
+                p1_id: 1,
+                p2_id: 2,
+                p1_score: 0,
+                p2_score: 0,
+                state_hash: 'seed:42',
+                last_pdn: '—',
+                winner_seat: 0,
+                seq: 0,
+                created_at: broker.nowIso ? broker.nowIso() : new Date().toISOString().slice(11, 19),
+              };
+              broker.tables.matches.unshift(m);
+            }
+            broker.activeMatchId = 101;
+            broker.renderDrawer();
+            if (typeof window !== 'undefined') {
+              const brokerDrawer = document.getElementById('broker-drawer');
+              if (brokerDrawer) brokerDrawer.hidden = false;
+            }
+          }
+          guest.exports.app_mines_set_mp(1, 101, 1, 42, 1);
+          guest.mpSeat = 1;
+          guest.mpMatchId = 101;
+          guest.mpGame = 'mines';
+          guest.actorType = 'AutoPilot';
+          if (guest.render) guest.render();
+          return true;
+        },
+        desc: 'Configure vm-01 as Seat P1 (Seed 42, Max Strikes 1) on Match #101',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p2',
+        check: (guest) => {
+          guest.exports.app_mines_set_mp(1, 101, 2, 42, 1);
+          guest.mpSeat = 2;
+          guest.mpMatchId = 101;
+          guest.mpGame = 'mines';
+          guest.actorType = 'AutoPilot';
+          if (guest.render) guest.render();
+          return true;
+        },
+        desc: 'Configure vm-02 as Seat P2 (Seed 42, Max Strikes 1) on Match #101',
+      },
+      {
+        action: 'assertTurn',
+        targetVm: 'p1',
+        seat: 1,
+        desc: 'Assert vm-01 turn is P1',
+      },
+      {
+        action: 'assertTurn',
+        targetVm: 'p2',
+        seat: 1,
+        desc: 'Assert vm-02 turn is P1',
+      },
+      // Step 1: P1 reveals safe cell (0, 0)
+      {
+        action: 'clickCell',
+        targetVm: 'p1',
+        row: 0,
+        col: 0,
+        desc: 'P1 (vm-01): Reveal safe cell at (0, 0)',
+      },
+      {
+        action: 'wait',
+        ms: 200,
+        desc: 'Wait for broker event relay',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p1',
+        check: (guest) => guest.exports.app_mines_p1_score() > 0,
+        desc: 'Assert points awarded to P1 on vm-01',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p2',
+        check: (guest) => guest.exports.app_mines_p1_score() > 0,
+        desc: 'Assert points synchronized to P2 on vm-02 via broker RX',
+      },
+      {
+        action: 'assertTurn',
+        targetVm: 'p1',
+        seat: 2,
+        desc: 'Assert turn passed to P2 on vm-01',
+      },
+      {
+        action: 'assertTurn',
+        targetVm: 'p2',
+        seat: 2,
+        desc: 'Assert turn passed to P2 on vm-02',
+      },
+      // Step 2: P2 reveals safe cell (0, 7)
+      {
+        action: 'clickCell',
+        targetVm: 'p2',
+        row: 0,
+        col: 7,
+        desc: 'P2 (vm-02): Reveal safe cell at (0, 7)',
+      },
+      {
+        action: 'wait',
+        ms: 200,
+        desc: 'Wait for broker event relay',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p2',
+        check: (guest) => guest.exports.app_mines_p2_score() > 0,
+        desc: 'Assert points awarded to P2 on vm-02',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p1',
+        check: (guest) => guest.exports.app_mines_p2_score() > 0,
+        desc: 'Assert points synchronized to P1 on vm-01 via broker RX',
+      },
+      {
+        action: 'splitSnapshot',
+        label: 'Minesweeper 2P Turn Relay - Safe Paths Dual View',
+        desc: 'Capture dual-perspective split snapshot of both safe territories',
+      },
+      // Step 3: P1 clicks known bomb (0, 6) -> sudden-death detonation!
+      {
+        action: 'clickCell',
+        targetVm: 'p1',
+        row: 0,
+        col: 6,
+        desc: 'P1 (vm-01): Reveal known bomb cell at (0, 6) triggering sudden-death',
+      },
+      {
+        action: 'wait',
+        ms: 200,
+        desc: 'Wait for broker event relay',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p1',
+        check: (guest) => guest.exports.app_mines_winner() === 2,
+        desc: 'Assert sudden-death elimination on vm-01 (Winner is P2)',
+      },
+      {
+        action: 'assert',
+        targetVm: 'p2',
+        check: (guest) => guest.exports.app_mines_winner() === 2,
+        desc: 'Assert sudden-death elimination synced to vm-02 (Winner is P2)',
+      },
+      {
+        action: 'splitSnapshot',
+        label: 'Minesweeper 2P Turn Relay - Sudden Death Detonation Dual View',
+        desc: 'Capture final dual-screen snapshot showing synchronized sudden-death detonation',
+      },
+    ],
+  },
 ];
 
 export function getMissionById(id) {

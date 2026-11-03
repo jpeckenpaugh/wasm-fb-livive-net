@@ -493,10 +493,12 @@ pub fn checkers_geom(client_w: i32, client_h: i32) -> CheckersGeom {
         let max_board_h = client_h - 44;
         let max_board_w = (client_w * 3 / 5) - 44;
         let avail = max_board_h.min(max_board_w).max(200);
-        let cell = (avail / 8).clamp(24, 74);
+        let max_cell = if client_w >= 1440 || client_h >= 900 { 116 } else { 74 };
+        let cell = (avail / 8).clamp(24, max_cell);
         let grid_px = 8 * cell;
 
-        let info_w = (client_w - grid_px - 96).clamp(200, 360);
+        let max_info = if client_w >= 1440 { 420 } else { 360 };
+        let info_w = (client_w - grid_px - 96).clamp(200, max_info);
         let total_w = grid_px + 48 + info_w;
         let board_x = ((client_w - total_w) / 2).max(16);
         let board_y = ((client_h - grid_px) / 2).max(12);
@@ -526,7 +528,8 @@ pub fn checkers_geom(client_w: i32, client_h: i32) -> CheckersGeom {
         let avail_w = client_w - 32;
         let avail_h = (client_h * 58 / 100).max(200);
         let avail = avail_w.min(avail_h);
-        let cell = (avail / 8).clamp(24, 68);
+        let max_cell = if client_h >= 900 { 96 } else { 68 };
+        let cell = (avail / 8).clamp(24, max_cell);
         let grid_px = 8 * cell;
 
         let board_x = ((client_w - grid_px) / 2).max(12);

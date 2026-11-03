@@ -1841,5 +1841,14 @@ mod tests {
         let chk0_x = (coord_chk0 >> 16) as i32;
         let chk0_y = (coord_chk0 & 0xFFFF) as i32;
         assert_eq!(app_semantic_hit(chk0_x, chk0_y), (3 << 24) | 0);
+
+        // 5. Test at 1080p (1920x1080) dynamic scaling
+        assert_eq!(app_init(1920, 1080), 1);
+        let g_chess_1080 = chess::chess_geom(1920, 1080 - wm::TITLE_H);
+        assert_eq!(g_chess_1080.cell, 116);
+        let g_chk_1080 = checkers::checkers_geom(1920, 1080 - wm::TITLE_H);
+        assert_eq!(g_chk_1080.cell, 116);
+        let g_mines_1080 = mines::mines_geom(1920, 1080 - wm::TITLE_H);
+        assert_eq!(g_mines_1080.cell, 112);
     }
 }

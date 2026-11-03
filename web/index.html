@@ -329,6 +329,19 @@
       padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 500;
       background: #818cf818; border: 1px solid var(--accent-soft); color: #c7d2fe;
     }
+    .actor-badge {
+      padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
+      background: #38bdf818; border: 1px solid #38bdf855; color: #7dd3fc;
+    }
+    .actor-badge.autopilot {
+      background: #a855f718; border-color: #a855f766; color: #d8b4fe;
+    }
+    .actor-badge.minimax {
+      background: #38bdf818; border-color: #38bdf866; color: #7dd3fc;
+    }
+    .actor-badge.human {
+      background: #34d39918; border-color: #34d39966; color: #6ee7b7;
+    }
     .vm-action-btn {
       background: var(--panel-2);
       border: 1px solid var(--line-2);
@@ -910,6 +923,8 @@
                 <option value="mines-gold-path">Minesweeper Known-Seed Victory &amp; Detonation</option>
                 <option value="chess-checkers-opening">Chess &amp; Checkers Opening vs Minimax AI</option>
                 <option value="chess-checkmate-6-moves">Chess - Checkmate in 6 Moves (vs AI)</option>
+                <option value="checkers-2p-entangled-convergence">Mission 5: Checkers 2P Entangled Convergence (Dual-VM)</option>
+                <option value="mines-2p-turn-relay">Mission 6: Minesweeper 2P Turn Relay (Dual-VM)</option>
               </select>
               <label for="ap-pacing-select"><b>Pacing:</b></label>
               <select id="ap-pacing-select" class="res-select">

@@ -51,6 +51,38 @@ export class AutoPilotRunner {
     return null;
   }
 
+  resolveTargetGuest(targetVm) {
+    if (!targetVm || targetVm === 'active') {
+      return this.getActiveGuest();
+    }
+    const guests = this.deps.getGuests ? this.deps.getGuests() : [];
+    if (!guests || guests.length === 0) return null;
+
+    if (typeof targetVm === 'number') {
+      return guests.find((g) => g.id === targetVm) || guests[targetVm] || null;
+    }
+
+    const t = String(targetVm).toLowerCase();
+    if (t === 'p1' || t === 'seat1' || t === 'seat-1' || t === 'vm-01' || t === 'vm1') {
+      return (
+        guests.find((g) => g.mpSeat === 1) ||
+        guests.find((g) => g.name === 'vm-01' || g.id === 1) ||
+        guests[0] ||
+        null
+      );
+    }
+    if (t === 'p2' || t === 'seat2' || t === 'seat-2' || t === 'vm-02' || t === 'vm2') {
+      return (
+        guests.find((g) => g.mpSeat === 2) ||
+        guests.find((g) => g.name === 'vm-02' || g.id === 2) ||
+        guests[1] ||
+        null
+      );
+    }
+
+    return guests.find((g) => g.name === targetVm || String(g.id) === t) || this.getActiveGuest();
+  }
+
   listMissions() {
     return MISSIONS.map((m) => ({
       id: m.id,
@@ -242,7 +274,7 @@ export class AutoPilotRunner {
 
   async executeStepAction(step) {
     const { action } = step;
-    let guest = this.getActiveGuest();
+    let guest = step.targetVm ? this.resolveTargetGuest(step.targetVm) : this.getActiveGuest();
 
     switch (action) {
       case 'boot': {
@@ -430,6 +462,99 @@ export class AutoPilotRunner {
         break;
       }
 
+      case 'splitSnapshot': {
+        const guests = this.deps.getGuests ? this.deps.getGuests() : [];
+        const g1 = this.resolveTargetGuest('p1') || guests[0];
+        const g2 = this.resolveTargetGuest('p2') || guests[1];
+        if (!g1 || !g2) {
+          throw new Error('Action splitSnapshot requires at least two guests (P1 and P2)');
+        }
+
+        let snap = null;
+        if (this.deps.captureSplitSnapshot) {
+          snap = this.deps.captureSplitSnapshot(g1, g2);
+        } else if (typeof window !== 'undefined' && window.__appliance?.splitSnapshot) {
+          snap = window.__appliance.splitSnapshot(g1.id, g2.id);
+        } else if (typeof document !== 'undefined') {
+          // In-browser canvas composite fallback
+          const w1 = g1.width || 1280;
+          const h1 = g1.height || 720;
+          const w2 = g2.width || 1280;
+          const h2 = g2.height || 720;
+          const compW = w1 + w2;
+          const compH = Math.max(h1, h2);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = compW;
+          canvas.height = compH;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, compW, compH);
+            if (g1.canvas) ctx.drawImage(g1.canvas, 0, 0, w1, h1);
+            if (g2.canvas) ctx.drawImage(g2.canvas, w1, 0, w2, h2);
+          }
+          const dataUrl = canvas.toDataURL('image/png');
+          const h1Hex = g1.exports?.app_fb_hash ? `0x${(g1.exports.app_fb_hash() >>> 0).toString(16).padStart(8, '0')}` : '0x0';
+          const h2Hex = g2.exports?.app_fb_hash ? `0x${(g2.exports.app_fb_hash() >>> 0).toString(16).padStart(8, '0')}` : '0x0';
+
+          snap = {
+            label: step.label || `Split Snapshot (P1 ${g1.name} | P2 ${g2.name})`,
+            dataUrl,
+            hashHex: `${h1Hex} | ${h2Hex}`,
+            seq: 1,
+            view: 'Split View Dual-Perspective',
+          };
+        }
+
+        if (snap) {
+          this.report.snapshots.push({
+            stepIndex: this.currentStepIdx,
+            label: step.label || snap.label || `Step ${this.currentStepIdx + 1} Split Snapshot`,
+            hash: snap.hash || 0,
+            hashHex: snap.hashHex || '',
+            seq: snap.seq || 0,
+            view: snap.view || 'Split View',
+            dataUrl: snap.dataUrl,
+          });
+        }
+        break;
+      }
+
+      case 'assertTurn': {
+        if (!guest || !guest.exports) throw new Error('Action assertTurn: guest VM not available');
+        const expectedSeat = step.seat;
+        let actualTurn = null;
+        if (guest.mpGame === 'checkers' && guest.exports.app_checkers_turn) {
+          actualTurn = guest.exports.app_checkers_turn();
+        } else if (guest.mpGame === 'chess' && guest.exports.app_chess_turn) {
+          actualTurn = guest.exports.app_chess_turn();
+        } else if (guest.mpGame === 'mines' && guest.exports.app_mines_turn) {
+          actualTurn = guest.exports.app_mines_turn();
+        } else if (guest.exports.app_mines_turn) {
+          actualTurn = guest.exports.app_mines_turn();
+        } else if (guest.exports.app_checkers_turn) {
+          actualTurn = guest.exports.app_checkers_turn();
+        } else if (guest.exports.app_chess_turn) {
+          actualTurn = guest.exports.app_chess_turn();
+        }
+        if (expectedSeat != null && actualTurn !== expectedSeat) {
+          throw new Error(`AssertTurn failed for ${guest.name}: expected turn ${expectedSeat}, got ${actualTurn}`);
+        }
+        break;
+      }
+
+      case 'assertState': {
+        if (!guest || !guest.exports) throw new Error('Action assertState: guest VM not available');
+        if (typeof step.check === 'function') {
+          const pass = step.check(guest);
+          if (!pass) {
+            throw new Error(`AssertState failed for ${guest.name}: ${step.desc || 'check returned false'}`);
+          }
+        }
+        break;
+      }
+
       case 'snapshot': {
         if (!guest) throw new Error('Action snapshot: guest VM not available');
         let snap = null;
@@ -495,8 +620,27 @@ export class AutoPilotRunner {
 
       case 'assertHash': {
         if (!guest || !guest.exports) throw new Error('Action assertHash: guest VM not available');
-        const currentHash = guest.exports.app_fb_hash ? (guest.exports.app_fb_hash() >>> 0) : 0;
-        if (step.expectedHash && currentHash !== step.expectedHash) {
+        const hashFn = step.kind === 'checkers'
+          ? (guest.exports.app_checkers_state_hash ? () => guest.exports.app_checkers_state_hash() >>> 0 : null)
+          : step.kind === 'chess'
+            ? (guest.exports.app_chess_state_hash ? () => guest.exports.app_chess_state_hash() >>> 0 : null)
+            : (guest.exports.app_fb_hash ? () => guest.exports.app_fb_hash() >>> 0 : null);
+        
+        const currentHash = hashFn ? hashFn() : (guest.exports.app_fb_hash ? (guest.exports.app_fb_hash() >>> 0) : 0);
+
+        if (step.compareToVm) {
+          const peer = this.resolveTargetGuest(step.compareToVm);
+          if (!peer || !peer.exports) throw new Error(`AssertHash compareToVm: peer VM '${step.compareToVm}' not available`);
+          const peerHashFn = step.kind === 'checkers'
+            ? (peer.exports.app_checkers_state_hash ? () => peer.exports.app_checkers_state_hash() >>> 0 : null)
+            : step.kind === 'chess'
+              ? (peer.exports.app_chess_state_hash ? () => peer.exports.app_chess_state_hash() >>> 0 : null)
+              : (peer.exports.app_fb_hash ? () => peer.exports.app_fb_hash() >>> 0 : null);
+          const peerHash = peerHashFn ? peerHashFn() : (peer.exports.app_fb_hash ? (peer.exports.app_fb_hash() >>> 0) : 0);
+          if (currentHash !== peerHash) {
+            throw new Error(`AssertHash divergence between ${guest.name} (0x${currentHash.toString(16)}) and ${peer.name} (0x${peerHash.toString(16)})`);
+          }
+        } else if (step.expectedHash && currentHash !== step.expectedHash) {
           throw new Error(`AssertHash failed: expected 0x${step.expectedHash.toString(16)}, got 0x${currentHash.toString(16)}`);
         }
         break;
