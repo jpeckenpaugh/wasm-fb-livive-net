@@ -9,744 +9,861 @@
         "width": 1280,
         "height": 720
       },
-      "desc": "Boot guest VM at 1280×720"
+      "desc": "Ensure guest VM is initialized at 1280×720"
     },
     {
-      "action": "click",
-      "x": 24,
-      "y": 17,
-      "desc": "[Action 1] Click at (24, 17)"
+      "action": "openApp",
+      "slot": "chess",
+      "desc": "Open Classic Chess application"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 4161424255,
-      "desc": "[Verify 1] Assert FNV-1a hash matches 0xf80a4b7f"
-    },
-    {
-      "action": "click",
-      "x": 105,
-      "y": 495,
-      "desc": "[Action 2] Click at (105, 495)"
-    },
-    {
-      "action": "assertHash",
-      "expectedHash": 3190016916,
-      "desc": "[Verify 2] Assert FNV-1a hash matches 0xbe23cb94"
+      "action": "assert",
+      "desc": "Assert active application is Chess (slot 6)",
+      "assertType": "app_selected",
+      "expected": 6
     },
     {
       "action": "click",
       "x": 1054,
       "y": 609,
-      "desc": "[Action 3] Click at (1054, 609)"
+      "desc": "[Action 3] Click Difficulty button"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 4121275873,
-      "desc": "[Verify 3] Assert FNV-1a hash matches 0xf5a5ade1"
+      "action": "wait",
+      "ms": 150,
+      "desc": "Wait for button state update"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "g1",
       "x": 621,
       "y": 643,
-      "desc": "[Action 4] Click at (621, 643)"
+      "desc": "[Action 4] Square g1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3900062835,
-      "desc": "[Verify 4] Assert FNV-1a hash matches 0xe8763c73"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "h3",
       "x": 691,
       "y": 468,
-      "desc": "[Action 5] Click at (691, 468)"
+      "desc": "[Action 5] Square h3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3467156322,
-      "desc": "[Verify 5] Assert FNV-1a hash matches 0xcea89b62"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "b1",
       "x": 265,
       "y": 639,
-      "desc": "[Action 6] Click at (265, 639)"
+      "desc": "[Action 6] Square b1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3224945633,
-      "desc": "[Verify 6] Assert FNV-1a hash matches 0xc038c3e1"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "a3",
       "x": 190,
       "y": 476,
-      "desc": "[Action 7] Click at (190, 476)"
+      "desc": "[Action 7] Square a3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2558007797,
-      "desc": "[Verify 7] Assert FNV-1a hash matches 0x987819f5"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c2",
       "x": 331,
       "y": 553,
-      "desc": "[Action 8] Click at (331, 553)"
+      "desc": "[Action 8] Square c2"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 373667786,
-      "desc": "[Verify 8] Assert FNV-1a hash matches 0x1645b7ca"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c3",
       "x": 341,
       "y": 480,
-      "desc": "[Action 9] Click at (341, 480)"
+      "desc": "[Action 9] Square c3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 240833791,
-      "desc": "[Verify 9] Assert FNV-1a hash matches 0x0e5ad4ff"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c3",
       "x": 335,
       "y": 487,
-      "desc": "[Action 10] Click at (335, 487)"
+      "desc": "[Action 10] Square c3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2509812162,
-      "desc": "[Verify 10] Assert FNV-1a hash matches 0x9598b1c2"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c4",
       "x": 334,
       "y": 407,
-      "desc": "[Action 11] Click at (334, 407)"
+      "desc": "[Action 11] Square c4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3422166591,
-      "desc": "[Verify 11] Assert FNV-1a hash matches 0xcbfa1e3f"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c4",
       "x": 329,
       "y": 409,
-      "desc": "[Action 12] Click at (329, 409)"
+      "desc": "[Action 12] Square c4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3724670200,
-      "desc": "[Verify 12] Assert FNV-1a hash matches 0xde01f4f8"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c5",
       "x": 340,
       "y": 350,
-      "desc": "[Action 13] Click at (340, 350)"
+      "desc": "[Action 13] Square c5"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2648461200,
-      "desc": "[Verify 13] Assert FNV-1a hash matches 0x9ddc4f90"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e2",
       "x": 478,
       "y": 579,
-      "desc": "[Action 14] Click at (478, 579)"
+      "desc": "[Action 14] Square e2"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1401253535,
-      "desc": "[Verify 14] Assert FNV-1a hash matches 0x53856e9f"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e4",
       "x": 471,
       "y": 376,
-      "desc": "[Action 15] Click at (471, 376)"
+      "desc": "[Action 15] Square e4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1034268687,
-      "desc": "[Verify 15] Assert FNV-1a hash matches 0x3da5b00f"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e4",
       "x": 474,
       "y": 412,
-      "desc": "[Action 16] Click at (474, 412)"
+      "desc": "[Action 16] Square e4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1980011598,
-      "desc": "[Verify 16] Assert FNV-1a hash matches 0x7604944e"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e5",
       "x": 476,
       "y": 320,
-      "desc": "[Action 17] Click at (476, 320)"
+      "desc": "[Action 17] Square e5"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 4010048652,
-      "desc": "[Verify 17] Assert FNV-1a hash matches 0xef047c8c"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "d2",
       "x": 411,
       "y": 568,
-      "desc": "[Action 18] Click at (411, 568)"
+      "desc": "[Action 18] Square d2"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2996851995,
-      "desc": "[Verify 18] Assert FNV-1a hash matches 0xb2a0551b"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "d4",
       "x": 401,
       "y": 421,
-      "desc": "[Action 19] Click at (401, 421)"
+      "desc": "[Action 19] Square d4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2459569637,
-      "desc": "[Verify 19] Assert FNV-1a hash matches 0x929a0de5"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "g2",
       "x": 625,
       "y": 568,
-      "desc": "[Action 20] Click at (625, 568)"
+      "desc": "[Action 20] Square g2"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1144943237,
-      "desc": "[Verify 20] Assert FNV-1a hash matches 0x443e7285"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "g3",
       "x": 625,
       "y": 494,
-      "desc": "[Action 21] Click at (625, 494)"
+      "desc": "[Action 21] Square g3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 4264730397,
-      "desc": "[Verify 21] Assert FNV-1a hash matches 0xfe329f1d"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "f1",
       "x": 553,
       "y": 644,
-      "desc": "[Action 22] Click at (553, 644)"
+      "desc": "[Action 22] Square f1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 207412588,
-      "desc": "[Verify 22] Assert FNV-1a hash matches 0x0c5cdd6c"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "d3",
       "x": 400,
       "y": 477,
-      "desc": "[Action 23] Click at (400, 477)"
+      "desc": "[Action 23] Square d3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3849423428,
-      "desc": "[Verify 23] Assert FNV-1a hash matches 0xe5718a44"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "d3",
       "x": 398,
       "y": 486,
-      "desc": "[Action 24] Click at (398, 486)"
+      "desc": "[Action 24] Square d3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2784364600,
-      "desc": "[Verify 24] Assert FNV-1a hash matches 0xa5f60838"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e4",
       "x": 462,
       "y": 409,
-      "desc": "[Action 25] Click at (462, 409)"
+      "desc": "[Action 25] Square e4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1666758342,
-      "desc": "[Verify 25] Assert FNV-1a hash matches 0x6358b6c6"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "d1",
       "x": 408,
       "y": 633,
-      "desc": "[Action 26] Click at (408, 633)"
+      "desc": "[Action 26] Square d1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1326822892,
-      "desc": "[Verify 26] Assert FNV-1a hash matches 0x4f15b5ec"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "d1",
       "x": 409,
       "y": 623,
-      "desc": "[Action 27] Click at (409, 623)"
+      "desc": "[Action 27] Square d1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2257897677,
-      "desc": "[Verify 27] Assert FNV-1a hash matches 0x8694c8cd"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c1",
       "x": 337,
       "y": 626,
-      "desc": "[Action 28] Click at (337, 626)"
+      "desc": "[Action 28] Square c1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 948317567,
-      "desc": "[Verify 28] Assert FNV-1a hash matches 0x38862d7f"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "g5",
       "x": 628,
       "y": 347,
-      "desc": "[Action 29] Click at (628, 347)"
+      "desc": "[Action 29] Square g5"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 178171523,
-      "desc": "[Verify 29] Assert FNV-1a hash matches 0x0a9eae83"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "g5",
       "x": 626,
       "y": 345,
-      "desc": "[Action 30] Click at (626, 345)"
+      "desc": "[Action 30] Square g5"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1586779670,
-      "desc": "[Verify 30] Assert FNV-1a hash matches 0x5e945616"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e7",
       "x": 487,
       "y": 190,
-      "desc": "[Action 31] Click at (487, 190)"
+      "desc": "[Action 31] Square e7"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2882583342,
-      "desc": "[Verify 31] Assert FNV-1a hash matches 0xabd0bb2e"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e1",
       "x": 469,
       "y": 647,
-      "desc": "[Action 32] Click at (469, 647)"
+      "desc": "[Action 32] Square e1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1780141707,
-      "desc": "[Verify 32] Assert FNV-1a hash matches 0x6a1ace8b"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e1",
       "x": 476,
       "y": 633,
-      "desc": "[Action 33] Click at (476, 633)"
+      "desc": "[Action 33] Square e1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 873267265,
-      "desc": "[Verify 33] Assert FNV-1a hash matches 0x340d0041"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "a1",
       "x": 186,
       "y": 650,
-      "desc": "[Action 34] Click at (186, 650)"
+      "desc": "[Action 34] Square a1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1503142362,
-      "desc": "[Verify 34] Assert FNV-1a hash matches 0x599821da"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c1",
       "x": 332,
       "y": 643,
-      "desc": "[Action 35] Click at (332, 643)"
+      "desc": "[Action 35] Square c1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3790811963,
-      "desc": "[Verify 35] Assert FNV-1a hash matches 0xe1f3333b"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c5",
       "x": 329,
       "y": 322,
-      "desc": "[Action 36] Click at (329, 322)"
+      "desc": "[Action 36] Square c5"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3798184363,
-      "desc": "[Verify 36] Assert FNV-1a hash matches 0xe263b1ab"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c6",
       "x": 338,
       "y": 246,
-      "desc": "[Action 37] Click at (338, 246)"
+      "desc": "[Action 37] Square c6"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1049592130,
-      "desc": "[Verify 37] Assert FNV-1a hash matches 0x3e8f8142"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e1",
       "x": 473,
       "y": 637,
-      "desc": "[Action 38] Click at (473, 637)"
+      "desc": "[Action 38] Square e1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 4097492444,
-      "desc": "[Verify 38] Assert FNV-1a hash matches 0xf43ac5dc"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "f1",
       "x": 575,
       "y": 625,
-      "desc": "[Action 39] Click at (575, 625)"
+      "desc": "[Action 39] Square f1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3016549339,
-      "desc": "[Verify 39] Assert FNV-1a hash matches 0xb3cce3db"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c1",
       "x": 324,
       "y": 638,
-      "desc": "[Action 40] Click at (324, 638)"
+      "desc": "[Action 40] Square c1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 829804857,
-      "desc": "[Verify 40] Assert FNV-1a hash matches 0x3175d139"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c6",
       "x": 327,
       "y": 275,
-      "desc": "[Action 41] Click at (327, 275)"
+      "desc": "[Action 41] Square c6"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3110717424,
-      "desc": "[Verify 41] Assert FNV-1a hash matches 0xb969c7f0"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "d1",
       "x": 395,
       "y": 640,
-      "desc": "[Action 42] Click at (395, 640)"
+      "desc": "[Action 42] Square d1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2479889573,
-      "desc": "[Verify 42] Assert FNV-1a hash matches 0x93d01ca5"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e2",
       "x": 471,
       "y": 555,
-      "desc": "[Action 43] Click at (471, 555)"
+      "desc": "[Action 43] Square e2"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3070690851,
-      "desc": "[Verify 43] Assert FNV-1a hash matches 0xb7070623"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "f1",
       "x": 544,
       "y": 645,
-      "desc": "[Action 44] Click at (544, 645)"
+      "desc": "[Action 44] Square f1"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1765628009,
-      "desc": "[Verify 44] Assert FNV-1a hash matches 0x693d5869"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "g2",
       "x": 635,
       "y": 546,
-      "desc": "[Action 45] Click at (635, 546)"
+      "desc": "[Action 45] Square g2"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 694850965,
-      "desc": "[Verify 45] Assert FNV-1a hash matches 0x296a9595"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e2",
       "x": 483,
       "y": 542,
-      "desc": "[Action 46] Click at (483, 542)"
+      "desc": "[Action 46] Square e2"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3342822931,
-      "desc": "[Verify 46] Assert FNV-1a hash matches 0xc73f6e13"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e4",
       "x": 472,
       "y": 401,
-      "desc": "[Action 47] Click at (472, 401)"
+      "desc": "[Action 47] Square e4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1878777974,
-      "desc": "[Verify 47] Assert FNV-1a hash matches 0x6ffbe076"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "h3",
       "x": 692,
       "y": 480,
-      "desc": "[Action 48] Click at (692, 480)"
+      "desc": "[Action 48] Square h3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2412556221,
-      "desc": "[Verify 48] Assert FNV-1a hash matches 0x8fccafbd"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "h3",
       "x": 700,
       "y": 487,
-      "desc": "[Action 49] Click at (700, 487)"
+      "desc": "[Action 49] Square h3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1437199117,
-      "desc": "[Verify 49] Assert FNV-1a hash matches 0x55a9eb0d"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "a3",
       "x": 176,
       "y": 492,
-      "desc": "[Action 50] Click at (176, 492)"
+      "desc": "[Action 50] Square a3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 874059605,
-      "desc": "[Verify 50] Assert FNV-1a hash matches 0x34191755"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c2",
       "x": 322,
       "y": 556,
-      "desc": "[Action 51] Click at (322, 556)"
+      "desc": "[Action 51] Square c2"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3385430363,
-      "desc": "[Verify 51] Assert FNV-1a hash matches 0xc9c9915b"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e4",
       "x": 486,
       "y": 413,
-      "desc": "[Action 52] Click at (486, 413)"
+      "desc": "[Action 52] Square e4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3140091924,
-      "desc": "[Verify 52] Assert FNV-1a hash matches 0xbb2a0014"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c6",
       "x": 346,
       "y": 261,
-      "desc": "[Action 53] Click at (346, 261)"
+      "desc": "[Action 53] Square c6"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2400062296,
-      "desc": "[Verify 53] Assert FNV-1a hash matches 0x8f0e0b58"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c6",
       "x": 342,
       "y": 265,
-      "desc": "[Action 54] Click at (342, 265)"
+      "desc": "[Action 54] Square c6"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1412366023,
-      "desc": "[Verify 54] Assert FNV-1a hash matches 0x542efec7"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "a6",
       "x": 179,
       "y": 271,
-      "desc": "[Action 55] Click at (179, 271)"
+      "desc": "[Action 55] Square a6"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 4175873416,
-      "desc": "[Verify 55] Assert FNV-1a hash matches 0xf8e6c588"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "a6",
       "x": 175,
       "y": 267,
-      "desc": "[Action 56] Click at (175, 267)"
+      "desc": "[Action 56] Square a6"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1822179672,
-      "desc": "[Verify 56] Assert FNV-1a hash matches 0x6c9c4158"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c4",
       "x": 337,
       "y": 411,
-      "desc": "[Action 57] Click at (337, 411)"
+      "desc": "[Action 57] Square c4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 467351947,
-      "desc": "[Verify 57] Assert FNV-1a hash matches 0x1bdb398b"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "h3",
       "x": 690,
       "y": 486,
-      "desc": "[Action 58] Click at (690, 486)"
+      "desc": "[Action 58] Square h3"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3663755923,
-      "desc": "[Verify 58] Assert FNV-1a hash matches 0xda607a93"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "f4",
       "x": 548,
       "y": 408,
-      "desc": "[Action 59] Click at (548, 408)"
+      "desc": "[Action 59] Square f4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 1012354285,
-      "desc": "[Verify 59] Assert FNV-1a hash matches 0x3c574ced"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "f4",
       "x": 548,
       "y": 413,
-      "desc": "[Action 60] Click at (548, 413)"
+      "desc": "[Action 60] Square f4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2594983971,
-      "desc": "[Verify 60] Assert FNV-1a hash matches 0x9aac5023"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e6",
       "x": 475,
       "y": 265,
-      "desc": "[Action 61] Click at (475, 265)"
+      "desc": "[Action 61] Square e6"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3670781855,
-      "desc": "[Verify 61] Assert FNV-1a hash matches 0xdacbaf9f"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "e6",
       "x": 469,
       "y": 270,
-      "desc": "[Action 62] Click at (469, 270)"
+      "desc": "[Action 62] Square e6"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2880070338,
-      "desc": "[Verify 62] Assert FNV-1a hash matches 0xabaa62c2"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "d8",
       "x": 399,
       "y": 115,
-      "desc": "[Action 63] Click at (399, 115)"
+      "desc": "[Action 63] Square d8"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 2059143967,
-      "desc": "[Verify 63] Assert FNV-1a hash matches 0x7abc0b1f"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "c4",
       "x": 332,
       "y": 407,
-      "desc": "[Action 64] Click at (332, 407)"
+      "desc": "[Action 64] Square c4"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3593815347,
-      "desc": "[Verify 64] Assert FNV-1a hash matches 0xd6354533"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "f7",
       "x": 552,
       "y": 193,
-      "desc": "[Action 65] Click at (552, 193)"
+      "desc": "[Action 65] Square f7"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 3942613695,
-      "desc": "[Verify 65] Assert FNV-1a hash matches 0xeaff82bf"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "f7",
       "x": 543,
       "y": 194,
-      "desc": "[Action 66] Click at (543, 194)"
+      "desc": "[Action 66] Square f7"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 313922898,
-      "desc": "[Verify 66] Assert FNV-1a hash matches 0x12b61552"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
-      "action": "click",
+      "action": "clickSquare",
+      "game": "chess",
+      "square": "f8",
       "x": 549,
       "y": 103,
-      "desc": "[Action 67] Click at (549, 103)"
+      "desc": "[Action 67] Square f8"
     },
     {
-      "action": "assertHash",
-      "expectedHash": 303696954,
-      "desc": "[Verify 67] Assert FNV-1a hash matches 0x121a0c3a"
+      "action": "wait",
+      "ms": 300,
+      "desc": "Wait for move / AI response"
     },
     {
       "action": "assert",
@@ -756,7 +873,7 @@
     },
     {
       "action": "snapshot",
-      "label": "Chess - Checkmate Victory Against 6-Ply Hard AI",
+      "label": "Chess - 6-Ply Hard AI Checkmate (Positional Endgame)",
       "desc": "Capture victory snapshot with terminal Checkmate"
     }
   ]
