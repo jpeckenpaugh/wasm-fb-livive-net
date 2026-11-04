@@ -1,7 +1,7 @@
 {
   "id": "multi-display-cockpit",
-  "name": "Mission 9: Multi-Head Appliance Cockpit (3 Appliances, 4 Displays, 2 Full Endgames)",
-  "description": "Concurrent dual-match exhibition to full completion across 4 displays: Checkers Match #901 (Jarad vs Alex) progresses through 101 turns to terminal piece elimination, while Chess Match #902 (Jarad vs FlowBot777) reaches decisive checkmate victory, synchronized across broker relay.",
+  "name": "Mission 9: Multi-Head Appliance Cockpit (3 Appliances, 4 Displays, Checkers Endgame & 3-Game Chess Trilogy)",
+  "description": "Concurrent dual-match exhibition across 4 displays: Checkers Match #901 (Jarad vs Alex) progresses through 101 turns to terminal piece elimination, while Chess (Jarad vs FlowBot777) executes 3 progressive games back-to-back (2-ply Scholar, 4-ply 6-move, 6-ply Legal checkmates) over broker relay.",
   "steps": [
     {
       "action": "boot",
@@ -176,14 +176,14 @@
       "targetVm": "appliance-01:display:1",
       "game": "chess",
       "square": "e2",
-      "desc": "[M2 Turn 1] Jarad selects Pawn at e2 on Head 2"
+      "desc": "Jarad selects Pawn at e2 on Head 2"
     },
     {
       "action": "clickSquare",
       "targetVm": "appliance-01:display:1",
       "game": "chess",
       "square": "e4",
-      "desc": "[M2 Turn 1] Jarad plays 1. e4 on Head 2"
+      "desc": "Jarad plays 1. e4 on Head 2"
     },
     {
       "action": "wait",
@@ -214,14 +214,14 @@
       "targetVm": "appliance-03:display:0",
       "game": "chess",
       "square": "e7",
-      "desc": "[M2 Turn 2] FlowBot777 selects Pawn at e7 on Head 3"
+      "desc": "FlowBot777 selects Pawn at e7 on Head 3"
     },
     {
       "action": "clickSquare",
       "targetVm": "appliance-03:display:0",
       "game": "chess",
       "square": "e5",
-      "desc": "[M2 Turn 2] FlowBot777 plays 1... e5 on Head 3"
+      "desc": "FlowBot777 plays 1... e5 on Head 3"
     },
     {
       "action": "wait",
@@ -266,14 +266,14 @@
       "targetVm": "appliance-01:display:1",
       "game": "chess",
       "square": "f1",
-      "desc": "[M2 Turn 3] Jarad selects Bishop at f1 on Head 2"
+      "desc": "Jarad selects Bishop at f1 on Head 2"
     },
     {
       "action": "clickSquare",
       "targetVm": "appliance-01:display:1",
       "game": "chess",
       "square": "c4",
-      "desc": "[M2 Turn 3] Jarad plays 2. Bc4 on Head 2"
+      "desc": "Jarad plays 2. Bc4 on Head 2"
     },
     {
       "action": "wait",
@@ -304,14 +304,14 @@
       "targetVm": "appliance-03:display:0",
       "game": "chess",
       "square": "b8",
-      "desc": "[M2 Turn 4] FlowBot777 selects Knight at b8 on Head 3"
+      "desc": "FlowBot777 selects Knight at b8 on Head 3"
     },
     {
       "action": "clickSquare",
       "targetVm": "appliance-03:display:0",
       "game": "chess",
       "square": "c6",
-      "desc": "[M2 Turn 4] FlowBot777 plays 2... Nc6 on Head 3"
+      "desc": "FlowBot777 plays 2... Nc6 on Head 3"
     },
     {
       "action": "wait",
@@ -356,14 +356,14 @@
       "targetVm": "appliance-01:display:1",
       "game": "chess",
       "square": "d1",
-      "desc": "[M2 Turn 5] Jarad selects Queen at d1 on Head 2"
+      "desc": "Jarad selects Queen at d1 on Head 2"
     },
     {
       "action": "clickSquare",
       "targetVm": "appliance-01:display:1",
       "game": "chess",
       "square": "h5",
-      "desc": "[M2 Turn 5] Jarad plays 3. Qh5 on Head 2"
+      "desc": "Jarad plays 3. Qh5 on Head 2"
     },
     {
       "action": "wait",
@@ -394,14 +394,14 @@
       "targetVm": "appliance-03:display:0",
       "game": "chess",
       "square": "g8",
-      "desc": "[M2 Turn 6] FlowBot777 selects Knight at g8 on Head 3"
+      "desc": "FlowBot777 selects Knight at g8 on Head 3"
     },
     {
       "action": "clickSquare",
       "targetVm": "appliance-03:display:0",
       "game": "chess",
       "square": "f6",
-      "desc": "[M2 Turn 6] FlowBot777 plays 3... Nf6 on Head 3"
+      "desc": "FlowBot777 plays 3... Nf6 on Head 3"
     },
     {
       "action": "wait",
@@ -446,14 +446,14 @@
       "targetVm": "appliance-01:display:1",
       "game": "chess",
       "square": "h5",
-      "desc": "[M2 Turn 7] Jarad selects Queen at h5 on Head 2"
+      "desc": "Jarad selects Queen at h5 on Head 2"
     },
     {
       "action": "clickSquare",
       "targetVm": "appliance-01:display:1",
       "game": "chess",
       "square": "f7",
-      "desc": "[M2 Turn 7] Jarad plays 4. Qxf7# (Checkmate!) on Head 2"
+      "desc": "Jarad plays 4. Qxf7# (Checkmate!) on Head 2"
     },
     {
       "action": "wait",
@@ -520,6 +520,33 @@
       "desc": "Wait for Checkers broker relay to Head 1"
     },
     {
+      "action": "configureMatch",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "matchId": 903,
+      "seat": 1,
+      "p1Seed": "Jarad",
+      "p2Seed": "FlowBot777",
+      "desc": "Configure appliance-01:display:1 as Seat P1 (Jarad) on Chess Match #903"
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "matchId": 903,
+      "seat": 2,
+      "p1Seed": "Jarad",
+      "p2Seed": "FlowBot777",
+      "desc": "Configure appliance-03:display:0 as Seat P2 (FlowBot777) on Chess Match #903"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:1",
+      "kind": "chess",
+      "compareToVm": "appliance-03:display:0",
+      "desc": "Assert Chess Match #903 zero-drift initial state convergence"
+    },
+    {
       "action": "clickSquare",
       "targetVm": "appliance-02:display:0",
       "game": "checkers",
@@ -537,6 +564,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "b1",
+      "desc": "Jarad selects Knight at b1 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "a3",
+      "desc": "Jarad plays 1. Na3 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -559,6 +605,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "b8",
+      "desc": "FlowBot777 selects Knight at b8 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "c6",
+      "desc": "FlowBot777 plays 1... Nc6 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-02:display:0",
       "game": "checkers",
       "id": 4,
@@ -575,6 +640,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "e2",
+      "desc": "Jarad selects Pawn at e2 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "e4",
+      "desc": "Jarad plays 2. e4 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -597,6 +681,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "g8",
+      "desc": "FlowBot777 selects Knight at g8 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "f6",
+      "desc": "FlowBot777 plays 2... Nf6 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-02:display:0",
       "game": "checkers",
       "id": 9,
@@ -613,6 +716,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "d1",
+      "desc": "Jarad selects Queen at d1 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f3",
+      "desc": "Jarad plays 3. Qf3 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -642,6 +764,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "f6",
+      "desc": "FlowBot777 retreats Knight at f6 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "g8",
+      "desc": "FlowBot777 plays 3... Ng8 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-02:display:0",
       "game": "checkers",
       "id": 5,
@@ -658,6 +799,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f1",
+      "desc": "Jarad selects Bishop at f1 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "c4",
+      "desc": "Jarad plays 4. Bc4 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -680,6 +840,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "d7",
+      "desc": "FlowBot777 selects Pawn at d7 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "d6",
+      "desc": "FlowBot777 plays 4... d6 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-02:display:0",
       "game": "checkers",
       "id": 10,
@@ -696,6 +875,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f3",
+      "desc": "Jarad selects Queen at f3 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f7",
+      "desc": "Jarad plays 5. Qxf7+ (Check!) on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -718,6 +916,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "e8",
+      "desc": "FlowBot777 moves King at e8 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "d7",
+      "desc": "FlowBot777 plays 5... Kd7 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-02:display:0",
       "game": "checkers",
       "id": 15,
@@ -736,11 +953,44 @@
       "desc": "Wait for Checkers broker relay to Head 0"
     },
     {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "c4",
+      "desc": "Jarad selects Bishop at c4 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "e6",
+      "desc": "Jarad plays 6. Bxe6# (Checkmate!) on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
+    },
+    {
+      "action": "assert",
+      "targetVm": "appliance-01:display:1",
+      "desc": "Assert Chess Match #903 GameStatus is terminal Checkmate (status === 2)",
+      "assertType": "chess_status",
+      "expected": 2
+    },
+    {
+      "action": "assert",
+      "targetVm": "appliance-03:display:0",
+      "desc": "Assert Chess Match #903 remote peer confirms terminal Checkmate (status === 2)",
+      "assertType": "chess_status",
+      "expected": 2
+    },
+    {
       "action": "assertHash",
-      "targetVm": "appliance-01:display:0",
-      "kind": "checkers",
-      "compareToVm": "appliance-02:display:0",
-      "desc": "[Turn 20 Check] Assert Checkers Match #901 zero-drift convergence"
+      "targetVm": "appliance-01:display:1",
+      "kind": "chess",
+      "compareToVm": "appliance-03:display:0",
+      "desc": "Assert Chess Match #903 zero-drift checkmate terminal parity"
     },
     {
       "action": "clickSquare",
@@ -781,6 +1031,33 @@
       "desc": "Wait for Checkers broker relay to Head 0"
     },
     {
+      "action": "configureMatch",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "matchId": 904,
+      "seat": 1,
+      "p1Seed": "Jarad",
+      "p2Seed": "FlowBot777",
+      "desc": "Configure appliance-01:display:1 as Seat P1 (Jarad) on Chess Match #904"
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "matchId": 904,
+      "seat": 2,
+      "p1Seed": "Jarad",
+      "p2Seed": "FlowBot777",
+      "desc": "Configure appliance-03:display:0 as Seat P2 (FlowBot777) on Chess Match #904"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:1",
+      "kind": "chess",
+      "compareToVm": "appliance-03:display:0",
+      "desc": "Assert Chess Match #904 zero-drift initial state convergence"
+    },
+    {
       "action": "clickSquare",
       "targetVm": "appliance-01:display:0",
       "game": "checkers",
@@ -798,6 +1075,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "e2",
+      "desc": "Jarad selects Pawn at e2 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "e4",
+      "desc": "Jarad plays 1. e4 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -820,6 +1116,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "e7",
+      "desc": "FlowBot777 selects Pawn at e7 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "e5",
+      "desc": "FlowBot777 plays 1... e5 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-01:display:0",
       "game": "checkers",
       "id": 25,
@@ -836,6 +1151,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "g1",
+      "desc": "Jarad selects Knight at g1 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f3",
+      "desc": "Jarad plays 2. Nf3 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -858,6 +1192,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "d7",
+      "desc": "FlowBot777 selects Pawn at d7 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "d6",
+      "desc": "FlowBot777 plays 2... d6 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-01:display:0",
       "game": "checkers",
       "id": 17,
@@ -874,6 +1227,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f1",
+      "desc": "Jarad selects Bishop at f1 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "c4",
+      "desc": "Jarad plays 3. Bc4 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -896,6 +1268,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "c8",
+      "desc": "FlowBot777 selects Bishop at c8 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "g4",
+      "desc": "FlowBot777 plays 3... Bg4 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-01:display:0",
       "game": "checkers",
       "id": 23,
@@ -912,6 +1303,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "b1",
+      "desc": "Jarad selects Knight at b1 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "c3",
+      "desc": "Jarad plays 4. Nc3 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -934,6 +1344,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "g7",
+      "desc": "FlowBot777 selects Pawn at g7 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "g6",
+      "desc": "FlowBot777 plays 4... g6 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-01:display:0",
       "game": "checkers",
       "id": 14,
@@ -950,6 +1379,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f3",
+      "desc": "Jarad sacrifices Knight at f3 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "e5",
+      "desc": "Jarad plays 5. Nxe5 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -972,6 +1420,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "g4",
+      "desc": "FlowBot777 captures Queen at d1 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "d1",
+      "desc": "FlowBot777 plays 5... Bxd1 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-01:display:0",
       "game": "checkers",
       "id": 21,
@@ -988,6 +1455,25 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "c4",
+      "desc": "Jarad selects Bishop at c4 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f7",
+      "desc": "Jarad plays 6. Bxf7+ (Check!) on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
     },
     {
       "action": "clickSquare",
@@ -1010,6 +1496,25 @@
     },
     {
       "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "e8",
+      "desc": "FlowBot777 moves King at e8 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "e7",
+      "desc": "FlowBot777 plays 6... Ke7 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "clickSquare",
       "targetVm": "appliance-01:display:0",
       "game": "checkers",
       "id": 19,
@@ -1026,6 +1531,46 @@
       "action": "wait",
       "ms": 100,
       "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "c3",
+      "desc": "Jarad selects Knight at c3 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "d5",
+      "desc": "Jarad plays 7. Nd5# (Checkmate!) on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
+    },
+    {
+      "action": "assert",
+      "targetVm": "appliance-01:display:1",
+      "desc": "Assert Chess Match #904 GameStatus is terminal Checkmate (status === 2)",
+      "assertType": "chess_status",
+      "expected": 2
+    },
+    {
+      "action": "assert",
+      "targetVm": "appliance-03:display:0",
+      "desc": "Assert Chess Match #904 remote peer confirms terminal Checkmate (status === 2)",
+      "assertType": "chess_status",
+      "expected": 2
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:1",
+      "kind": "chess",
+      "compareToVm": "appliance-03:display:0",
+      "desc": "Assert Chess Match #904 zero-drift checkmate terminal parity"
     },
     {
       "action": "clickSquare",
@@ -2332,8 +2877,8 @@
     },
     {
       "action": "splitSnapshot",
-      "label": "Mission 9: Multi-Head Dual Terminal Decisive Victories (Checkers 101-Turn & Chess Checkmate)",
-      "desc": "Capture final 4-display 2×2 composite cockpit snapshot showing terminal checkmate and piece-elimination victories"
+      "label": "Mission 9: Multi-Head Dual Terminal Decisive Victories (Checkers 101-Turn & 3-Game Chess Trilogy)",
+      "desc": "Capture final 4-display 2×2 composite cockpit snapshot showing terminal checkmate trilogy and piece-elimination victories"
     }
   ]
 }

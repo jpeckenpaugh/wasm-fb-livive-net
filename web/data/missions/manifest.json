@@ -61,8 +61,8 @@
   },
   {
     "id": "multi-display-cockpit",
-    "name": "Mission 9: Multi-Head Appliance Cockpit (3 Appliances, 4 Displays, 2 Full Endgames)",
-    "description": "Concurrent dual-match exhibition to full completion across 4 displays: Checkers Match #901 (Jarad vs Alex) progresses through 101 turns to terminal piece elimination, while Chess Match #902 (Jarad vs FlowBot777) reaches decisive checkmate victory, synchronized across broker relay",
+    "name": "Mission 9: Multi-Head Appliance Cockpit (3 Appliances, 4 Displays, 2 Full Endgames & Trilogy)",
+    "description": "Concurrent dual-match exhibition to full completion across 4 displays: Checkers Match #901 (Jarad vs Alex) progresses through 101 turns to terminal piece elimination, while Chess (Jarad vs FlowBot777) runs a 3-game trilogy (2-ply Scholar's Mate, 4-ply Checkmate, and 6-ply Legal's Mate) back-to-back, synchronized across broker relay with zero-drift state parity",
     "file": "multi-display-cockpit.json"
   }
 ]
