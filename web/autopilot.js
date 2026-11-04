@@ -1,6 +1,7 @@
 /* Auto Pilot Runner: Deterministic Mission Runner, Action Interpreter & State Assertions */
 
 import { MISSIONS, getMissionById, loadMissions } from './missions.js';
+import { syncPlayerAvatarsToGuest } from './services/avatar.js';
 
 const MODS = { Shift: 1, Ctrl: 2, Alt: 4, Meta: 8 };
 
@@ -82,6 +83,26 @@ export class AutoPilotRunner {
         guests.find((g) => g.mpSeat === 2) ||
         guests[1] ||
         guests.find((g) => g.name === 'vm-02' || g.id === 2) ||
+        null
+      );
+    }
+    if (t === 'p3' || t === 'seat3' || t === 'seat-3' || t === 'vm-03' || t === 'vm3') {
+      if (forBoot) {
+        return guests[2] || null;
+      }
+      return (
+        guests[2] ||
+        guests.find((g) => g.name === 'vm-03' || g.id === 3) ||
+        null
+      );
+    }
+    if (t === 'p4' || t === 'seat4' || t === 'seat-4' || t === 'vm-04' || t === 'vm4') {
+      if (forBoot) {
+        return guests[3] || null;
+      }
+      return (
+        guests[3] ||
+        guests.find((g) => g.name === 'vm-04' || g.id === 4) ||
         null
       );
     }
@@ -503,12 +524,46 @@ export class AutoPilotRunner {
         const guests = this.deps.getGuests ? this.deps.getGuests() : [];
         const g1 = this.resolveTargetGuest('p1') || guests[0];
         const g2 = this.resolveTargetGuest('p2') || guests[1];
+        const g3 = this.resolveTargetGuest('p3') || guests[2];
+        const g4 = this.resolveTargetGuest('p4') || guests[3];
         if (!g1 || !g2) {
           throw new Error('Action splitSnapshot requires at least two guests (P1 and P2)');
         }
 
         let snap = null;
-        if (this.deps.captureSplitSnapshot) {
+        if (g3 && g4 && typeof document !== 'undefined') {
+          // Quad-view composite snapshot (2x2 grid)
+          const w = g1.width || 640;
+          const h = g1.height || 480;
+          const compW = w * 2;
+          const compH = h * 2;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = compW;
+          canvas.height = compH;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, compW, compH);
+            if (g1.canvas) ctx.drawImage(g1.canvas, 0, 0, w, h);
+            if (g2.canvas) ctx.drawImage(g2.canvas, w, 0, w, h);
+            if (g3.canvas) ctx.drawImage(g3.canvas, 0, h, w, h);
+            if (g4.canvas) ctx.drawImage(g4.canvas, w, h, w, h);
+          }
+          const dataUrl = canvas.toDataURL('image/png');
+          const h1 = g1.exports?.app_fb_hash ? `0x${(g1.exports.app_fb_hash() >>> 0).toString(16)}` : '0x0';
+          const h2 = g2.exports?.app_fb_hash ? `0x${(g2.exports.app_fb_hash() >>> 0).toString(16)}` : '0x0';
+          const h3 = g3.exports?.app_fb_hash ? `0x${(g3.exports.app_fb_hash() >>> 0).toString(16)}` : '0x0';
+          const h4 = g4.exports?.app_fb_hash ? `0x${(g4.exports.app_fb_hash() >>> 0).toString(16)}` : '0x0';
+
+          snap = {
+            label: step.label || `Quad Snapshot (4-VM 2x2 Grid)`,
+            dataUrl,
+            hashHex: `${h1} | ${h2} | ${h3} | ${h4}`,
+            seq: 1,
+            view: 'Quad View 2x2 Grid',
+          };
+        } else if (this.deps.captureSplitSnapshot) {
           snap = this.deps.captureSplitSnapshot(g1, g2);
         } else if (typeof window !== 'undefined' && window.__appliance?.splitSnapshot) {
           snap = window.__appliance.splitSnapshot(g1.id, g2.id);
@@ -674,6 +729,21 @@ export class AutoPilotRunner {
         guest.mpMatchId = matchId;
         guest.mpGame = game;
         guest.actorType = 'AutoPilot';
+
+        // Synchronize match-level player identities across peer VMs
+        const allGuests = this.deps.getGuests ? this.deps.getGuests() : [];
+        const peers = allGuests.filter((g) => g.mpMatchId === matchId);
+        const p1Vm = peers.find((g) => g.mpSeat === 1) || (seat === 1 ? guest : null);
+        const p2Vm = peers.find((g) => g.mpSeat === 2) || (seat === 2 ? guest : null);
+
+        const p1Seed = step.p1Seed || p1Vm?.identity?.seed || p1Vm?.identity?.name || (matchId === 802 ? 'Alex' : 'Jarad');
+        const p2Seed = step.p2Seed || p2Vm?.identity?.seed || p2Vm?.identity?.name || (matchId === 802 ? 'Minimax-4ply' : 'Minimax-2ply');
+
+        for (const peer of peers) {
+          syncPlayerAvatarsToGuest(peer, p1Seed, p2Seed);
+        }
+        syncPlayerAvatarsToGuest(guest, p1Seed, p2Seed);
+
         if (guest.render) guest.render();
         break;
       }

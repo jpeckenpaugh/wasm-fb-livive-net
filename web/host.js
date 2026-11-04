@@ -1678,9 +1678,16 @@ async function createGuest(opts = {}) {
   const buildInfo = getBuildInfo(buildId);
   const fbBytes = width * height * 4;
   const id = nextId++;
+  const identity = opts.identity || {
+    name: opts.name || `User-${String(id).padStart(2, '0')}`,
+    seed: opts.seed || (id === 1 ? 'Jarad' : id === 3 ? 'Alex' : opts.name || `User-${String(id).padStart(2, '0')}`),
+    type: opts.actorType === 'minimax' ? 'robot' : 'human',
+  };
   const vm = {
     id,
-    name: `vm-${String(id).padStart(2, '0')}`,
+    name: opts.name || `vm-${String(id).padStart(2, '0')}`,
+    identity,
+    actorType: opts.actorType || null,
     buildId: buildInfo.id,
     buildInfo,
     width,
@@ -1961,7 +1968,9 @@ async function createGuest(opts = {}) {
       true,
     );
     pumpClock();
-    syncPlayerAvatarsToGuest(vm, 'tester-01', 'Felix');
+    const p1Seed = vm.identity?.seed || 'Jarad';
+    const p2Seed = 'Minimax-2ply';
+    syncPlayerAvatarsToGuest(vm, p1Seed, p2Seed);
     initWebForGuest(vm).catch((error) => console.error(error));
     return vm;
   } catch (error) {

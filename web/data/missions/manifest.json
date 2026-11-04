@@ -52,5 +52,11 @@
     "name": "Mission 7: Checkers 2P Minimax Duel (6-Ply vs 2-Ply)",
     "description": "Complete 101-turn 2P Checkers game between two separate appliances over broker relay: vm-01 (6-Ply Hard Minimax) vs vm-02 (2-Ply Easy Minimax), culminating in terminal checkmate/elimination victory for P1",
     "file": "checkers-2p-minimax-duel.json"
+  },
+  {
+    "id": "checkers-quad-minimax-duels",
+    "name": "Mission 8: Checkers Quad-VM Minimax Duels (2-Ply vs 4-Ply & 2-Ply vs 6-Ply)",
+    "description": "Concurrent dual-match exhibition across 4 isolated VMs in a 2×2 VGA grid: Match #1 (vm-01 4-Ply vs vm-02 2-Ply) and Match #2 (vm-03 6-Ply vs vm-04 2-Ply) progressing over broker relay with zero-drift state convergence",
+    "file": "checkers-quad-minimax-duels.json"
   }
 ]

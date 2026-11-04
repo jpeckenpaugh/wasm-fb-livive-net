@@ -10,6 +10,7 @@ const MISSION_FILES = [
   'checkers-2p-entangled-convergence',
   'mines-2p-turn-relay',
   'checkers-2p-minimax-duel',
+  'checkers-quad-minimax-duels',
 ];
 
 export let MISSIONS = [];

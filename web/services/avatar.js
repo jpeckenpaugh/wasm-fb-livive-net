@@ -248,10 +248,20 @@ export function resolveGuestAvatarSeeds(guest, p1Default = 'tester-01', p2Defaul
   let p1Seed = p1Default;
   let p2Seed = p2Default;
 
+  // 1. Prefer VM session identity if provisioned
+  if (guest && guest.identity) {
+    if (guest.mpSeat === 2) {
+      p2Seed = guest.identity.seed || guest.identity.name || p2Default;
+    } else {
+      p1Seed = guest.identity.seed || guest.identity.name || p1Default;
+    }
+  }
+
+  // 2. If vs AI in local standalone mode, ensure P2 gets a robot avatar
   if (guest && guest.exports) {
     const isChessAi = guest.exports.app_chess_is_vs_ai ? guest.exports.app_chess_is_vs_ai() === 1 : false;
     const isCheckersAi = guest.exports.app_checkers_is_vs_ai ? guest.exports.app_checkers_is_vs_ai() === 1 : false;
-    if (isChessAi || isCheckersAi) {
+    if ((isChessAi || isCheckersAi) && !isBotSeed(p2Seed)) {
       p2Seed = 'Felix'; // DiceBear voxel-bot
     }
   }
