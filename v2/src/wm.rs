@@ -598,6 +598,8 @@ impl WmState {
         staged_context: &[u8],
         p1_avatar: Option<&[u32]>,
         p2_avatar: Option<&[u32]>,
+        p1_name: Option<&str>,
+        p2_name: Option<&str>,
     ) {
         if !self.ready {
             return;
@@ -647,8 +649,8 @@ impl WmState {
                     )
                 }
                 AppSlot::Mines => mines::draw_window(&mut client_fb, &self.mines, self.anim_tick, p1_avatar, p2_avatar),
-                AppSlot::Checkers => checkers::draw_window(&mut client_fb, &self.checkers, self.anim_tick, p1_avatar, p2_avatar),
-                AppSlot::Chess => chess::draw_window(&mut client_fb, &self.chess, self.anim_tick, p1_avatar, p2_avatar),
+                AppSlot::Checkers => checkers::draw_window(&mut client_fb, &self.checkers, self.anim_tick, p1_avatar, p2_avatar, p1_name, p2_name),
+                AppSlot::Chess => chess::draw_window(&mut client_fb, &self.chess, self.anim_tick, p1_avatar, p2_avatar, p1_name, p2_name),
             }
         }
 

@@ -54,6 +54,10 @@ struct GuestMemory {
     p2_avatar: UnsafeCell<[u32; 49152]>,
     has_p1_avatar: UnsafeCell<bool>,
     has_p2_avatar: UnsafeCell<bool>,
+    p1_name: UnsafeCell<[u8; 32]>,
+    p1_name_len: UnsafeCell<usize>,
+    p2_name: UnsafeCell<[u8; 32]>,
+    p2_name_len: UnsafeCell<usize>,
     wm: UnsafeCell<WmState>,
 }
 
@@ -79,6 +83,10 @@ static GUEST: GuestMemory = GuestMemory {
     p2_avatar: UnsafeCell::new([0; 49152]),
     has_p1_avatar: UnsafeCell::new(false),
     has_p2_avatar: UnsafeCell::new(false),
+    p1_name: UnsafeCell::new([0; 32]),
+    p1_name_len: UnsafeCell::new(0),
+    p2_name: UnsafeCell::new([0; 32]),
+    p2_name_len: UnsafeCell::new(0),
     wm: UnsafeCell::new(WmState::new()),
 };
 
@@ -198,7 +206,19 @@ fn wm_render(wm: &mut WmState, fb: &mut Framebuffer, st: &[u32], txt: &[u8], ctx
         } else {
             None
         };
-        wm.render(fb, st, txt, ctx, p1, p2);
+        let p1_name_str = if *GUEST.p1_name_len.get() > 0 {
+            let buf = &*GUEST.p1_name.get();
+            core::str::from_utf8(&buf[..*GUEST.p1_name_len.get()]).ok()
+        } else {
+            None
+        };
+        let p2_name_str = if *GUEST.p2_name_len.get() > 0 {
+            let buf = &*GUEST.p2_name.get();
+            core::str::from_utf8(&buf[..*GUEST.p2_name_len.get()]).ok()
+        } else {
+            None
+        };
+        wm.render(fb, st, txt, ctx, p1, p2, p1_name_str, p2_name_str);
     }
 }
 
@@ -1257,6 +1277,34 @@ pub extern "C" fn app_chess_step_ai() -> i32 {
 }
 
 // --- Player DiceBear Avatar ABI (128x128 3-frame animated sprite strip RGBA) ---
+
+#[no_mangle]
+pub extern "C" fn app_set_player_name(seat: i32, name_len: usize) -> i32 {
+    let len = name_len.min(32);
+    with_state(|wm, fb, st, txt, ctx| {
+        unsafe {
+            let ptr = (*GUEST.name_scratch.get()).as_ptr();
+            let src = core::slice::from_raw_parts(ptr, len);
+            match seat {
+                1 => {
+                    let dst = &mut *GUEST.p1_name.get();
+                    dst[..len].copy_from_slice(src);
+                    *GUEST.p1_name_len.get() = len;
+                }
+                2 => {
+                    let dst = &mut *GUEST.p2_name.get();
+                    dst[..len].copy_from_slice(src);
+                    *GUEST.p2_name_len.get() = len;
+                }
+                _ => return 0,
+            }
+        }
+        if wm.ready {
+            wm_render(wm, fb, st, txt, ctx);
+        }
+        1
+    })
+}
 
 #[no_mangle]
 pub extern "C" fn app_avatar_staging_ptr() -> *mut u8 {

@@ -639,6 +639,8 @@ pub fn draw_window(
     anim_tick: u32,
     p1_avatar: Option<&[u32]>,
     p2_avatar: Option<&[u32]>,
+    p1_name: Option<&str>,
+    p2_name: Option<&str>,
 ) {
     fb.clear(t::BG);
     let g = checkers_geom(fb.w, fb.h);
@@ -882,6 +884,7 @@ pub fn draw_window(
     };
 
     // Column 1: Red Header
+    let red_label = p1_name.unwrap_or("RED");
     fb.fill(g.info_x, score_y, col_w, header_h, rgb(0x3b, 0x07, 0x12));
     fb.border(g.info_x, score_y, col_w, header_h, 1, rgb(0x9f, 0x12, 0x39));
     let text_x1 = if let Some(avatar) = p1_avatar {
@@ -898,10 +901,16 @@ pub fn draw_window(
     } else {
         g.info_x + 6
     };
-    draw_str(fb, text_x1, score_y + 4, "RED", if compact_info { 1 } else { 2 }, rgb(0xfb, 0x71, 0x85));
+    draw_str(fb, text_x1, score_y + 4, red_label, if compact_info { 1 } else { 2 }, rgb(0xfb, 0x71, 0x85));
 
     // Column 2: Black Header
-    let blk_hdr_label = if app.mode == CheckersMode::VsAi { "BLACK (AI)" } else { "BLACK" };
+    let blk_hdr_label = if let Some(name) = p2_name {
+        name
+    } else if app.mode == CheckersMode::VsAi {
+        "BLACK (AI)"
+    } else {
+        "BLACK"
+    };
     fb.fill(col2_x, score_y, col_w, header_h, rgb(0x0a, 0x1e, 0x2f));
     fb.border(col2_x, score_y, col_w, header_h, 1, rgb(0x02, 0x84, 0xc7));
     let text_x2 = if let Some(avatar) = p2_avatar {

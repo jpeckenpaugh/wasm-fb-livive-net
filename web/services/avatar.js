@@ -59,6 +59,7 @@ export function generateProceduralVoxelStrip(seed) {
 
   const h = fnv1a(seed || 'tester-01');
   const rng = new Mulberry32(h);
+  const isBot = isBotSeed(seed);
   const palette = VOXEL_PALETTES[rng.range(0, VOXEL_PALETTES.length - 1)];
 
   // 16x16 logical base grid
@@ -66,41 +67,87 @@ export function generateProceduralVoxelStrip(seed) {
   const bgCol = 0x18181bff;
   baseGrid.fill(bgCol);
 
-  const borderCol = palette[rng.range(0, 2)];
-  for (let x = 0; x < 16; x++) {
-    baseGrid[x] = borderCol;
-    baseGrid[15 * 16 + x] = borderCol;
-  }
-  for (let y = 0; y < 16; y++) {
-    baseGrid[y * 16] = borderCol;
-    baseGrid[y * 16 + 15] = borderCol;
-  }
+  if (isBot) {
+    // Distinctive Robot / Bot Voxel Chassis
+    const steelCol = 0x64748bff;
+    const darkSteel = 0x334155ff;
+    const visorCol = palette[0];
+    const antennaCol = palette[3] || 0x38bdf8ff;
 
-  const fg1 = palette[rng.range(0, 2)];
-  const fg2 = palette[rng.range(3, 4)];
-  for (let y = 3; y <= 13; y++) {
-    for (let x = 3; x <= 7; x++) {
-      if (rng.next() > 0.35) {
-        const col = rng.next() > 0.4 ? fg1 : fg2;
-        baseGrid[y * 16 + x] = col;
-        baseGrid[y * 16 + (15 - x)] = col;
+    // Outer metal chassis
+    for (let x = 2; x <= 13; x++) {
+      baseGrid[3 * 16 + x] = steelCol;
+      baseGrid[14 * 16 + x] = steelCol;
+    }
+    for (let y = 3; y <= 14; y++) {
+      baseGrid[y * 16 + 2] = steelCol;
+      baseGrid[y * 16 + 13] = steelCol;
+    }
+    // Face plate
+    for (let y = 4; y <= 13; y++) {
+      for (let x = 3; x <= 12; x++) {
+        baseGrid[y * 16 + x] = darkSteel;
       }
     }
+    // Antenna / Ears
+    baseGrid[1 * 16 + 7] = antennaCol;
+    baseGrid[1 * 16 + 8] = antennaCol;
+    baseGrid[2 * 16 + 7] = steelCol;
+    baseGrid[2 * 16 + 8] = steelCol;
+    baseGrid[8 * 16 + 1] = antennaCol;
+    baseGrid[8 * 16 + 14] = antennaCol;
+
+    // Glowing Robot Visor / Eyes
+    for (let x = 4; x <= 11; x++) {
+      baseGrid[7 * 16 + x] = visorCol;
+    }
+    baseGrid[7 * 16 + 6] = 0xffffffff;
+    baseGrid[7 * 16 + 9] = 0xffffffff;
+
+    // Speaker mouth grill
+    for (let x = 5; x <= 10; x++) {
+      if (x % 2 === 0) {
+        baseGrid[11 * 16 + x] = steelCol;
+      }
+    }
+  } else {
+    // Distinctive Human Voxel Face
+    const borderCol = palette[rng.range(0, 2)];
+    for (let x = 0; x < 16; x++) {
+      baseGrid[x] = borderCol;
+      baseGrid[15 * 16 + x] = borderCol;
+    }
+    for (let y = 0; y < 16; y++) {
+      baseGrid[y * 16] = borderCol;
+      baseGrid[y * 16 + 15] = borderCol;
+    }
+
+    const fg1 = palette[rng.range(0, 2)];
+    const fg2 = palette[rng.range(3, 4)];
+    for (let y = 3; y <= 13; y++) {
+      for (let x = 3; x <= 7; x++) {
+        if (rng.next() > 0.35) {
+          const col = rng.next() > 0.4 ? fg1 : fg2;
+          baseGrid[y * 16 + x] = col;
+          baseGrid[y * 16 + (15 - x)] = col;
+        }
+      }
+    }
+
+    // Eye and mouth baseline
+    const eyeCol = 0xffffffff;
+    const pupilCol = 0x000000ff;
+    baseGrid[7 * 16 + 5] = eyeCol;
+    baseGrid[7 * 16 + 6] = pupilCol;
+    baseGrid[7 * 16 + 10] = eyeCol;
+    baseGrid[7 * 16 + 9] = pupilCol;
+
+    const mouthCol = palette[rng.range(1, 3)];
+    baseGrid[10 * 16 + 6] = mouthCol;
+    baseGrid[10 * 16 + 7] = mouthCol;
+    baseGrid[10 * 16 + 8] = mouthCol;
+    baseGrid[10 * 16 + 9] = mouthCol;
   }
-
-  // Eye and mouth baseline
-  const eyeCol = 0xffffffff;
-  const pupilCol = 0x000000ff;
-  baseGrid[7 * 16 + 5] = eyeCol;
-  baseGrid[7 * 16 + 6] = pupilCol;
-  baseGrid[7 * 16 + 10] = eyeCol;
-  baseGrid[7 * 16 + 9] = pupilCol;
-
-  const mouthCol = palette[rng.range(1, 3)];
-  baseGrid[10 * 16 + 6] = mouthCol;
-  baseGrid[10 * 16 + 7] = mouthCol;
-  baseGrid[10 * 16 + 8] = mouthCol;
-  baseGrid[10 * 16 + 9] = mouthCol;
 
   // Render 3 frames of 128x128 into 384x128 buffer
   const strip = new Uint32Array(384 * 128);
@@ -109,11 +156,19 @@ export function generateProceduralVoxelStrip(seed) {
     const frameGrid = new Uint32Array(baseGrid);
     let dy = 0;
     if (f === 1) {
-      // Blink: eyes closed (pupil matching skin/bg)
-      frameGrid[7 * 16 + 5] = borderCol;
-      frameGrid[7 * 16 + 6] = borderCol;
-      frameGrid[7 * 16 + 10] = borderCol;
-      frameGrid[7 * 16 + 9] = borderCol;
+      if (isBot) {
+        // Robot blink: visor turns dark steel
+        for (let x = 4; x <= 11; x++) {
+          frameGrid[7 * 16 + x] = 0x334155ff;
+        }
+      } else {
+        // Human blink: eyes closed (eyelid matching border/skin)
+        const eyelidCol = palette[rng.range(0, 2)];
+        frameGrid[7 * 16 + 5] = eyelidCol;
+        frameGrid[7 * 16 + 6] = eyelidCol;
+        frameGrid[7 * 16 + 10] = eyelidCol;
+        frameGrid[7 * 16 + 9] = eyelidCol;
+      }
     } else if (f === 2) {
       // Shift / bob up by 1 grid cell
       dy = -1;
@@ -257,8 +312,8 @@ export function resolveGuestAvatarSeeds(guest, p1Default = 'tester-01', p2Defaul
     }
   }
 
-  // 2. If vs AI in local standalone mode, ensure P2 gets a robot avatar
-  if (guest && guest.exports) {
+  // 2. If vs AI in local standalone mode (no broker / mpMatchId), ensure P2 gets a robot avatar
+  if (!guest?.mpMatchId && guest && guest.exports) {
     const isChessAi = guest.exports.app_chess_is_vs_ai ? guest.exports.app_chess_is_vs_ai() === 1 : false;
     const isCheckersAi = guest.exports.app_checkers_is_vs_ai ? guest.exports.app_checkers_is_vs_ai() === 1 : false;
     if ((isChessAi || isCheckersAi) && !isBotSeed(p2Seed)) {
@@ -281,11 +336,18 @@ export function resolveGuestAvatarSeeds(guest, p1Default = 'tester-01', p2Defaul
 export function syncPlayerAvatarsToGuest(guest, p1Requested, p2Requested) {
   if (!guest || !guest.exports || !guest.exports.app_set_player_avatar) return;
 
-  const { p1Seed, p2Seed } = resolveGuestAvatarSeeds(
-    guest,
-    p1Requested || 'tester-01',
-    p2Requested || 'Felix'
-  );
+  let p1Seed = p1Requested;
+  let p2Seed = p2Requested;
+
+  if (!p1Seed || !p2Seed) {
+    const resolved = resolveGuestAvatarSeeds(
+      guest,
+      p1Requested || 'tester-01',
+      p2Requested || 'Felix'
+    );
+    p1Seed = p1Seed || resolved.p1Seed;
+    p2Seed = p2Seed || resolved.p2Seed;
+  }
 
   const stagingPtr = guest.exports.app_avatar_staging_ptr
     ? guest.exports.app_avatar_staging_ptr()
@@ -303,6 +365,23 @@ export function syncPlayerAvatarsToGuest(guest, p1Requested, p2Requested) {
   const mem2 = new Uint32Array(guest.exports.memory.buffer, stagingPtr, 49152);
   mem2.set(p2Immediate);
   guest.exports.app_set_player_avatar(2, 384, 128);
+
+  // Sync player display names to guest Wasm memory if supported
+  if (guest.exports.app_mount_name_buf && guest.exports.app_set_player_name) {
+    const encoder = new TextEncoder();
+    const namePtr = guest.exports.app_mount_name_buf();
+
+    if (p1Seed) {
+      const p1Bytes = encoder.encode(String(p1Seed).slice(0, 31));
+      new Uint8Array(guest.exports.memory.buffer, namePtr, p1Bytes.length).set(p1Bytes);
+      guest.exports.app_set_player_name(1, p1Bytes.length);
+    }
+    if (p2Seed) {
+      const p2Bytes = encoder.encode(String(p2Seed).slice(0, 31));
+      new Uint8Array(guest.exports.memory.buffer, namePtr, p2Bytes.length).set(p2Bytes);
+      guest.exports.app_set_player_name(2, p2Bytes.length);
+    }
+  }
 
   if (guest.render) {
     guest.render();

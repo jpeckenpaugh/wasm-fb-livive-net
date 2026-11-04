@@ -1,0 +1,2339 @@
+{
+  "id": "multi-display-cockpit",
+  "name": "Mission 9: Multi-Head Appliance Cockpit (3 Appliances, 4 Displays, 2 Full Endgames)",
+  "description": "Concurrent dual-match exhibition to full completion across 4 displays: Checkers Match #901 (Jarad vs Alex) progresses through 101 turns to terminal piece elimination, while Chess Match #902 (Jarad vs FlowBot777) reaches decisive checkmate victory, synchronized across broker relay.",
+  "steps": [
+    {
+      "action": "boot",
+      "targetVm": "appliance-01:display:0",
+      "opts": {
+        "width": 640,
+        "height": 480,
+        "name": "appliance-01:display:0",
+        "userName": "Jarad",
+        "identity": {
+          "name": "Jarad",
+          "seed": "Jarad",
+          "type": "human"
+        }
+      },
+      "desc": "Boot appliance-01:display:0 (Head 0: Jarad Workstation - Checkers) at 640×480 VGA"
+    },
+    {
+      "action": "boot",
+      "targetVm": "appliance-02:display:0",
+      "opts": {
+        "width": 640,
+        "height": 480,
+        "name": "appliance-02:display:0",
+        "userName": "Alex",
+        "identity": {
+          "name": "Alex",
+          "seed": "Alex",
+          "type": "human"
+        }
+      },
+      "desc": "Boot appliance-02:display:0 (Head 1: Alex Workstation - Checkers) at 640×480 VGA"
+    },
+    {
+      "action": "boot",
+      "targetVm": "appliance-01:display:1",
+      "opts": {
+        "width": 640,
+        "height": 480,
+        "name": "appliance-01:display:1",
+        "userName": "Jarad",
+        "identity": {
+          "name": "Jarad",
+          "seed": "Jarad",
+          "type": "human"
+        }
+      },
+      "desc": "Boot appliance-01:display:1 (Head 2: Jarad Workstation - Chess Multi-head) at 640×480 VGA"
+    },
+    {
+      "action": "boot",
+      "targetVm": "appliance-03:display:0",
+      "opts": {
+        "width": 640,
+        "height": 480,
+        "name": "appliance-03:display:0",
+        "userName": "FlowBot777",
+        "actorType": "minimax",
+        "identity": {
+          "name": "FlowBot777",
+          "seed": "FlowBot777",
+          "type": "robot"
+        }
+      },
+      "desc": "Boot appliance-03:display:0 (Head 3: FlowBot777 AI Terminal - Chess) at 640×480 VGA"
+    },
+    {
+      "action": "setSplitView",
+      "targetVm": "appliance-01:display:0",
+      "enabled": true,
+      "desc": "Enable 2×2 quad-grid display across all 4 heads"
+    },
+    {
+      "action": "openApp",
+      "targetVm": "appliance-01:display:0",
+      "slot": "checkers",
+      "desc": "Open Checkers on appliance-01:display:0"
+    },
+    {
+      "action": "openApp",
+      "targetVm": "appliance-02:display:0",
+      "slot": "checkers",
+      "desc": "Open Checkers on appliance-02:display:0"
+    },
+    {
+      "action": "openApp",
+      "targetVm": "appliance-01:display:1",
+      "slot": "chess",
+      "desc": "Open Chess on appliance-01:display:1"
+    },
+    {
+      "action": "openApp",
+      "targetVm": "appliance-03:display:0",
+      "slot": "chess",
+      "desc": "Open Chess on appliance-03:display:0"
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "matchId": 901,
+      "seat": 1,
+      "p1Seed": "Jarad",
+      "p2Seed": "Alex",
+      "desc": "Configure appliance-01:display:0 as Seat P1 (Jarad) on Checkers Match #901"
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "matchId": 901,
+      "seat": 2,
+      "p1Seed": "Jarad",
+      "p2Seed": "Alex",
+      "desc": "Configure appliance-02:display:0 as Seat P2 (Alex) on Checkers Match #901"
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "matchId": 902,
+      "seat": 1,
+      "p1Seed": "Jarad",
+      "p2Seed": "FlowBot777",
+      "desc": "Configure appliance-01:display:1 as Seat P1 (Jarad) on Chess Match #902"
+    },
+    {
+      "action": "configureMatch",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "matchId": 902,
+      "seat": 2,
+      "p1Seed": "Jarad",
+      "p2Seed": "FlowBot777",
+      "desc": "Configure appliance-03:display:0 as Seat P2 (FlowBot777) on Chess Match #902"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "Assert Checkers Match #901 zero-drift initial state convergence"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:1",
+      "kind": "chess",
+      "compareToVm": "appliance-03:display:0",
+      "desc": "Assert Chess Match #902 zero-drift initial state convergence"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 23,
+      "desc": "[M1 Turn 1] Jarad: square 23"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 18,
+      "desc": "[M1 Turn 1] Jarad: square 18"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "e2",
+      "desc": "[M2 Turn 1] Jarad selects Pawn at e2 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "e4",
+      "desc": "[M2 Turn 1] Jarad plays 1. e4 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 2] Alex: square 10"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 2] Alex: square 14"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "e7",
+      "desc": "[M2 Turn 2] FlowBot777 selects Pawn at e7 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "e5",
+      "desc": "[M2 Turn 2] FlowBot777 plays 1... e5 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "[Round 1 Check] Assert Checkers Match #901 state parity (0 drift)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:1",
+      "kind": "chess",
+      "compareToVm": "appliance-03:display:0",
+      "desc": "[Round 1 Check] Assert Chess Match #902 state parity (0 drift)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 27,
+      "desc": "[M1 Turn 3] Jarad: square 27"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 23,
+      "desc": "[M1 Turn 3] Jarad: square 23"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f1",
+      "desc": "[M2 Turn 3] Jarad selects Bishop at f1 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "c4",
+      "desc": "[M2 Turn 3] Jarad plays 2. Bc4 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 6,
+      "desc": "[M1 Turn 4] Alex: square 6"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 4] Alex: square 10"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "b8",
+      "desc": "[M2 Turn 4] FlowBot777 selects Knight at b8 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "c6",
+      "desc": "[M2 Turn 4] FlowBot777 plays 2... Nc6 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "[Round 2 Check] Assert Checkers Match #901 state parity (0 drift)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:1",
+      "kind": "chess",
+      "compareToVm": "appliance-03:display:0",
+      "desc": "[Round 2 Check] Assert Chess Match #902 state parity (0 drift)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 5] Jarad: square 21"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 5] Jarad: square 17"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "d1",
+      "desc": "[M2 Turn 5] Jarad selects Queen at d1 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "h5",
+      "desc": "[M2 Turn 5] Jarad plays 3. Qh5 on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 6] Alex: square 14"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 6] Alex: square 21"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "g8",
+      "desc": "[M2 Turn 6] FlowBot777 selects Knight at g8 on Head 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-03:display:0",
+      "game": "chess",
+      "square": "f6",
+      "desc": "[M2 Turn 6] FlowBot777 plays 3... Nf6 on Head 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 2"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "[Round 3 Check] Assert Checkers Match #901 state parity (0 drift)"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:1",
+      "kind": "chess",
+      "compareToVm": "appliance-03:display:0",
+      "desc": "[Round 3 Check] Assert Chess Match #902 state parity (0 drift)"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 7] Jarad: square 25"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 16,
+      "desc": "[M1 Turn 7] Jarad: square 16"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "h5",
+      "desc": "[M2 Turn 7] Jarad selects Queen at h5 on Head 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:1",
+      "game": "chess",
+      "square": "f7",
+      "desc": "[M2 Turn 7] Jarad plays 4. Qxf7# (Checkmate!) on Head 2"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Chess broker relay to Head 3"
+    },
+    {
+      "action": "assert",
+      "targetVm": "appliance-01:display:1",
+      "desc": "Assert Chess Match #902 GameStatus is terminal Checkmate (status === 2)",
+      "assertType": "chess_status",
+      "expected": 2
+    },
+    {
+      "action": "assert",
+      "targetVm": "appliance-03:display:0",
+      "desc": "Assert Chess Match #902 remote peer confirms terminal Checkmate (status === 2)",
+      "assertType": "chess_status",
+      "expected": 2
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:1",
+      "kind": "chess",
+      "compareToVm": "appliance-03:display:0",
+      "desc": "Assert Chess Match #902 zero-drift checkmate terminal parity"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 8] Alex: square 8"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 8] Alex: square 13"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 9] Jarad: square 22"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 9] Jarad: square 17"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 10] Alex: square 13"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 10] Alex: square 22"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 26,
+      "desc": "[M1 Turn 11] Jarad: square 26"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 11] Jarad: square 17"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 4,
+      "desc": "[M1 Turn 12] Alex: square 4"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 12] Alex: square 8"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 16,
+      "desc": "[M1 Turn 13] Jarad: square 16"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 13] Jarad: square 13"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 9,
+      "desc": "[M1 Turn 14] Alex: square 9"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 16,
+      "desc": "[M1 Turn 14] Alex: square 16"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 20,
+      "desc": "[M1 Turn 15] Jarad: square 20"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 15] Jarad: square 13"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 4,
+      "desc": "[M1 Turn 15] Jarad: square 4"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 16] Alex: square 5"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 9,
+      "desc": "[M1 Turn 16] Alex: square 9"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 24,
+      "desc": "[M1 Turn 17] Jarad: square 24"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 17] Jarad: square 21"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 18] Alex: square 10"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 15,
+      "desc": "[M1 Turn 18] Alex: square 15"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 30,
+      "desc": "[M1 Turn 19] Jarad: square 30"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 19] Jarad: square 25"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 15,
+      "desc": "[M1 Turn 20] Alex: square 15"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 20] Alex: square 22"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "[Turn 20 Check] Assert Checkers Match #901 zero-drift convergence"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 21] Jarad: square 25"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 18,
+      "desc": "[M1 Turn 21] Jarad: square 18"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 7,
+      "desc": "[M1 Turn 22] Alex: square 7"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 22] Alex: square 10"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 29,
+      "desc": "[M1 Turn 23] Jarad: square 29"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 23] Jarad: square 25"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 3,
+      "desc": "[M1 Turn 24] Alex: square 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 7,
+      "desc": "[M1 Turn 24] Alex: square 7"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 25] Jarad: square 25"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 25] Jarad: square 22"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 26] Alex: square 10"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 15,
+      "desc": "[M1 Turn 26] Alex: square 15"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 27] Jarad: square 17"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 27] Jarad: square 14"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 9,
+      "desc": "[M1 Turn 28] Alex: square 9"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 28] Alex: square 13"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 23,
+      "desc": "[M1 Turn 29] Jarad: square 23"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 19,
+      "desc": "[M1 Turn 29] Jarad: square 19"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 7,
+      "desc": "[M1 Turn 30] Alex: square 7"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 30] Alex: square 10"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 31] Jarad: square 14"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 7,
+      "desc": "[M1 Turn 31] Jarad: square 7"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 32] Alex: square 13"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 32] Alex: square 17"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 33] Jarad: square 21"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 33] Jarad: square 14"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 1,
+      "desc": "[M1 Turn 34] Alex: square 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 34] Alex: square 5"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 19,
+      "desc": "[M1 Turn 35] Jarad: square 19"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 35] Jarad: square 10"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 36] Alex: square 5"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 36] Alex: square 8"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 28,
+      "desc": "[M1 Turn 37] Jarad: square 28"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 24,
+      "desc": "[M1 Turn 37] Jarad: square 24"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 38] Alex: square 8"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 38] Alex: square 13"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 24,
+      "desc": "[M1 Turn 39] Jarad: square 24"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 39] Jarad: square 21"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 0,
+      "desc": "[M1 Turn 40] Alex: square 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 40] Alex: square 5"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "[Turn 40 Check] Assert Checkers Match #901 zero-drift convergence"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 4,
+      "desc": "[M1 Turn 41] Jarad: square 4"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 0,
+      "desc": "[M1 Turn 41] Jarad: square 0"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 42] Alex: square 5"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 42] Alex: square 8"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 43] Jarad: square 14"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 9,
+      "desc": "[M1 Turn 43] Jarad: square 9"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 44] Alex: square 8"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 12,
+      "desc": "[M1 Turn 44] Alex: square 12"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 18,
+      "desc": "[M1 Turn 45] Jarad: square 18"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 45] Jarad: square 14"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 11,
+      "desc": "[M1 Turn 46] Alex: square 11"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 15,
+      "desc": "[M1 Turn 46] Alex: square 15"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 7,
+      "desc": "[M1 Turn 47] Jarad: square 7"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 3,
+      "desc": "[M1 Turn 47] Jarad: square 3"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 15,
+      "desc": "[M1 Turn 48] Alex: square 15"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 19,
+      "desc": "[M1 Turn 48] Alex: square 19"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 49] Jarad: square 21"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 49] Jarad: square 17"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 50] Alex: square 13"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 16,
+      "desc": "[M1 Turn 50] Alex: square 16"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 51] Jarad: square 22"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 18,
+      "desc": "[M1 Turn 51] Jarad: square 18"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 16,
+      "desc": "[M1 Turn 52] Alex: square 16"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 52] Alex: square 21"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 53] Jarad: square 17"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 53] Jarad: square 13"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 19,
+      "desc": "[M1 Turn 54] Alex: square 19"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 23,
+      "desc": "[M1 Turn 54] Alex: square 23"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 9,
+      "desc": "[M1 Turn 55] Jarad: square 9"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 55] Jarad: square 5"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 12,
+      "desc": "[M1 Turn 56] Alex: square 12"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 16,
+      "desc": "[M1 Turn 56] Alex: square 16"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 57] Jarad: square 14"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 9,
+      "desc": "[M1 Turn 57] Jarad: square 9"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 16,
+      "desc": "[M1 Turn 58] Alex: square 16"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 20,
+      "desc": "[M1 Turn 58] Alex: square 20"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 18,
+      "desc": "[M1 Turn 59] Jarad: square 18"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 59] Jarad: square 14"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 20,
+      "desc": "[M1 Turn 60] Alex: square 20"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 24,
+      "desc": "[M1 Turn 60] Alex: square 24"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "[Turn 60 Check] Assert Checkers Match #901 zero-drift convergence"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 61] Jarad: square 5"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 1,
+      "desc": "[M1 Turn 61] Jarad: square 1"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 24,
+      "desc": "[M1 Turn 62] Alex: square 24"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 29,
+      "desc": "[M1 Turn 62] Alex: square 29"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 1,
+      "desc": "[M1 Turn 63] Jarad: square 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 63] Jarad: square 5"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 29,
+      "desc": "[M1 Turn 64] Alex: square 29"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 64] Alex: square 25"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 65] Jarad: square 10"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 6,
+      "desc": "[M1 Turn 65] Jarad: square 6"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 66] Alex: square 25"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 66] Alex: square 22"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 6,
+      "desc": "[M1 Turn 67] Jarad: square 6"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 1,
+      "desc": "[M1 Turn 67] Jarad: square 1"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 23,
+      "desc": "[M1 Turn 68] Alex: square 23"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 26,
+      "desc": "[M1 Turn 68] Alex: square 26"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 14,
+      "desc": "[M1 Turn 69] Jarad: square 14"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 69] Jarad: square 10"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 26,
+      "desc": "[M1 Turn 70] Alex: square 26"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 30,
+      "desc": "[M1 Turn 70] Alex: square 30"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 71] Jarad: square 5"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 71] Jarad: square 8"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 72] Alex: square 22"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 72] Alex: square 17"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 73] Jarad: square 8"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 12,
+      "desc": "[M1 Turn 73] Jarad: square 12"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 74] Alex: square 17"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 74] Alex: square 8"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 12,
+      "desc": "[M1 Turn 75] Jarad: square 12"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 75] Jarad: square 5"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 76] Alex: square 21"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 76] Alex: square 25"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 77] Jarad: square 5"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 77] Jarad: square 8"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 78] Alex: square 25"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 29,
+      "desc": "[M1 Turn 78] Alex: square 29"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 1,
+      "desc": "[M1 Turn 79] Jarad: square 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 79] Jarad: square 5"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 29,
+      "desc": "[M1 Turn 80] Alex: square 29"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 80] Alex: square 25"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "[Turn 80 Check] Assert Checkers Match #901 zero-drift convergence"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 81] Jarad: square 8"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 81] Jarad: square 13"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 82] Alex: square 25"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 82] Alex: square 21"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 83] Jarad: square 5"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 83] Jarad: square 8"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 30,
+      "desc": "[M1 Turn 84] Alex: square 30"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 84] Alex: square 25"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 85] Jarad: square 10"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 6,
+      "desc": "[M1 Turn 85] Jarad: square 6"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 25,
+      "desc": "[M1 Turn 86] Alex: square 25"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 86] Alex: square 22"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 0,
+      "desc": "[M1 Turn 87] Jarad: square 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 5,
+      "desc": "[M1 Turn 87] Jarad: square 5"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 21,
+      "desc": "[M1 Turn 88] Alex: square 21"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 17,
+      "desc": "[M1 Turn 88] Alex: square 17"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 31,
+      "desc": "[M1 Turn 89] Jarad: square 31"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 26,
+      "desc": "[M1 Turn 89] Jarad: square 26"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 90] Alex: square 22"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 31,
+      "desc": "[M1 Turn 90] Alex: square 31"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 91] Jarad: square 13"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 91] Jarad: square 22"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 31,
+      "desc": "[M1 Turn 92] Alex: square 31"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 27,
+      "desc": "[M1 Turn 92] Alex: square 27"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 8,
+      "desc": "[M1 Turn 93] Jarad: square 8"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 13,
+      "desc": "[M1 Turn 93] Jarad: square 13"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 27,
+      "desc": "[M1 Turn 94] Alex: square 27"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 23,
+      "desc": "[M1 Turn 94] Alex: square 23"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 6,
+      "desc": "[M1 Turn 95] Jarad: square 6"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 1,
+      "desc": "[M1 Turn 95] Jarad: square 1"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 23,
+      "desc": "[M1 Turn 96] Alex: square 23"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 19,
+      "desc": "[M1 Turn 96] Alex: square 19"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 22,
+      "desc": "[M1 Turn 97] Jarad: square 22"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 18,
+      "desc": "[M1 Turn 97] Jarad: square 18"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 2,
+      "desc": "[M1 Turn 98] Alex: square 2"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 7,
+      "desc": "[M1 Turn 98] Alex: square 7"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 3,
+      "desc": "[M1 Turn 99] Jarad: square 3"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 99] Jarad: square 10"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 19,
+      "desc": "[M1 Turn 100] Alex: square 19"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-02:display:0",
+      "game": "checkers",
+      "id": 15,
+      "desc": "[M1 Turn 100] Alex: square 15"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 0"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "[Turn 100 Check] Assert Checkers Match #901 zero-drift convergence"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 10,
+      "desc": "[M1 Turn 101] Jarad: square 10"
+    },
+    {
+      "action": "clickSquare",
+      "targetVm": "appliance-01:display:0",
+      "game": "checkers",
+      "id": 19,
+      "desc": "[M1 Turn 101] Jarad: square 19"
+    },
+    {
+      "action": "wait",
+      "ms": 100,
+      "desc": "Wait for Checkers broker relay to Head 1"
+    },
+    {
+      "action": "assertHash",
+      "targetVm": "appliance-01:display:0",
+      "kind": "checkers",
+      "compareToVm": "appliance-02:display:0",
+      "desc": "Assert Checkers Match #901 terminal state parity (Black 0 pieces, Red victory)"
+    },
+    {
+      "action": "assert",
+      "targetVm": "appliance-01:display:0",
+      "desc": "Assert Checkers Match #901 winner is Red (winner === 1)",
+      "assertType": "checkers_winner",
+      "expected": 1
+    },
+    {
+      "action": "assert",
+      "targetVm": "appliance-02:display:0",
+      "desc": "Assert Checkers Match #901 remote peer confirms Red victory (winner === 1)",
+      "assertType": "checkers_winner",
+      "expected": 1
+    },
+    {
+      "action": "splitSnapshot",
+      "label": "Mission 9: Multi-Head Dual Terminal Decisive Victories (Checkers 101-Turn & Chess Checkmate)",
+      "desc": "Capture final 4-display 2×2 composite cockpit snapshot showing terminal checkmate and piece-elimination victories"
+    }
+  ]
+}

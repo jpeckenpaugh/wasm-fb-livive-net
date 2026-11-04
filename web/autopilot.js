@@ -64,6 +64,25 @@ export class AutoPilotRunner {
     }
 
     const t = String(targetVm).toLowerCase();
+
+    // Support Appliance:Display URIs:
+    // appliance-01:display:0 or appliance-01:0 -> Head 0
+    // appliance-02:display:0 or appliance-02:0 -> Head 1
+    // appliance-01:display:1 or appliance-01:1 -> Head 2
+    // appliance-03:display:0 or appliance-03:0 -> Head 3
+    if (t.includes('appliance-01:0') || t.includes('appliance-01:display:0') || t.includes('appliance-1:0')) {
+      return forBoot ? (guests[0] || null) : (guests[0] || null);
+    }
+    if (t.includes('appliance-02:0') || t.includes('appliance-02:display:0') || t.includes('appliance-2:0')) {
+      return forBoot ? (guests[1] || null) : (guests[1] || null);
+    }
+    if (t.includes('appliance-01:1') || t.includes('appliance-01:display:1') || t.includes('appliance-1:1')) {
+      return forBoot ? (guests[2] || null) : (guests[2] || null);
+    }
+    if (t.includes('appliance-03:0') || t.includes('appliance-03:display:0') || t.includes('appliance-3:0')) {
+      return forBoot ? (guests[3] || null) : (guests[3] || null);
+    }
+
     if (t === 'p1' || t === 'seat1' || t === 'seat-1' || t === 'vm-01' || t === 'vm1') {
       if (forBoot) {
         return guests[0] || null;
@@ -737,7 +756,7 @@ export class AutoPilotRunner {
         const p2Vm = peers.find((g) => g.mpSeat === 2) || (seat === 2 ? guest : null);
 
         const p1Seed = step.p1Seed || p1Vm?.identity?.seed || p1Vm?.identity?.name || (matchId === 802 ? 'Alex' : 'Jarad');
-        const p2Seed = step.p2Seed || p2Vm?.identity?.seed || p2Vm?.identity?.name || (matchId === 802 ? 'Minimax-4ply' : 'Minimax-2ply');
+        const p2Seed = step.p2Seed || p2Vm?.identity?.seed || p2Vm?.identity?.name || (matchId === 902 ? 'FlowBot777' : matchId === 802 ? 'Minimax-4ply' : 'Minimax-2ply');
 
         for (const peer of peers) {
           syncPlayerAvatarsToGuest(peer, p1Seed, p2Seed);
@@ -778,6 +797,10 @@ export class AutoPilotRunner {
               break;
             case 'checkers_turn':
               actualVal = exp?.app_checkers_turn ? exp.app_checkers_turn() : -1;
+              pass = actualVal === step.expected;
+              break;
+            case 'checkers_winner':
+              actualVal = exp?.app_checkers_winner ? exp.app_checkers_winner() : 0;
               pass = actualVal === step.expected;
               break;
             case 'checkers_ai_pending':

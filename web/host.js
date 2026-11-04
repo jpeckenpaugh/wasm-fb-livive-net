@@ -1287,8 +1287,19 @@ const buildPanelHtml = (vm) => {
 function computeActorForGuest(guest) {
   if (guest.actorType) {
     if (guest.actorType === 'autopilot') return { cls: 'autopilot', label: '✈️ AutoPilot' };
-    if (guest.actorType === 'minimax') return { cls: 'minimax', label: '🤖 Minimax' };
-    return { cls: 'human', label: '👤 Human' };
+    if (guest.actorType === 'minimax') {
+      const name = guest.identity?.name || 'FlowBot777';
+      return { cls: 'minimax', label: `🤖 ${name}` };
+    }
+    const name = guest.identity?.name || 'Human';
+    return { cls: 'human', label: `👤 ${name}` };
+  }
+  if (guest.identity?.name) {
+    const isRobot = guest.identity.type === 'robot';
+    return {
+      cls: isRobot ? 'minimax' : 'human',
+      label: `${isRobot ? '🤖' : '👤'} ${guest.identity.name}`,
+    };
   }
   if (typeof autoPilotRunner !== 'undefined' && autoPilotRunner.state === 'running') {
     return { cls: 'autopilot', label: '✈️ AutoPilot' };
@@ -1678,14 +1689,16 @@ async function createGuest(opts = {}) {
   const buildInfo = getBuildInfo(buildId);
   const fbBytes = width * height * 4;
   const id = nextId++;
+  const uri = opts.uri || opts.name || `vm-${String(id).padStart(2, '0')}`;
   const identity = opts.identity || {
-    name: opts.name || `User-${String(id).padStart(2, '0')}`,
+    name: opts.userName || opts.name || `User-${String(id).padStart(2, '0')}`,
     seed: opts.seed || (id === 1 ? 'Jarad' : id === 3 ? 'Alex' : opts.name || `User-${String(id).padStart(2, '0')}`),
     type: opts.actorType === 'minimax' ? 'robot' : 'human',
   };
   const vm = {
     id,
-    name: opts.name || `vm-${String(id).padStart(2, '0')}`,
+    name: uri,
+    uri,
     identity,
     actorType: opts.actorType || null,
     buildId: buildInfo.id,

@@ -577,6 +577,8 @@ pub fn draw_window(
     anim_tick: u32,
     p1_avatar: Option<&[u32]>,
     p2_avatar: Option<&[u32]>,
+    p1_name: Option<&str>,
+    p2_name: Option<&str>,
 ) {
     fb.clear(t::BG);
     let g = chess_geom(fb.w, fb.h);
@@ -850,6 +852,7 @@ pub fn draw_window(
     };
 
     // Column 1: White Player Card
+    let white_label = p1_name.unwrap_or("WHITE");
     fb.fill(g.info_x, score_y, col_w, header_h, rgb(0x45, 0x1a, 0x03));
     fb.border(g.info_x, score_y, col_w, header_h, 1, rgb(0xb4, 0x53, 0x09));
     let text_x1 = if let Some(avatar) = p1_avatar {
@@ -865,10 +868,12 @@ pub fn draw_window(
     } else {
         g.info_x + 6
     };
-    draw_str(fb, text_x1, score_y + 4, "WHITE", if compact_info { 1 } else { 2 }, rgb(0xfd, 0xba, 0x74));
+    draw_str(fb, text_x1, score_y + 4, white_label, if compact_info { 1 } else { 2 }, rgb(0xfd, 0xba, 0x74));
 
     // Column 2: Black Player Card
-    let blk_hdr = if app.mode == ChessMode::VsAi {
+    let blk_hdr = if let Some(name) = p2_name {
+        name
+    } else if app.mode == ChessMode::VsAi {
         "BLACK (AI)"
     } else {
         "BLACK"

@@ -58,5 +58,11 @@
     "name": "Mission 8: Checkers Quad-VM Minimax Duels (2-Ply vs 4-Ply & 2-Ply vs 6-Ply)",
     "description": "Concurrent dual-match exhibition across 4 isolated VMs in a 2×2 VGA grid: Match #1 (vm-01 4-Ply vs vm-02 2-Ply) and Match #2 (vm-03 6-Ply vs vm-04 2-Ply) progressing over broker relay with zero-drift state convergence",
     "file": "checkers-quad-minimax-duels.json"
+  },
+  {
+    "id": "multi-display-cockpit",
+    "name": "Mission 9: Multi-Head Appliance Cockpit (3 Appliances, 4 Displays, 2 Full Endgames)",
+    "description": "Concurrent dual-match exhibition to full completion across 4 displays: Checkers Match #901 (Jarad vs Alex) progresses through 101 turns to terminal piece elimination, while Chess Match #902 (Jarad vs FlowBot777) reaches decisive checkmate victory, synchronized across broker relay",
+    "file": "multi-display-cockpit.json"
   }
 ]

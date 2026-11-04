@@ -11,6 +11,7 @@ const MISSION_FILES = [
   'mines-2p-turn-relay',
   'checkers-2p-minimax-duel',
   'checkers-quad-minimax-duels',
+  'multi-display-cockpit',
 ];
 
 export let MISSIONS = [];
