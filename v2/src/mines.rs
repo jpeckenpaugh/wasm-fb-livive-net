@@ -38,10 +38,6 @@ pub struct MinesApp {
     pub tx_pending: bool,
     pub tx_action: u8,
     pub tx_cell: u8,
-    pub p1_avatar: [u32; 256],
-    pub p2_avatar: [u32; 256],
-    pub has_p1_avatar: bool,
-    pub has_p2_avatar: bool,
 }
 
 impl MinesApp {
@@ -50,9 +46,9 @@ impl MinesApp {
             board: BoardState {
                 seed: DEFAULT_SEED,
                 num_bombs: DEFAULT_BOMBS,
+                rules: Rules { max_strikes: 1 },
                 move_count: 0,
                 strikes: 0,
-                rules: Rules { max_strikes: 1 },
                 mine_mask: 0,
                 adj_counts: [0; 64],
                 revealed_mask: 0,
@@ -73,10 +69,6 @@ impl MinesApp {
             tx_pending: false,
             tx_action: 0,
             tx_cell: 0,
-            p1_avatar: [0; 256],
-            p2_avatar: [0; 256],
-            has_p1_avatar: false,
-            has_p2_avatar: false,
         }
     }
 
@@ -394,7 +386,13 @@ pub fn mines_geom(client_w: i32, client_h: i32) -> MinesGeom {
     }
 }
 
-pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
+pub fn draw_window(
+    fb: &mut Framebuffer,
+    app: &MinesApp,
+    anim_tick: u32,
+    p1_avatar: Option<&[u32]>,
+    p2_avatar: Option<&[u32]>,
+) {
     fb.clear(t::BG);
     let g = mines_geom(fb.w, fb.h);
     let b = &app.board;
@@ -525,11 +523,25 @@ pub fn draw_window(fb: &mut Framebuffer, app: &MinesApp) {
         let mut score_buf = [b' '; 32];
         let score_str = f::mp_score_str(&mut score_buf, app.p1_score, app.p2_score);
         ui::kv_row(fb, row(y), "Score", score_str, row_sc, label_col, t::ACCENT);
-        if app.has_p1_avatar {
-            fb.blit(g.info_x + 52, y + (step_y - 16) / 2, &app.p1_avatar, 16, 16);
+        if let Some(avatar) = p1_avatar {
+            let frame = match (anim_tick / 2) % 15 {
+                12 => 1, // blink
+                14 => 2, // shift
+                _ => 0,  // rest
+            };
+            let frame_offset = (frame as usize) * 16384;
+            let avatar_slice = &avatar[frame_offset..frame_offset + 16384];
+            fb.blit_scaled(g.info_x + 52, y + (step_y - 16) / 2, 16, 16, avatar_slice, 128, 128);
         }
-        if app.has_p2_avatar {
-            fb.blit(g.info_x + g.info_w - 20, y + (step_y - 16) / 2, &app.p2_avatar, 16, 16);
+        if let Some(avatar) = p2_avatar {
+            let frame = match ((anim_tick + 7) / 2) % 15 {
+                12 => 1, // blink (staggered offset)
+                14 => 2, // shift
+                _ => 0,  // rest
+            };
+            let frame_offset = (frame as usize) * 16384;
+            let avatar_slice = &avatar[frame_offset..frame_offset + 16384];
+            fb.blit_scaled(g.info_x + g.info_w - 20, y + (step_y - 16) / 2, 16, 16, avatar_slice, 128, 128);
         }
         y += step_y;
     }

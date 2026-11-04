@@ -52,10 +52,6 @@ pub struct CheckersApp {
     pub tx_action: u8,
     pub tx_lo: u32,
     pub tx_hi: u32,
-    pub p1_avatar: [u32; 256],
-    pub p2_avatar: [u32; 256],
-    pub has_p1_avatar: bool,
-    pub has_p2_avatar: bool,
 }
 
 impl CheckersApp {
@@ -81,10 +77,6 @@ impl CheckersApp {
             tx_action: TX_NONE,
             tx_lo: 0,
             tx_hi: 0,
-            p1_avatar: [0; 256],
-            p2_avatar: [0; 256],
-            has_p1_avatar: false,
-            has_p2_avatar: false,
         }
     }
 
@@ -641,7 +633,13 @@ fn draw_target_ring(fb: &mut Framebuffer, cx: i32, cy: i32, radius: i32, color: 
     }
 }
 
-pub fn draw_window(fb: &mut Framebuffer, app: &CheckersApp) {
+pub fn draw_window(
+    fb: &mut Framebuffer,
+    app: &CheckersApp,
+    anim_tick: u32,
+    p1_avatar: Option<&[u32]>,
+    p2_avatar: Option<&[u32]>,
+) {
     fb.clear(t::BG);
     let g = checkers_geom(fb.w, fb.h);
     let s = &app.state;
@@ -877,29 +875,53 @@ pub fn draw_window(fb: &mut Framebuffer, app: &CheckersApp) {
     let score_y = turn_pill_y + turn_pill_h + 8;
     let col_w = (g.info_w - 6) / 2;
     let col2_x = g.info_x + col_w + 6;
+    let (avatar_sz, header_h) = if compact_info {
+        (32, 32)
+    } else {
+        (64, 64)
+    };
 
     // Column 1: Red Header
-    fb.fill(g.info_x, score_y, col_w, 16, rgb(0x3b, 0x07, 0x12));
-    if app.has_p1_avatar {
-        fb.blit(g.info_x, score_y, &app.p1_avatar, 16, 16);
-        draw_str(fb, g.info_x + 20, score_y + 3, "RED", 1, rgb(0xfb, 0x71, 0x85));
+    fb.fill(g.info_x, score_y, col_w, header_h, rgb(0x3b, 0x07, 0x12));
+    fb.border(g.info_x, score_y, col_w, header_h, 1, rgb(0x9f, 0x12, 0x39));
+    let text_x1 = if let Some(avatar) = p1_avatar {
+        // 3-frame animated avatar flipbook (Frame 0: rest, 1: blink, 2: shift/bob)
+        let frame = match (anim_tick / 2) % 15 {
+            12 => 1, // blink
+            14 => 2, // shift
+            _ => 0,  // rest
+        };
+        let frame_offset = (frame as usize) * 16384;
+        let avatar_slice = &avatar[frame_offset..frame_offset + 16384];
+        fb.blit_scaled(g.info_x, score_y, avatar_sz, avatar_sz, avatar_slice, 128, 128);
+        g.info_x + avatar_sz + 8
     } else {
-        draw_str(fb, g.info_x + 4, score_y + 3, "RED", 1, rgb(0xfb, 0x71, 0x85));
-    }
+        g.info_x + 6
+    };
+    draw_str(fb, text_x1, score_y + 4, "RED", if compact_info { 1 } else { 2 }, rgb(0xfb, 0x71, 0x85));
 
     // Column 2: Black Header
     let blk_hdr_label = if app.mode == CheckersMode::VsAi { "BLACK (AI)" } else { "BLACK" };
-    fb.fill(col2_x, score_y, col_w, 16, rgb(0x0a, 0x1e, 0x2f));
-    if app.has_p2_avatar {
-        fb.blit(col2_x, score_y, &app.p2_avatar, 16, 16);
-        draw_str(fb, col2_x + 20, score_y + 3, blk_hdr_label, 1, rgb(0x38, 0xbd, 0xf8));
+    fb.fill(col2_x, score_y, col_w, header_h, rgb(0x0a, 0x1e, 0x2f));
+    fb.border(col2_x, score_y, col_w, header_h, 1, rgb(0x02, 0x84, 0xc7));
+    let text_x2 = if let Some(avatar) = p2_avatar {
+        let frame = match ((anim_tick + 7) / 2) % 15 {
+            12 => 1, // blink (staggered offset)
+            14 => 2, // shift
+            _ => 0,  // rest
+        };
+        let frame_offset = (frame as usize) * 16384;
+        let avatar_slice = &avatar[frame_offset..frame_offset + 16384];
+        fb.blit_scaled(col2_x, score_y, avatar_sz, avatar_sz, avatar_slice, 128, 128);
+        col2_x + avatar_sz + 8
     } else {
-        draw_str(fb, col2_x + 4, score_y + 3, blk_hdr_label, 1, rgb(0x38, 0xbd, 0xf8));
-    }
+        col2_x + 6
+    };
+    draw_str(fb, text_x2, score_y + 4, blk_hdr_label, 1, rgb(0x38, 0xbd, 0xf8));
 
     // Row: Discs & Kings count
     let mut num_buf = [0u8; 32];
-    let row1_y = score_y + 19;
+    let row1_y = score_y + header_h + 6;
     
     // Red stats: "D: {red_cnt}  K: {red_kings}"
     let r_discs_str = f::checkers_pieces_str(&mut num_buf, red_cnt, red_kings);

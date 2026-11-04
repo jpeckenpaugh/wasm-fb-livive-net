@@ -1961,7 +1961,7 @@ async function createGuest(opts = {}) {
       true,
     );
     pumpClock();
-    syncPlayerAvatarsToGuest(vm, 'tester-01', 'tester-02');
+    syncPlayerAvatarsToGuest(vm, 'tester-01', 'Felix');
     initWebForGuest(vm).catch((error) => console.error(error));
     return vm;
   } catch (error) {

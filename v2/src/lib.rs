@@ -50,6 +50,10 @@ struct GuestMemory {
     #[cfg(not(target_arch = "wasm32"))]
     context_staging: UnsafeCell<[u8; MAX_CONTEXT_BYTES]>,
     name_scratch: UnsafeCell<[u8; 64]>,
+    p1_avatar: UnsafeCell<[u32; 49152]>,
+    p2_avatar: UnsafeCell<[u32; 49152]>,
+    has_p1_avatar: UnsafeCell<bool>,
+    has_p2_avatar: UnsafeCell<bool>,
     wm: UnsafeCell<WmState>,
 }
 
@@ -71,6 +75,10 @@ static GUEST: GuestMemory = GuestMemory {
     #[cfg(not(target_arch = "wasm32"))]
     context_staging: UnsafeCell::new([0; MAX_CONTEXT_BYTES]),
     name_scratch: UnsafeCell::new([0; 64]),
+    p1_avatar: UnsafeCell::new([0; 49152]),
+    p2_avatar: UnsafeCell::new([0; 49152]),
+    has_p1_avatar: UnsafeCell::new(false),
+    has_p2_avatar: UnsafeCell::new(false),
     wm: UnsafeCell::new(WmState::new()),
 };
 
@@ -177,6 +185,23 @@ fn with_state<R>(f: impl FnOnce(&mut WmState, &mut Framebuffer, &[u32], &[u8], &
     }
 }
 
+#[inline]
+fn wm_render(wm: &mut WmState, fb: &mut Framebuffer, st: &[u32], txt: &[u8], ctx: &[u8]) {
+    unsafe {
+        let p1 = if *GUEST.has_p1_avatar.get() {
+            Some((*GUEST.p1_avatar.get()).as_slice())
+        } else {
+            None
+        };
+        let p2 = if *GUEST.has_p2_avatar.get() {
+            Some((*GUEST.p2_avatar.get()).as_slice())
+        } else {
+            None
+        };
+        wm.render(fb, st, txt, ctx, p1, p2);
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn app_init(width: i32, height: i32) -> i32 {
     let mut w = if width <= 0 || width > MAX_DIM {
@@ -200,7 +225,7 @@ pub extern "C" fn app_init(width: i32, height: i32) -> i32 {
     }
     with_state(|wm, fb, st, txt, ctx| {
         wm.init(w, h, wm.session_id);
-        wm.render(fb, st, txt, ctx);
+        wm_render(wm, fb, st, txt, ctx);
         1
     })
 }
@@ -210,7 +235,7 @@ pub extern "C" fn app_set_session(session_id: u32) {
     with_state(|wm, fb, st, txt, ctx| {
         wm.session_id = if session_id > 0 { session_id } else { 1 };
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -218,7 +243,7 @@ pub extern "C" fn app_set_session(session_id: u32) {
 #[no_mangle]
 pub extern "C" fn app_render() {
     with_state(|wm, fb, st, txt, ctx| {
-        wm.render(fb, st, txt, ctx);
+        wm_render(wm, fb, st, txt, ctx);
     });
 }
 
@@ -227,7 +252,7 @@ pub extern "C" fn app_click(x: i32, y: i32) -> i32 {
     with_state(|wm, fb, st, txt, ctx| {
         let rc = wm.click(x, y);
         if rc.is_changed() {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
         rc.to_i32()
     })
@@ -248,7 +273,7 @@ pub extern "C" fn app_key_mods(key: i32, mods: i32) -> i32 {
     with_state(|wm, fb, st, txt, ctx| {
         let rc = wm.key(key, mods);
         if rc.is_changed() {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
         rc.to_i32()
     })
@@ -259,7 +284,7 @@ pub extern "C" fn app_pointer_move(x: i32, y: i32) -> i32 {
     with_state(|wm, fb, st, txt, ctx| {
         let rc = wm.pointer_move(x, y);
         if rc.is_changed() {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
         rc.to_i32()
     })
@@ -270,7 +295,7 @@ pub extern "C" fn app_pointer_leave() -> i32 {
     with_state(|wm, fb, st, txt, ctx| {
         let rc = wm.pointer_leave();
         if rc.is_changed() {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
         rc.to_i32()
     })
@@ -367,7 +392,8 @@ pub extern "C" fn app_tick() -> i32 {
         if !wm.ready || wm.test_pattern {
             return 0;
         }
-        wm.render(fb, st, txt, ctx);
+        wm.anim_tick = wm.anim_tick.wrapping_add(1);
+        wm_render(wm, fb, st, txt, ctx);
         1
     })
 }
@@ -377,7 +403,7 @@ pub extern "C" fn app_record_snapshot() -> u32 {
     with_state(|wm, fb, st, txt, ctx| {
         wm.snapshot_seq = wm.snapshot_seq.wrapping_add(1);
         wm.system.snapshots_taken = wm.snapshot_seq;
-        wm.render(fb, st, txt, ctx);
+        wm_render(wm, fb, st, txt, ctx);
         fb.fnv1a_32()
     })
 }
@@ -414,7 +440,7 @@ pub extern "C" fn app_mount_update_size(idx: i32, byte_size: u32) -> i32 {
         }
         wm.files.entries[idx as usize].byte_size = byte_size;
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
         0
     })
@@ -427,7 +453,7 @@ pub extern "C" fn app_mount_commit_error(idx: i32, code: i32) {
     with_state(|wm, fb, st, txt, ctx| {
         wm.files.complete_error(idx, code);
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -443,7 +469,7 @@ pub extern "C" fn app_web_commit_meta(byte_len: usize) {
     with_state(|wm, fb, st, txt, ctx| {
         wm.files.complete_web_meta(byte_len);
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -499,7 +525,7 @@ pub extern "C" fn app_mount_commit_rgba(idx: i32, w: i32, h: i32) {
         let clamped_h = h.clamp(0, wm.height);
         wm.files.complete_stage(idx, clamped_w, clamped_h);
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -511,7 +537,7 @@ pub extern "C" fn app_mount_commit_text(idx: i32, byte_len: usize) {
     with_state(|wm, fb, st, txt, ctx| {
         wm.files.complete_stage_text(idx, byte_len);
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -523,7 +549,7 @@ pub extern "C" fn app_mount_commit_context(idx: i32, byte_len: usize) {
     with_state(|wm, fb, st, txt, ctx| {
         wm.files.complete_stage_context(idx, byte_len);
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -849,7 +875,7 @@ pub extern "C" fn app_semantic_coord(kind: u32, id: u32) -> u32 {
 pub extern "C" fn app_set_test_pattern(enabled: i32) {
     with_state(|wm, fb, st, txt, ctx| {
         wm.test_pattern = enabled != 0;
-        wm.render(fb, st, txt, ctx);
+        wm_render(wm, fb, st, txt, ctx);
     });
 }
 
@@ -863,7 +889,7 @@ pub extern "C" fn app_tts_set_active(active: i32) {
     with_state(|wm, fb, st, txt, ctx| {
         wm.files.tts_active = active != 0;
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -889,7 +915,7 @@ pub extern "C" fn app_mines_set_mp(
         wm.active_app = AppSlot::Mines;
         wm.focus = wm::Focus::Client;
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -967,7 +993,7 @@ pub extern "C" fn app_mines_apply_rx(
             wm.mines.mp_seq = seq;
             wm.mines.tx_pending = false;
             if wm.ready {
-                wm.render(fb, st, txt, ctx);
+                wm_render(wm, fb, st, txt, ctx);
             }
             return 1;
         }
@@ -984,7 +1010,7 @@ pub extern "C" fn app_mines_apply_rx(
             wm.mines.mp_seq = seq;
             wm.mines.tx_pending = false;
             if wm.ready {
-                wm.render(fb, st, txt, ctx);
+                wm_render(wm, fb, st, txt, ctx);
             }
             return 1;
         }
@@ -1006,7 +1032,7 @@ pub extern "C" fn app_checkers_set_mp(enabled: i32, match_id: u32, seat: i32, di
         wm.active_app = AppSlot::Checkers;
         wm.focus = wm::Focus::Client;
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -1021,7 +1047,7 @@ pub extern "C" fn app_checkers_step_ai() -> i32 {
     with_state(|wm, fb, st, txt, ctx| {
         if wm.checkers.step_ai() {
             if wm.ready {
-                wm.render(fb, st, txt, ctx);
+                wm_render(wm, fb, st, txt, ctx);
             }
             1
         } else {
@@ -1066,7 +1092,7 @@ pub extern "C" fn app_checkers_apply_rx(
             hi,
         );
         if ok && wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
         i32::from(ok)
     })
@@ -1102,6 +1128,17 @@ pub extern "C" fn app_checkers_black_count() -> i32 {
     unsafe { (*GUEST.wm.get()).checkers.state.piece_counts().1 as i32 }
 }
 
+#[no_mangle]
+pub extern "C" fn app_checkers_is_vs_ai() -> i32 {
+    unsafe {
+        if (*GUEST.wm.get()).checkers.mode == checkers::CheckersMode::VsAi {
+            1
+        } else {
+            0
+        }
+    }
+}
+
 // --- Chess AI & 2-Player Match Broker Host Mailbox ABI ---
 
 #[no_mangle]
@@ -1116,7 +1153,7 @@ pub extern "C" fn app_chess_set_mp(enabled: i32, match_id: u32, seat: i32, diffi
         wm.active_app = AppSlot::Chess;
         wm.focus = wm::Focus::Client;
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
     });
 }
@@ -1155,6 +1192,17 @@ pub extern "C" fn app_chess_state_hash() -> u32 {
 }
 
 #[no_mangle]
+pub extern "C" fn app_chess_is_vs_ai() -> i32 {
+    unsafe {
+        if (*GUEST.wm.get()).chess.mode == chess::ChessMode::VsAi {
+            1
+        } else {
+            0
+        }
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn app_chess_tx_pending() -> i32 {
     unsafe { i32::from((*GUEST.wm.get()).chess.tx_pending) }
 }
@@ -1183,7 +1231,7 @@ pub extern "C" fn app_chess_apply_rx(
             promo.clamp(0, 7) as u8,
         );
         if ok && wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
         i32::from(ok)
     })
@@ -1199,7 +1247,7 @@ pub extern "C" fn app_chess_step_ai() -> i32 {
     with_state(|wm, fb, st, txt, ctx| {
         if wm.chess.step_ai() {
             if wm.ready {
-                wm.render(fb, st, txt, ctx);
+                wm_render(wm, fb, st, txt, ctx);
             }
             1
         } else {
@@ -1208,7 +1256,7 @@ pub extern "C" fn app_chess_step_ai() -> i32 {
     })
 }
 
-// --- Player DiceBear Avatar ABI (16x16 RGBA) ---
+// --- Player DiceBear Avatar ABI (128x128 3-frame animated sprite strip RGBA) ---
 
 #[no_mangle]
 pub extern "C" fn app_avatar_staging_ptr() -> *mut u8 {
@@ -1217,30 +1265,68 @@ pub extern "C" fn app_avatar_staging_ptr() -> *mut u8 {
 
 #[no_mangle]
 pub extern "C" fn app_set_player_avatar(seat: i32, w: i32, h: i32) -> i32 {
-    if w != 16 || h != 16 {
+    let frame_count = if w == 384 && h == 128 {
+        3
+    } else if w == 128 && h == 128 {
+        1
+    } else if w == 16 && h == 16 {
+        1
+    } else {
         return 0;
-    }
+    };
+
     with_state(|wm, fb, st, txt, ctx| {
-        let pixels = &st[..256];
-        if seat == 1 {
-            wm.checkers.p1_avatar.copy_from_slice(pixels);
-            wm.checkers.has_p1_avatar = true;
-            wm.chess.p1_avatar.copy_from_slice(pixels);
-            wm.chess.has_p1_avatar = true;
-            wm.mines.p1_avatar.copy_from_slice(pixels);
-            wm.mines.has_p1_avatar = true;
-        } else if seat == 2 {
-            wm.checkers.p2_avatar.copy_from_slice(pixels);
-            wm.checkers.has_p2_avatar = true;
-            wm.chess.p2_avatar.copy_from_slice(pixels);
-            wm.chess.has_p2_avatar = true;
-            wm.mines.p2_avatar.copy_from_slice(pixels);
-            wm.mines.has_p2_avatar = true;
-        } else {
-            return 0;
+        let total_pixels = (w * h) as usize;
+        let incoming = &st[..total_pixels.min(st.len())];
+
+        let (target_buf, target_flag) = unsafe {
+            match seat {
+                1 => (&mut *GUEST.p1_avatar.get(), &mut *GUEST.has_p1_avatar.get()),
+                2 => (&mut *GUEST.p2_avatar.get(), &mut *GUEST.has_p2_avatar.get()),
+                _ => return 0,
+            }
+        };
+
+        if frame_count == 3 {
+            // Full 384x128 strip (3 frames of 128x128 side-by-side)
+            // Rearrange from row-stride 384 into 3 contiguous 128x128 frames (16384 px each)
+            let mut packed = [0u32; 49152];
+            for row in 0..128 {
+                for f in 0..3 {
+                    let src_idx = row * 384 + f * 128;
+                    let dst_idx = f * 16384 + row * 128;
+                    packed[dst_idx..dst_idx + 128].copy_from_slice(&incoming[src_idx..src_idx + 128]);
+                }
+            }
+            target_buf.copy_from_slice(&packed);
+            *target_flag = true;
+        } else if w == 128 && h == 128 {
+            // Single 128x128 static frame -> copy into frame 0, 1, 2
+            let mut packed = [0u32; 49152];
+            packed[..16384].copy_from_slice(&incoming[..16384]);
+            packed[16384..32768].copy_from_slice(&incoming[..16384]);
+            packed[32768..49152].copy_from_slice(&incoming[..16384]);
+            target_buf.copy_from_slice(&packed);
+            *target_flag = true;
+        } else if w == 16 && h == 16 {
+            // Backward compatibility with legacy 16x16: upscale 8x into 128x128
+            let mut packed = [0u32; 49152];
+            for r in 0..128 {
+                let sr = r / 8;
+                for c in 0..128 {
+                    let sc = c / 8;
+                    let px = incoming[sr * 16 + sc];
+                    packed[r * 128 + c] = px;
+                    packed[16384 + r * 128 + c] = px;
+                    packed[32768 + r * 128 + c] = px;
+                }
+            }
+            target_buf.copy_from_slice(&packed);
+            *target_flag = true;
         }
+
         if wm.ready {
-            wm.render(fb, st, txt, ctx);
+            wm_render(wm, fb, st, txt, ctx);
         }
         1
     })

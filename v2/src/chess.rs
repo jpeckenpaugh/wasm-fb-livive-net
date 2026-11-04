@@ -53,10 +53,6 @@ pub struct ChessApp {
     pub tx_from: u8,
     pub tx_to: u8,
     pub tx_promo: u8,
-    pub p1_avatar: [u32; 256],
-    pub p2_avatar: [u32; 256],
-    pub has_p1_avatar: bool,
-    pub has_p2_avatar: bool,
 }
 
 impl ChessApp {
@@ -80,10 +76,6 @@ impl ChessApp {
             tx_from: 0,
             tx_to: 0,
             tx_promo: 0,
-            p1_avatar: [0; 256],
-            p2_avatar: [0; 256],
-            has_p1_avatar: false,
-            has_p2_avatar: false,
         }
     }
 
@@ -579,7 +571,13 @@ fn piece_to_icon(piece: u8) -> Option<Icon> {
     }
 }
 
-pub fn draw_window(fb: &mut Framebuffer, app: &ChessApp) {
+pub fn draw_window(
+    fb: &mut Framebuffer,
+    app: &ChessApp,
+    anim_tick: u32,
+    p1_avatar: Option<&[u32]>,
+    p2_avatar: Option<&[u32]>,
+) {
     fb.clear(t::BG);
     let g = chess_geom(fb.w, fb.h);
     let s = &app.state;
@@ -841,34 +839,59 @@ pub fn draw_window(fb: &mut Framebuffer, app: &ChessApp) {
         ban_text_col,
     );
 
-    // Captured pieces tally / Mini piece icons
+    // 2-Column Player Avatar & Captured Pieces Scoreboard
     let score_y = banner_y + banner_h + 8;
     let col_w = (g.info_w - 6) / 2;
     let col2_x = g.info_x + col_w + 6;
-
-    fb.fill(g.info_x, score_y, col_w, 16, rgb(0x45, 0x1a, 0x03));
-    if app.has_p1_avatar {
-        fb.blit(g.info_x, score_y, &app.p1_avatar, 16, 16);
-        draw_str(fb, g.info_x + 20, score_y + 3, "WHITE", 1, rgb(0xfd, 0xba, 0x74));
+    let (avatar_sz, header_h) = if compact_info {
+        (32, 32)
     } else {
-        draw_str(fb, g.info_x + 4, score_y + 3, "WHITE", 1, rgb(0xfd, 0xba, 0x74));
-    }
+        (64, 64)
+    };
 
+    // Column 1: White Player Card
+    fb.fill(g.info_x, score_y, col_w, header_h, rgb(0x45, 0x1a, 0x03));
+    fb.border(g.info_x, score_y, col_w, header_h, 1, rgb(0xb4, 0x53, 0x09));
+    let text_x1 = if let Some(avatar) = p1_avatar {
+        let frame = match (anim_tick / 2) % 15 {
+            12 => 1, // blink
+            14 => 2, // shift
+            _ => 0,  // rest
+        };
+        let frame_offset = (frame as usize) * 16384;
+        let avatar_slice = &avatar[frame_offset..frame_offset + 16384];
+        fb.blit_scaled(g.info_x, score_y, avatar_sz, avatar_sz, avatar_slice, 128, 128);
+        g.info_x + avatar_sz + 8
+    } else {
+        g.info_x + 6
+    };
+    draw_str(fb, text_x1, score_y + 4, "WHITE", if compact_info { 1 } else { 2 }, rgb(0xfd, 0xba, 0x74));
+
+    // Column 2: Black Player Card
     let blk_hdr = if app.mode == ChessMode::VsAi {
         "BLACK (AI)"
     } else {
         "BLACK"
     };
-    fb.fill(col2_x, score_y, col_w, 16, rgb(0x0a, 0x1e, 0x2f));
-    if app.has_p2_avatar {
-        fb.blit(col2_x, score_y, &app.p2_avatar, 16, 16);
-        draw_str(fb, col2_x + 20, score_y + 3, blk_hdr, 1, rgb(0x38, 0xbd, 0xf8));
+    fb.fill(col2_x, score_y, col_w, header_h, rgb(0x0a, 0x1e, 0x2f));
+    fb.border(col2_x, score_y, col_w, header_h, 1, rgb(0x02, 0x84, 0xc7));
+    let text_x2 = if let Some(avatar) = p2_avatar {
+        let frame = match ((anim_tick + 7) / 2) % 15 {
+            12 => 1, // blink (staggered offset)
+            14 => 2, // shift
+            _ => 0,  // rest
+        };
+        let frame_offset = (frame as usize) * 16384;
+        let avatar_slice = &avatar[frame_offset..frame_offset + 16384];
+        fb.blit_scaled(col2_x, score_y, avatar_sz, avatar_sz, avatar_slice, 128, 128);
+        col2_x + avatar_sz + 8
     } else {
-        draw_str(fb, col2_x + 4, score_y + 3, blk_hdr, 1, rgb(0x38, 0xbd, 0xf8));
-    }
+        col2_x + 6
+    };
+    draw_str(fb, text_x2, score_y + 4, blk_hdr, 1, rgb(0x38, 0xbd, 0xf8));
 
     let (w_count, b_count) = app.piece_counts();
-    let row1_y = score_y + 19;
+    let row1_y = score_y + header_h + 6;
 
     let mut w_buf = [0u8; 8];
     let mut b_buf = [0u8; 8];

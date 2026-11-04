@@ -1,0 +1,158 @@
+{
+  "id": "chess-checkmate-4-moves",
+  "name": "Chess - Checkmate in 4 Moves (vs AI Easy 2-Ply)",
+  "description": "Rapid Scholar's Mate checkmate against 2-ply Easy Minimax AI in 4 moves.",
+  "steps": [
+    {
+      "action": "boot",
+      "opts": {
+        "width": 1280,
+        "height": 720
+      },
+      "desc": "Boot guest VM at 1280×720"
+    },
+    {
+      "action": "click",
+      "x": 18,
+      "y": 18,
+      "desc": "[Action 1] Click at (18, 18)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 1964026359,
+      "desc": "[Verify 1] Assert FNV-1a hash matches 0x7510a9f7"
+    },
+    {
+      "action": "click",
+      "x": 115,
+      "y": 468,
+      "desc": "[Action 2] Click at (115, 468)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 3076578122,
+      "desc": "[Verify 2] Assert FNV-1a hash matches 0xb760db4a"
+    },
+    {
+      "action": "click",
+      "x": 912,
+      "y": 610,
+      "desc": "[Action 3] Click at (912, 610)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 1299500768,
+      "desc": "[Verify 3] Assert FNV-1a hash matches 0x4d74cee0"
+    },
+    {
+      "action": "click",
+      "x": 912,
+      "y": 610,
+      "desc": "[Action 4] Click at (912, 610)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 483922943,
+      "desc": "[Verify 4] Assert FNV-1a hash matches 0x1cd813ff"
+    },
+    {
+      "action": "click",
+      "x": 452,
+      "y": 559,
+      "desc": "[Action 5] Click at (452, 559)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 1944403077,
+      "desc": "[Verify 5] Assert FNV-1a hash matches 0x73e53c85"
+    },
+    {
+      "action": "click",
+      "x": 474,
+      "y": 400,
+      "desc": "[Action 6] Click at (474, 400)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 3977079412,
+      "desc": "[Verify 6] Assert FNV-1a hash matches 0xed0d6a74"
+    },
+    {
+      "action": "click",
+      "x": 402,
+      "y": 650,
+      "desc": "[Action 7] Click at (402, 650)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 2324492830,
+      "desc": "[Verify 7] Assert FNV-1a hash matches 0x8a8cf21e"
+    },
+    {
+      "action": "click",
+      "x": 549,
+      "y": 488,
+      "desc": "[Action 8] Click at (549, 488)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 2272343678,
+      "desc": "[Verify 8] Assert FNV-1a hash matches 0x8771367e"
+    },
+    {
+      "action": "click",
+      "x": 546,
+      "y": 651,
+      "desc": "[Action 9] Click at (546, 651)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 452264154,
+      "desc": "[Verify 9] Assert FNV-1a hash matches 0x1af500da"
+    },
+    {
+      "action": "click",
+      "x": 332,
+      "y": 414,
+      "desc": "[Action 10] Click at (332, 414)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 3441950264,
+      "desc": "[Verify 10] Assert FNV-1a hash matches 0xcd27fe38"
+    },
+    {
+      "action": "click",
+      "x": 559,
+      "y": 481,
+      "desc": "[Action 11] Click at (559, 481)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 1356838040,
+      "desc": "[Verify 11] Assert FNV-1a hash matches 0x50dfb498"
+    },
+    {
+      "action": "click",
+      "x": 541,
+      "y": 187,
+      "desc": "[Action 12] Click at (541, 187)"
+    },
+    {
+      "action": "assertHash",
+      "expectedHash": 1950993100,
+      "desc": "[Verify 12] Assert FNV-1a hash matches 0x7449cacc"
+    },
+    {
+      "action": "assert",
+      "desc": "Assert GameStatus is Checkmate (app_chess_status() === 2)",
+      "assertType": "chess_status",
+      "expected": 2
+    },
+    {
+      "action": "snapshot",
+      "label": "Chess - Checkmate Victory in 4 Moves",
+      "desc": "Capture victory snapshot with terminal Checkmate"
+    }
+  ]
+}

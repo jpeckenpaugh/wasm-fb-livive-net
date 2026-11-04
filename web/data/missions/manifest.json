@@ -18,10 +18,22 @@
     "file": "chess-checkers-opening.json"
   },
   {
+    "id": "chess-checkmate-4-moves",
+    "name": "Chess - Checkmate in 4 Moves (vs AI Easy 2-Ply)",
+    "description": "Rapid Scholar's Mate checkmate against 2-ply Easy Minimax AI in 4 moves",
+    "file": "chess-checkmate-4-moves.json"
+  },
+  {
     "id": "chess-checkmate-6-moves",
     "name": "Chess - Checkmate in 6 Moves (vs AI)",
     "description": "Execute Scholar's Mate / Accelerated Queen attack against Chess Minimax AI to achieve checkmate in 6 half-moves",
     "file": "chess-checkmate-6-moves.json"
+  },
+  {
+    "id": "chess-checkmate-long-6ply",
+    "name": "Chess - 6-Ply Hard AI Checkmate (Positional Endgame)",
+    "description": "Full strategic victory against Hard 6-Ply Minimax AI culminating in checkmate, with thinking pauses compressed for rapid replay",
+    "file": "chess-checkmate-long-6ply.json"
   },
   {
     "id": "checkers-2p-entangled-convergence",

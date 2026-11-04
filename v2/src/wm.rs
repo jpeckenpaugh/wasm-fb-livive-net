@@ -485,6 +485,7 @@ pub struct WmState {
     pub focus_visible: bool,
     pub test_pattern: bool,
     pub snapshot_seq: u32,
+    pub anim_tick: u32,
     pub hour: u8,
     pub minute: u8,
     pub second: u8,
@@ -512,6 +513,7 @@ impl WmState {
             focus_visible: false,
             test_pattern: false,
             snapshot_seq: 0,
+            anim_tick: 0,
             hour: 6,
             minute: 45,
             second: 0,
@@ -537,6 +539,7 @@ impl WmState {
         self.focus_visible = false;
         self.test_pattern = false;
         self.snapshot_seq = 0;
+        self.anim_tick = 0;
         self.system = SystemApp::new();
         self.calc = CalcApp::new();
         self.files = FilesApp::new();
@@ -593,6 +596,8 @@ impl WmState {
         staged_px: &[u32],
         staged_text: &[u8],
         staged_context: &[u8],
+        p1_avatar: Option<&[u32]>,
+        p2_avatar: Option<&[u32]>,
     ) {
         if !self.ready {
             return;
@@ -641,9 +646,9 @@ impl WmState {
                         staged_context,
                     )
                 }
-                AppSlot::Mines => mines::draw_window(&mut client_fb, &self.mines),
-                AppSlot::Checkers => checkers::draw_window(&mut client_fb, &self.checkers),
-                AppSlot::Chess => chess::draw_window(&mut client_fb, &self.chess),
+                AppSlot::Mines => mines::draw_window(&mut client_fb, &self.mines, self.anim_tick, p1_avatar, p2_avatar),
+                AppSlot::Checkers => checkers::draw_window(&mut client_fb, &self.checkers, self.anim_tick, p1_avatar, p2_avatar),
+                AppSlot::Chess => chess::draw_window(&mut client_fb, &self.chess, self.anim_tick, p1_avatar, p2_avatar),
             }
         }
 
