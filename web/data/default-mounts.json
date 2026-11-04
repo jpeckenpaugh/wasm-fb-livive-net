@@ -1,0 +1,612 @@
+[
+  {
+    "name": "wallpapers/01_aurora.png",
+    "url": "./assets/01_aurora.png",
+    "bytes": 493568,
+    "kind": "image"
+  },
+  {
+    "name": "wallpapers/02_rings.png",
+    "url": "./assets/02_rings.png",
+    "bytes": 389120,
+    "kind": "image"
+  },
+  {
+    "name": "wallpapers/03_checker.png",
+    "url": "./assets/03_checker.png",
+    "bytes": 90112,
+    "kind": "image"
+  },
+  {
+    "name": "wallpapers/04_dunes.png",
+    "url": "./assets/04_dunes.png",
+    "bytes": 11264,
+    "kind": "image"
+  },
+  {
+    "name": "wallpapers/05_orbits.png",
+    "url": "./assets/05_orbits.png",
+    "bytes": 158720,
+    "kind": "image"
+  },
+  {
+    "name": "samples/app.js",
+    "url": "./demo/app.js",
+    "bytes": 1045,
+    "kind": "code"
+  },
+  {
+    "name": "samples/data.json",
+    "url": "./demo/data.json",
+    "bytes": 527,
+    "kind": "code"
+  },
+  {
+    "name": "samples/entangled.md",
+    "url": "./demo/entangled.md",
+    "bytes": 9860,
+    "kind": "code",
+    "contextUrl": "./demo/.context.xml"
+  },
+  {
+    "name": "samples/feed.xml",
+    "url": "./demo/feed.xml",
+    "bytes": 1051,
+    "kind": "code"
+  },
+  {
+    "name": "samples/hello.c",
+    "url": "./demo/hello.c",
+    "bytes": 755,
+    "kind": "code"
+  },
+  {
+    "name": "samples/page.html",
+    "url": "./demo/page.html",
+    "bytes": 851,
+    "kind": "code"
+  },
+  {
+    "name": "samples/script.py",
+    "url": "./demo/script.py",
+    "bytes": 935,
+    "kind": "code"
+  },
+  {
+    "name": "samples/style.css",
+    "url": "./demo/style.css",
+    "bytes": 655,
+    "kind": "code"
+  },
+  {
+    "name": "samples/types.ts",
+    "url": "./demo/types.ts",
+    "bytes": 700,
+    "kind": "code"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-sm/lib.rs",
+    "url": "./gh/mines-sm/lib.rs",
+    "bytes": 12638,
+    "kind": "code",
+    "contextUrl": "./gh/mines-sm/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-sm/Cargo.toml",
+    "url": "./gh/mines-sm/Cargo.toml",
+    "bytes": 229,
+    "kind": "code",
+    "contextUrl": "./gh/mines-sm/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-sm/README.md",
+    "url": "./gh/mines-sm/README.md",
+    "bytes": 2599,
+    "kind": "code",
+    "contextUrl": "./gh/mines-sm/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/README.md",
+    "url": "./gh/mines-livive-net/README.md",
+    "bytes": 2394,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/index.html",
+    "url": "./gh/mines-livive-net/index.html",
+    "bytes": 12877,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/src/app.js",
+    "url": "./gh/mines-livive-net/src/app.js",
+    "bytes": 35616,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/src/contract.js",
+    "url": "./gh/mines-livive-net/src/contract.js",
+    "bytes": 2346,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/src/engine.js",
+    "url": "./gh/mines-livive-net/src/engine.js",
+    "bytes": 7728,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/src/featurize.js",
+    "url": "./gh/mines-livive-net/src/featurize.js",
+    "bytes": 2622,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/src/policy.js",
+    "url": "./gh/mines-livive-net/src/policy.js",
+    "bytes": 5657,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/tools/train.py",
+    "url": "./gh/mines-livive-net/tools/train.py",
+    "bytes": 14560,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/tools/eval.py",
+    "url": "./gh/mines-livive-net/tools/eval.py",
+    "bytes": 11962,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/models/manifest.json",
+    "url": "./gh/mines-livive-net/models/manifest.json",
+    "bytes": 9300,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/mines-livive-net/docs/checkpoints.md",
+    "url": "./gh/mines-livive-net/docs/checkpoints.md",
+    "bytes": 10602,
+    "kind": "code",
+    "contextUrl": "./gh/mines-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/README.md",
+    "url": "./gh/gm-livive-net/README.md",
+    "bytes": 10784,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/docs/ARCHITECTURE.md",
+    "url": "./gh/gm-livive-net/docs/ARCHITECTURE.md",
+    "bytes": 17121,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/claim_net.gd",
+    "url": "./gh/gm-livive-net/claim_net.gd",
+    "bytes": 15018,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/dodecahedron_planet.gd",
+    "url": "./gh/gm-livive-net/dodecahedron_planet.gd",
+    "bytes": 9764,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/face_camera_controller.gd",
+    "url": "./gh/gm-livive-net/face_camera_controller.gd",
+    "bytes": 2360,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/minesweeper_3d.gd",
+    "url": "./gh/gm-livive-net/minesweeper_3d.gd",
+    "bytes": 17425,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/minesweeper_tile_3d.gd",
+    "url": "./gh/gm-livive-net/minesweeper_tile_3d.gd",
+    "bytes": 5950,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/player.gd",
+    "url": "./gh/gm-livive-net/player.gd",
+    "bytes": 5666,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/project.godot",
+    "url": "./gh/gm-livive-net/project.godot",
+    "bytes": 3617,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/gm-livive-net/tests/run_tests.gd",
+    "url": "./gh/gm-livive-net/tests/run_tests.gd",
+    "bytes": 2367,
+    "kind": "code",
+    "contextUrl": "./gh/gm-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chk-livive-net/README.md",
+    "url": "./gh/chk-livive-net/README.md",
+    "bytes": 1520,
+    "kind": "code",
+    "contextUrl": "./gh/chk-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chk-livive-net/index.html",
+    "url": "./gh/chk-livive-net/index.html",
+    "bytes": 39194,
+    "kind": "code",
+    "contextUrl": "./gh/chk-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chk-livive-net/src/state.js",
+    "url": "./gh/chk-livive-net/src/state.js",
+    "bytes": 4942,
+    "kind": "code",
+    "contextUrl": "./gh/chk-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chk-livive-net/src/rules.js",
+    "url": "./gh/chk-livive-net/src/rules.js",
+    "bytes": 11366,
+    "kind": "code",
+    "contextUrl": "./gh/chk-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chk-livive-net/src/ai.js",
+    "url": "./gh/chk-livive-net/src/ai.js",
+    "bytes": 13235,
+    "kind": "code",
+    "contextUrl": "./gh/chk-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chk-livive-net/src/controller.js",
+    "url": "./gh/chk-livive-net/src/controller.js",
+    "bytes": 53707,
+    "kind": "code",
+    "contextUrl": "./gh/chk-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chk-livive-net/src/renderer.js",
+    "url": "./gh/chk-livive-net/src/renderer.js",
+    "bytes": 25476,
+    "kind": "code",
+    "contextUrl": "./gh/chk-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chk-livive-net/src/godot_adapter.js",
+    "url": "./gh/chk-livive-net/src/godot_adapter.js",
+    "bytes": 20395,
+    "kind": "code",
+    "contextUrl": "./gh/chk-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chk-livive-net/docs/godot_plan.md",
+    "url": "./gh/chk-livive-net/docs/godot_plan.md",
+    "bytes": 8762,
+    "kind": "code",
+    "contextUrl": "./gh/chk-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chs-livive-net/README.md",
+    "url": "./gh/chs-livive-net/README.md",
+    "bytes": 1316,
+    "kind": "code",
+    "contextUrl": "./gh/chs-livive-net/.context.xml"
+  },
+  {
+    "name": "gh/jpeckenpaugh/chs-livive-net/index.html",
+    "url": "./gh/chs-livive-net/index.html",
+    "bytes": 26202,
+    "kind": "code",
+    "contextUrl": "./gh/chs-livive-net/.context.xml"
+  },
+  {
+    "name": "web/livive.net/index.html",
+    "url": "./web/livive.net/index.html",
+    "bytes": 473348,
+    "kind": "code",
+    "contextUrl": "./web/livive.net/capture.json"
+  },
+  {
+    "name": "web/livive.net/rendered.html",
+    "url": "./web/livive.net/rendered.html",
+    "bytes": 536302,
+    "kind": "code",
+    "contextUrl": "./web/livive.net/capture.json"
+  },
+  {
+    "name": "web/livive.net/page.png",
+    "url": "./web/livive.net/page.png",
+    "bytes": 469588,
+    "kind": "image",
+    "contextUrl": "./web/livive.net/capture.json"
+  },
+  {
+    "name": "web/livive.net/text.txt",
+    "url": "./web/livive.net/text.txt",
+    "bytes": 4972,
+    "kind": "code",
+    "contextUrl": "./web/livive.net/capture.json"
+  },
+  {
+    "name": "web/livive.net/headers.txt",
+    "url": "./web/livive.net/headers.txt",
+    "bytes": 681,
+    "kind": "code",
+    "contextUrl": "./web/livive.net/capture.json"
+  },
+  {
+    "name": "web/livive.net/console.txt",
+    "url": "./web/livive.net/console.txt",
+    "bytes": 0,
+    "kind": "code",
+    "contextUrl": "./web/livive.net/capture.json"
+  },
+  {
+    "name": "web/livive.net/network.json",
+    "url": "./web/livive.net/network.json",
+    "bytes": 3699,
+    "kind": "code",
+    "contextUrl": "./web/livive.net/capture.json"
+  },
+  {
+    "name": "web/livive.net/capture.json",
+    "url": "./web/livive.net/capture.json",
+    "bytes": 1648,
+    "kind": "code",
+    "contextUrl": "./web/livive.net/capture.json"
+  },
+  {
+    "name": "web/mines.livive.net/index.html",
+    "url": "./web/mines.livive.net/index.html",
+    "bytes": 12877,
+    "kind": "code",
+    "contextUrl": "./web/mines.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines.livive.net/rendered.html",
+    "url": "./web/mines.livive.net/rendered.html",
+    "bytes": 44808,
+    "kind": "code",
+    "contextUrl": "./web/mines.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines.livive.net/page.png",
+    "url": "./web/mines.livive.net/page.png",
+    "bytes": 177697,
+    "kind": "image",
+    "contextUrl": "./web/mines.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines.livive.net/text.txt",
+    "url": "./web/mines.livive.net/text.txt",
+    "bytes": 718,
+    "kind": "code",
+    "contextUrl": "./web/mines.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines.livive.net/headers.txt",
+    "url": "./web/mines.livive.net/headers.txt",
+    "bytes": 682,
+    "kind": "code",
+    "contextUrl": "./web/mines.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines.livive.net/console.txt",
+    "url": "./web/mines.livive.net/console.txt",
+    "bytes": 0,
+    "kind": "code",
+    "contextUrl": "./web/mines.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines.livive.net/network.json",
+    "url": "./web/mines.livive.net/network.json",
+    "bytes": 1381,
+    "kind": "code",
+    "contextUrl": "./web/mines.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines.livive.net/capture.json",
+    "url": "./web/mines.livive.net/capture.json",
+    "bytes": 1686,
+    "kind": "code",
+    "contextUrl": "./web/mines.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines-sm.livive.net/index.html",
+    "url": "./web/mines-sm.livive.net/index.html",
+    "bytes": 17447,
+    "kind": "code",
+    "contextUrl": "./web/mines-sm.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines-sm.livive.net/rendered.html",
+    "url": "./web/mines-sm.livive.net/rendered.html",
+    "bytes": 24857,
+    "kind": "code",
+    "contextUrl": "./web/mines-sm.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines-sm.livive.net/page.png",
+    "url": "./web/mines-sm.livive.net/page.png",
+    "bytes": 94107,
+    "kind": "image",
+    "contextUrl": "./web/mines-sm.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines-sm.livive.net/text.txt",
+    "url": "./web/mines-sm.livive.net/text.txt",
+    "bytes": 2271,
+    "kind": "code",
+    "contextUrl": "./web/mines-sm.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines-sm.livive.net/headers.txt",
+    "url": "./web/mines-sm.livive.net/headers.txt",
+    "bytes": 684,
+    "kind": "code",
+    "contextUrl": "./web/mines-sm.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines-sm.livive.net/console.txt",
+    "url": "./web/mines-sm.livive.net/console.txt",
+    "bytes": 0,
+    "kind": "code",
+    "contextUrl": "./web/mines-sm.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines-sm.livive.net/network.json",
+    "url": "./web/mines-sm.livive.net/network.json",
+    "bytes": 151,
+    "kind": "code",
+    "contextUrl": "./web/mines-sm.livive.net/capture.json"
+  },
+  {
+    "name": "web/mines-sm.livive.net/capture.json",
+    "url": "./web/mines-sm.livive.net/capture.json",
+    "bytes": 1692,
+    "kind": "code",
+    "contextUrl": "./web/mines-sm.livive.net/capture.json"
+  },
+  {
+    "name": "web/gm.livive.net/index.html",
+    "url": "./web/gm.livive.net/index.html",
+    "bytes": 5439,
+    "kind": "code",
+    "contextUrl": "./web/gm.livive.net/capture.json"
+  },
+  {
+    "name": "web/gm.livive.net/rendered.html",
+    "url": "./web/gm.livive.net/rendered.html",
+    "bytes": 5799,
+    "kind": "code",
+    "contextUrl": "./web/gm.livive.net/capture.json"
+  },
+  {
+    "name": "web/gm.livive.net/page.png",
+    "url": "./web/gm.livive.net/page.png",
+    "bytes": 214863,
+    "kind": "image",
+    "contextUrl": "./web/gm.livive.net/capture.json"
+  },
+  {
+    "name": "web/gm.livive.net/text.txt",
+    "url": "./web/gm.livive.net/text.txt",
+    "bytes": 0,
+    "kind": "code",
+    "contextUrl": "./web/gm.livive.net/capture.json"
+  },
+  {
+    "name": "web/gm.livive.net/headers.txt",
+    "url": "./web/gm.livive.net/headers.txt",
+    "bytes": 678,
+    "kind": "code",
+    "contextUrl": "./web/gm.livive.net/capture.json"
+  },
+  {
+    "name": "web/gm.livive.net/console.txt",
+    "url": "./web/gm.livive.net/console.txt",
+    "bytes": 286,
+    "kind": "code",
+    "contextUrl": "./web/gm.livive.net/capture.json"
+  },
+  {
+    "name": "web/gm.livive.net/network.json",
+    "url": "./web/gm.livive.net/network.json",
+    "bytes": 541,
+    "kind": "code",
+    "contextUrl": "./web/gm.livive.net/capture.json"
+  },
+  {
+    "name": "web/gm.livive.net/capture.json",
+    "url": "./web/gm.livive.net/capture.json",
+    "bytes": 1646,
+    "kind": "code",
+    "contextUrl": "./web/gm.livive.net/capture.json"
+  },
+  {
+    "name": "web/chk.livive.net/index.html",
+    "url": "./web/chk.livive.net/index.html",
+    "bytes": 39194,
+    "kind": "code",
+    "contextUrl": "./web/chk.livive.net/capture.json"
+  },
+  {
+    "name": "web/chk.livive.net/rendered.html",
+    "url": "./web/chk.livive.net/rendered.html",
+    "bytes": 45804,
+    "kind": "code",
+    "contextUrl": "./web/chk.livive.net/capture.json"
+  },
+  {
+    "name": "web/chk.livive.net/page.png",
+    "url": "./web/chk.livive.net/page.png",
+    "bytes": 316393,
+    "kind": "image",
+    "contextUrl": "./web/chk.livive.net/capture.json"
+  },
+  {
+    "name": "web/chk.livive.net/text.txt",
+    "url": "./web/chk.livive.net/text.txt",
+    "bytes": 626,
+    "kind": "code",
+    "contextUrl": "./web/chk.livive.net/capture.json"
+  },
+  {
+    "name": "web/chk.livive.net/headers.txt",
+    "url": "./web/chk.livive.net/headers.txt",
+    "bytes": 679,
+    "kind": "code",
+    "contextUrl": "./web/chk.livive.net/capture.json"
+  },
+  {
+    "name": "web/chk.livive.net/console.txt",
+    "url": "./web/chk.livive.net/console.txt",
+    "bytes": 32,
+    "kind": "code",
+    "contextUrl": "./web/chk.livive.net/capture.json"
+  },
+  {
+    "name": "web/chk.livive.net/network.json",
+    "url": "./web/chk.livive.net/network.json",
+    "bytes": 1756,
+    "kind": "code",
+    "contextUrl": "./web/chk.livive.net/capture.json"
+  },
+  {
+    "name": "web/chk.livive.net/capture.json",
+    "url": "./web/chk.livive.net/capture.json",
+    "bytes": 1656,
+    "kind": "code",
+    "contextUrl": "./web/chk.livive.net/capture.json"
+  }
+]

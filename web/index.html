@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Test Appliance Orchestration Console</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/drawers.css">
+  <link rel="stylesheet" href="css/launchpad.css">
 </head>
 <body>
   <!-- Fixed Top HUD Bar (height: ~44px) -->
@@ -20,6 +22,7 @@
       </button>
     </div>
     <div class="topbar-right">
+      <button class="pane-toggle-btn" id="launchpad-nav-btn" type="button" title="Open Scenario &amp; Mission Launchpad" style="color: #a78bfa; border-color: #8b5cf688;">🚀 Launchpad</button>
       <button class="pane-toggle-btn active-toggle" id="toggle-inspector-btn" type="button" title="Toggle Inspector Pane [◨]">◨ Inspector</button>
       <nav class="nav-links">
         <a class="nav-link" href="./v2/">v2 baseline →</a>
@@ -32,6 +35,10 @@
   <div class="work-area">
     <!-- Collapsible Left Sidebar (~250px) -->
     <aside class="sidebar" id="sidebar">
+      <header class="sidebar-header">
+        <span class="sidebar-header-title">◧ Navigation</span>
+        <button class="pin-toggle-btn pinned" id="pin-sidebar-btn" type="button" title="Pin / Unpin Sidebar">📌 Pin</button>
+      </header>
       <!-- VM Provisioning -->
       <section class="sidebar-section" aria-label="VM Provisioning">
         <div class="sidebar-title"><span>+ Deploy Guest VM</span></div>
@@ -104,16 +111,29 @@
       </section>
     </aside>
 
+    <!-- Edge Peek Tab for Left Sidebar (Persistent when unpinned/closed) -->
+    <div class="peek-tab-left" id="peek-tab-sidebar" title="Open Sidebar [◧]">
+      <span class="peek-tab-label">Sidebar</span>
+    </div>
+
     <!-- Central Stage: Dynamic Scaling Container -->
     <main class="stage" id="stage">
       <div class="panels" id="panels"></div>
     </main>
 
+    <!-- Edge Peek Tab for Right Inspector (Persistent when unpinned/closed) -->
+    <div class="peek-tab-right" id="peek-tab-inspector" title="Open Inspector [◨]">
+      <span class="peek-tab-label">Inspector</span>
+    </div>
+
     <!-- Collapsible Right Inspector Pane (~380px) -->
     <aside class="inspector-pane" id="inspector-pane">
       <header class="inspector-header">
         <span class="inspector-header-title">⚡ Hypervisor Inspector</span>
-        <button class="inspector-close-btn" id="close-inspector-btn" type="button" title="Close Inspector">✕</button>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <button class="pin-toggle-btn pinned" id="pin-inspector-btn" type="button" title="Pin / Unpin Inspector">📌 Pin</button>
+          <button class="inspector-close-btn" id="close-inspector-btn" type="button" title="Close Inspector">✕</button>
+        </div>
       </header>
 
       <div class="inspector-content">

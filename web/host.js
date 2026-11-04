@@ -46,6 +46,11 @@ import {
   importTrajectoryJson,
   trajectoryToAutoPilotMission,
 } from './trajectory.js';
+import { KEY_CODES, MODS } from './core/input-codes.js';
+import { configureAutoPilotUiDeps, initAutoPilotUi } from './services/autopilot-ui.js';
+import { configureTrajectoryUiDeps, initTrajectoryUi } from './services/trajectory-ui.js';
+import { configureLaunchpadDeps, renderLaunchpad, hideLaunchpad } from './services/launchpad-ui.js';
+import defaultMountsData from './data/default-mounts.json' with { type: 'json' };
 
 const DEFAULT_W = 1280;
 const DEFAULT_H = 720;
@@ -53,57 +58,7 @@ const TITLE_H = 32;
 const HASH_EVERY_N_FRAMES = 10;
 
 /* Network mount catalog (`~/wallpapers/*`, `~/samples/*`, and `gh://`) served from `/` */
-const DEFAULT_MOUNTS = [
-  { name: 'wallpapers/01_aurora.png',  url: './assets/01_aurora.png',  bytes: 493568, kind: 'image' },
-  { name: 'wallpapers/02_rings.png',   url: './assets/02_rings.png',   bytes: 389120, kind: 'image' },
-  { name: 'wallpapers/03_checker.png', url: './assets/03_checker.png', bytes: 90112,  kind: 'image' },
-  { name: 'wallpapers/04_dunes.png',   url: './assets/04_dunes.png',   bytes: 11264,  kind: 'image' },
-  { name: 'wallpapers/05_orbits.png',  url: './assets/05_orbits.png',  bytes: 158720, kind: 'image' },
-  { name: 'samples/app.js',            url: './demo/app.js',           bytes: 1045,   kind: 'code' },
-  { name: 'samples/data.json',         url: './demo/data.json',        bytes: 527,    kind: 'code' },
-  { name: 'samples/entangled.md',      url: './demo/entangled.md',     bytes: 9860,   kind: 'code', contextUrl: './demo/.context.xml' },
-  { name: 'samples/feed.xml',          url: './demo/feed.xml',         bytes: 1051,   kind: 'code' },
-  { name: 'samples/hello.c',           url: './demo/hello.c',          bytes: 755,    kind: 'code' },
-  { name: 'samples/page.html',         url: './demo/page.html',        bytes: 851,    kind: 'code' },
-  { name: 'samples/script.py',         url: './demo/script.py',        bytes: 935,    kind: 'code' },
-  { name: 'samples/style.css',         url: './demo/style.css',        bytes: 655,    kind: 'code' },
-  { name: 'samples/types.ts',          url: './demo/types.ts',         bytes: 700,    kind: 'code' },
-  { name: 'gh/jpeckenpaugh/mines-sm/lib.rs', url: './gh/mines-sm/lib.rs', bytes: 12638, kind: 'code', contextUrl: './gh/mines-sm/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-sm/Cargo.toml', url: './gh/mines-sm/Cargo.toml', bytes: 229, kind: 'code', contextUrl: './gh/mines-sm/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-sm/README.md', url: './gh/mines-sm/README.md', bytes: 2599, kind: 'code', contextUrl: './gh/mines-sm/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/README.md', url: './gh/mines-livive-net/README.md', bytes: 2394, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/index.html', url: './gh/mines-livive-net/index.html', bytes: 12877, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/src/app.js', url: './gh/mines-livive-net/src/app.js', bytes: 35616, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/src/contract.js', url: './gh/mines-livive-net/src/contract.js', bytes: 2346, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/src/engine.js', url: './gh/mines-livive-net/src/engine.js', bytes: 7728, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/src/featurize.js', url: './gh/mines-livive-net/src/featurize.js', bytes: 2622, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/src/policy.js', url: './gh/mines-livive-net/src/policy.js', bytes: 5657, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/tools/train.py', url: './gh/mines-livive-net/tools/train.py', bytes: 14560, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/tools/eval.py', url: './gh/mines-livive-net/tools/eval.py', bytes: 11962, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/models/manifest.json', url: './gh/mines-livive-net/models/manifest.json', bytes: 9300, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/mines-livive-net/docs/checkpoints.md', url: './gh/mines-livive-net/docs/checkpoints.md', bytes: 10602, kind: 'code', contextUrl: './gh/mines-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/README.md', url: './gh/gm-livive-net/README.md', bytes: 10784, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/docs/ARCHITECTURE.md', url: './gh/gm-livive-net/docs/ARCHITECTURE.md', bytes: 17121, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/claim_net.gd', url: './gh/gm-livive-net/claim_net.gd', bytes: 15018, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/dodecahedron_planet.gd', url: './gh/gm-livive-net/dodecahedron_planet.gd', bytes: 9764, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/face_camera_controller.gd', url: './gh/gm-livive-net/face_camera_controller.gd', bytes: 2360, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/minesweeper_3d.gd', url: './gh/gm-livive-net/minesweeper_3d.gd', bytes: 17425, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/minesweeper_tile_3d.gd', url: './gh/gm-livive-net/minesweeper_tile_3d.gd', bytes: 5950, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/player.gd', url: './gh/gm-livive-net/player.gd', bytes: 5666, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/project.godot', url: './gh/gm-livive-net/project.godot', bytes: 3617, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/gm-livive-net/tests/run_tests.gd', url: './gh/gm-livive-net/tests/run_tests.gd', bytes: 2367, kind: 'code', contextUrl: './gh/gm-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chk-livive-net/README.md', url: './gh/chk-livive-net/README.md', bytes: 1520, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chk-livive-net/index.html', url: './gh/chk-livive-net/index.html', bytes: 39194, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chk-livive-net/src/state.js', url: './gh/chk-livive-net/src/state.js', bytes: 4942, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chk-livive-net/src/rules.js', url: './gh/chk-livive-net/src/rules.js', bytes: 11366, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chk-livive-net/src/ai.js', url: './gh/chk-livive-net/src/ai.js', bytes: 13235, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chk-livive-net/src/controller.js', url: './gh/chk-livive-net/src/controller.js', bytes: 53707, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chk-livive-net/src/renderer.js', url: './gh/chk-livive-net/src/renderer.js', bytes: 25476, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chk-livive-net/src/godot_adapter.js', url: './gh/chk-livive-net/src/godot_adapter.js', bytes: 20395, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chk-livive-net/docs/godot_plan.md', url: './gh/chk-livive-net/docs/godot_plan.md', bytes: 8762, kind: 'code', contextUrl: './gh/chk-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chs-livive-net/README.md', url: './gh/chs-livive-net/README.md', bytes: 1316, kind: 'code', contextUrl: './gh/chs-livive-net/.context.xml' },
-  { name: 'gh/jpeckenpaugh/chs-livive-net/index.html', url: './gh/chs-livive-net/index.html', bytes: 26202, kind: 'code', contextUrl: './gh/chs-livive-net/.context.xml' },
-];
+const DEFAULT_MOUNTS = defaultMountsData;
 
 /* Fallback build registry if `registry.json` hasn't loaded yet */
 const DEFAULT_REGISTRY = {
@@ -664,44 +619,6 @@ function serviceWebControl(guest) {
   }
 }
 
-/* Flat key namespace mirrored by `v2/src/input.rs::Key`. */
-const KEY_CODES = {
-  ArrowLeft: 1,
-  ArrowRight: 2,
-  ' ': 3,
-  '0': 10, '1': 11, '2': 12, '3': 13, '4': 14,
-  '5': 15, '6': 16, '7': 17, '8': 18, '9': 19,
-  '+': 20, '-': 21, '*': 22, 'x': 22, 'X': 22, '/': 23,
-  '=': 24, Enter: 24,
-  Escape: 25,
-  Backspace: 26,
-  '.': 27, ',': 27,
-  f: 30, F: 30,
-  n: 31, N: 31,
-  r: 32, R: 32,
-  Tab: 33,
-  PageUp: 34, '[': 34,
-  PageDown: 35, ']': 35,
-  '{': 36, '<': 36,
-  '}': 37, '>': 37,
-  k: 39, K: 39,
-  j: 38, J: 38,
-  i: 40, I: 40,
-  o: 63, O: 63,
-  d: 64, D: 64,
-  Home: 41,
-  End: 42,
-  c: 43, C: 43,
-  m: 44, M: 44,
-  ArrowUp: 50,
-  ArrowDown: 51,
-  F9: 60,
-  F10: 61,
-  F5: 62,
-};
-
-const MODS = { Shift: 1, Ctrl: 2, Alt: 4, Meta: 8 };
-
 const KiB = 1024;
 const MiB = 1024 * KiB;
 
@@ -738,6 +655,11 @@ const toggleInspectorBtn = document.getElementById('toggle-inspector-btn');
 const closeInspectorBtn = document.getElementById('close-inspector-btn');
 const inspectorPane = document.getElementById('inspector-pane');
 const sidebarEl = document.getElementById('sidebar');
+const peekTabSidebar = document.getElementById('peek-tab-sidebar');
+const peekTabInspector = document.getElementById('peek-tab-inspector');
+const pinSidebarBtn = document.getElementById('pin-sidebar-btn');
+const pinInspectorBtn = document.getElementById('pin-inspector-btn');
+const launchpadNavBtn = document.getElementById('launchpad-nav-btn');
 const brokerDrawer = document.getElementById('broker-drawer');
 const brokerResetBtn = document.getElementById('broker-reset-btn');
 const brokerHideBtn = document.getElementById('broker-hide-btn');
@@ -1566,7 +1488,10 @@ function destroyGuest(guest) {
     const next = guests[Math.min(index, guests.length - 1)];
     activate(next ? next.id : null);
   }
-  if (guests.length === 0) emptyState.hidden = false;
+  if (guests.length === 0) {
+    emptyState.hidden = true;
+    showLaunchpad();
+  }
   updateHostStats();
   setStatus('ready', true);
 }
@@ -2310,591 +2235,27 @@ const trajectoryPlayer = new TrajectoryPlayer({
   getGuests: () => guests,
 });
 
-const autoPilotBtn = document.getElementById('autopilot-btn');
-const autoPilotPanel = document.getElementById('autopilot-panel');
-const apHideBtn = document.getElementById('ap-hide-btn');
-const apMissionSelect = document.getElementById('ap-mission-select');
-const apPacingSelect = document.getElementById('ap-pacing-select');
-const apResSelect = document.getElementById('ap-res-select');
-const apRunBtn = document.getElementById('ap-run-btn');
-const apPauseBtn = document.getElementById('ap-pause-btn');
-const apResumeBtn = document.getElementById('ap-resume-btn');
-const apCancelBtn = document.getElementById('ap-cancel-btn');
-const apRunnerState = document.getElementById('ap-runner-state');
-const apStatusBadge = document.getElementById('ap-status-badge');
-const apStepLabel = document.getElementById('ap-step-label');
-const apTimerLabel = document.getElementById('ap-timer-label');
-const apProgressBar = document.getElementById('ap-progress-bar');
-const apLogList = document.getElementById('ap-log-list');
-const apGalleryContainer = document.getElementById('ap-gallery-container');
-const apGalleryTray = document.getElementById('ap-gallery-tray');
-const apSnapCount = document.getElementById('ap-snap-count');
+/* Wire Modular Auto Pilot UI */
+configureAutoPilotUiDeps({
+  autoPilotRunner,
+  getGuests: () => guests,
+  updateGuestBanner: (guest) => updateGuestBanner(guest),
+  openInspectorSection: (section) => openInspectorSection(section),
+  setStatus: (msg, ok) => setStatus(msg, ok),
+});
+const autoPilotUi = initAutoPilotUi();
 
-let apTimerInterval = null;
-let apMissionStartTime = 0;
-
-function updateAutoPilotControls(state) {
-  if (apRunnerState) apRunnerState.textContent = state;
-  if (apStatusBadge) {
-    apStatusBadge.style.display = 'inline-block';
-    apStatusBadge.textContent = state.toUpperCase();
-    if (state === 'running') {
-      apStatusBadge.style.borderColor = 'var(--accent)';
-      apStatusBadge.style.color = 'var(--accent)';
-    } else if (state === 'error' || state === 'failed') {
-      apStatusBadge.style.borderColor = '#f87171';
-      apStatusBadge.style.color = '#f87171';
-    } else if (state === 'completed') {
-      apStatusBadge.style.borderColor = 'var(--ok)';
-      apStatusBadge.style.color = 'var(--ok)';
-    } else {
-      apStatusBadge.style.borderColor = 'var(--dim)';
-      apStatusBadge.style.color = 'var(--dim)';
-    }
-  }
-
-  if (apRunBtn) apRunBtn.disabled = state === 'running';
-  if (apPauseBtn) apPauseBtn.disabled = state !== 'running';
-  if (apResumeBtn) apResumeBtn.disabled = state !== 'paused';
-  if (apCancelBtn) apCancelBtn.disabled = state !== 'running' && state !== 'paused';
-}
-
-autoPilotRunner.onLog = ({ msg, level }) => {
-  if (!apLogList) return;
-  const li = document.createElement('li');
-  if (level === 'error') li.className = 'error';
-  li.textContent = msg;
-  apLogList.appendChild(li);
-  apLogList.scrollTop = apLogList.scrollHeight;
-};
-
-autoPilotRunner.onStepChange = ({ stepIdx, totalSteps, step }) => {
-  const current = stepIdx + 1;
-  const pct = Math.round((stepIdx / totalSteps) * 100);
-  if (apProgressBar) apProgressBar.style.width = `${pct}%`;
-  if (apStepLabel) {
-    apStepLabel.textContent = `[Step ${current}/${totalSteps}] ${step.desc || step.action}`;
-  }
-  for (const guest of guests) {
-    updateGuestBanner(guest);
-  }
-};
-
-autoPilotRunner.onReportComplete = (report) => {
-  if (apTimerInterval) {
-    clearInterval(apTimerInterval);
-    apTimerInterval = null;
-  }
-  if (apProgressBar) {
-    apProgressBar.style.width = report.status === 'passed' ? '100%' : apProgressBar.style.width;
-  }
-  if (apTimerLabel) {
-    apTimerLabel.textContent = `${report.durationMs}ms`;
-  }
-  updateAutoPilotControls(report.status === 'passed' ? 'completed' : 'error');
-  for (const guest of guests) {
-    updateGuestBanner(guest);
-  }
-
-  // Render snapshots in Auto Pilot gallery tray
-  if (apGalleryContainer && apGalleryTray && report.snapshots && report.snapshots.length > 0) {
-    apGalleryContainer.style.display = 'block';
-    apGalleryTray.replaceChildren();
-    if (apSnapCount) apSnapCount.textContent = report.snapshots.length;
-    for (const snap of report.snapshots) {
-      const card = document.createElement('div');
-      card.className = 'ap-gallery-card';
-      card.innerHTML = `
-        <img src="${snap.dataUrl}" alt="${snap.label}">
-        <div style="font-weight:600; color:var(--text);">${snap.label}</div>
-        <div style="color:var(--dimmer);">${snap.hashHex} · seq #${snap.seq}</div>
-      `;
-      apGalleryTray.appendChild(card);
-    }
-  }
-};
-
-if (autoPilotBtn && autoPilotPanel) {
-  autoPilotBtn.addEventListener('click', () => {
-    if (autoPilotPanel.hidden) {
-      openInspectorSection(autoPilotPanel);
-    } else {
-      autoPilotPanel.hidden = true;
-    }
-  });
-}
-
-if (apHideBtn && autoPilotPanel) {
-  apHideBtn.addEventListener('click', () => {
-    autoPilotPanel.hidden = true;
-  });
-}
-
-if (apRunBtn) {
-  apRunBtn.addEventListener('click', () => {
-    const missionId = apMissionSelect ? apMissionSelect.value : 'system-audit';
-    const pacingMs = apPacingSelect ? parseInt(apPacingSelect.value, 10) : 400;
-    let resolution = null;
-    if (apResSelect && apResSelect.value !== 'default') {
-      const parts = apResSelect.value.split('x').map((n) => parseInt(n, 10));
-      if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) {
-        resolution = { width: parts[0], height: parts[1] };
-      }
-    }
-
-    if (apLogList) {
-      apLogList.replaceChildren();
-    }
-    if (apGalleryTray) {
-      apGalleryTray.replaceChildren();
-    }
-    if (apGalleryContainer) {
-      apGalleryContainer.style.display = 'none';
-    }
-    if (apProgressBar) {
-      apProgressBar.style.width = '0%';
-    }
-
-    updateAutoPilotControls('running');
-    for (const guest of guests) {
-      updateGuestBanner(guest);
-    }
-    apMissionStartTime = performance.now();
-    if (apTimerInterval) clearInterval(apTimerInterval);
-    apTimerInterval = setInterval(() => {
-      if (apTimerLabel) {
-        apTimerLabel.textContent = `${Math.round(performance.now() - apMissionStartTime)}ms`;
-      }
-    }, 100);
-
-    autoPilotRunner.runMission(missionId, { pacingMs, resolution }).catch((err) => {
-      console.error('Auto Pilot mission failed:', err);
-      updateAutoPilotControls('error');
-    });
-  });
-}
-
-// Warm the missions cache and sync dynamically
-loadMissions().then((missions) => {
-  if (apMissionSelect && missions && missions.length > 0) {
-    const currentVal = apMissionSelect.value;
-    apMissionSelect.replaceChildren();
-    for (const m of missions) {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.name;
-      if (m.id === currentVal) opt.selected = true;
-      apMissionSelect.appendChild(opt);
-    }
-  }
-}).catch((err) => console.warn('Could not warm missions cache:', err));
-
-if (apPauseBtn) {
-  apPauseBtn.addEventListener('click', () => {
-    autoPilotRunner.pause();
-    updateAutoPilotControls('paused');
-  });
-}
-
-if (apResumeBtn) {
-  apResumeBtn.addEventListener('click', () => {
-    autoPilotRunner.resume();
-    updateAutoPilotControls('running');
-    for (const guest of guests) {
-      updateGuestBanner(guest);
-    }
-  });
-}
-
-if (apCancelBtn) {
-  apCancelBtn.addEventListener('click', () => {
-    autoPilotRunner.cancel();
-    if (apTimerInterval) {
-      clearInterval(apTimerInterval);
-      apTimerInterval = null;
-    }
-    updateAutoPilotControls('cancelled');
-  });
-}
-
-/* ---------------- Trajectory Recording & Playback UI Wiring ---------------- */
-const recordBtn = document.getElementById('record-btn');
-const trajDrawerBtn = document.getElementById('traj-drawer-btn');
-const trajectoryDrawer = document.getElementById('trajectory-drawer');
-const trajHideBtn = document.getElementById('traj-hide-btn');
-
-const trajRunnerState = document.getElementById('traj-runner-state');
-const trajStatusBadge = document.getElementById('traj-status-badge');
-const trajActionsStat = document.getElementById('traj-actions-stat');
-const trajDurationStat = document.getElementById('traj-duration-stat');
-const trajParityBadge = document.getElementById('traj-parity-badge');
-const trajTargetStat = document.getElementById('traj-target-stat');
-const trajRecordedResStat = document.getElementById('traj-recorded-res-stat');
-const trajModeBadge = document.getElementById('traj-mode-badge');
-const trajModeGroup = document.getElementById('traj-mode-group');
-
-const trajSaveBtn = document.getElementById('traj-save-btn');
-const trajLoadBtn = document.getElementById('traj-load-btn');
-const trajFileInput = document.getElementById('traj-file-input');
-const trajConvertBtn = document.getElementById('traj-convert-btn');
-
-const trajStepBtn = document.getElementById('traj-step-btn');
-const trajPlayBtn = document.getElementById('traj-play-btn');
-const trajPauseBtn = document.getElementById('traj-pause-btn');
-const trajStopBtn = document.getElementById('traj-stop-btn');
-const trajSpeedGroup = document.getElementById('traj-speed-group');
-
-const trajActionLabel = document.getElementById('traj-action-label');
-const trajProgressPct = document.getElementById('traj-progress-pct');
-const trajTimelineFill = document.getElementById('traj-timeline-fill');
-const trajEventsList = document.getElementById('traj-events-list');
-
-let lastTrajectoryData = null;
-let currentPlaybackSpeed = 1.0;
-let recPulseInterval = null;
-
-function formatMsDuration(ms) {
-  const totalSecs = Math.floor(ms / 1000);
-  const m = Math.floor(totalSecs / 60).toString().padStart(2, '0');
-  const s = (totalSecs % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-}
-
-function updateRecordButtonUI(isRecording) {
-  if (!recordBtn) return;
-  if (isRecording) {
-    recordBtn.classList.add('recording-active');
-    if (recPulseInterval) clearInterval(recPulseInterval);
-    recPulseInterval = setInterval(() => {
-      if (trajectoryRecorder.isRecording()) {
-        const dur = formatMsDuration(trajectoryRecorder.getDuration());
-        const count = trajectoryRecorder.getActionCount();
-        recordBtn.textContent = `⏺ REC ${dur} · ${count} act`;
-      }
-    }, 500);
-    const dur = formatMsDuration(trajectoryRecorder.getDuration());
-    const count = trajectoryRecorder.getActionCount();
-    recordBtn.textContent = `⏺ REC ${dur} · ${count} act`;
-  } else {
-    recordBtn.classList.remove('recording-active');
-    if (recPulseInterval) {
-      clearInterval(recPulseInterval);
-      recPulseInterval = null;
-    }
-    recordBtn.textContent = '⏺ record';
-  }
-}
-
-function updateTrajectoryDrawerUI() {
-  const data = lastTrajectoryData || trajectoryRecorder.exportData();
-  const count = data?.events?.length || 0;
-  const duration = data?.metadata?.durationMs || 0;
-  const targetId = data?.metadata?.guestId != null ? data.metadata.guestId : (activeId != null ? activeId : '—');
-
-  if (trajActionsStat) trajActionsStat.textContent = count;
-  if (trajDurationStat) trajDurationStat.textContent = `${duration}ms`;
-  if (trajTargetStat) trajTargetStat.textContent = targetId;
-
-  const recRes = data?.metadata?.recordedResolution || data?.metadata?.resolution;
-  if (trajRecordedResStat) {
-    trajRecordedResStat.textContent = recRes ? `${recRes.width}×${recRes.height}` : '—';
-  }
-
-  // Update mode pill
-  const activeGuest = guests.find((cand) => cand.id === activeId) || guests[0];
-  const resMatch = recRes && activeGuest && activeGuest.width === recRes.width && activeGuest.height === recRes.height;
-  const currentMode = trajectoryPlayer.getPlaybackMode();
-
-  if (trajModeBadge) {
-    if (currentMode === 'semantic' || (currentMode === 'auto' && !resMatch)) {
-      trajModeBadge.className = 'traj-badge ok';
-      trajModeBadge.textContent = '🧠 Semantic (Adaptive)';
-    } else {
-      trajModeBadge.className = 'traj-badge neutral';
-      trajModeBadge.textContent = '🎯 Physical 1:1';
-    }
-  }
-
-  // Update hash parity badge
-  if (trajParityBadge) {
-    if (trajectoryPlayer.hashDivergenceCount > 0) {
-      trajParityBadge.className = 'traj-badge diverged';
-      trajParityBadge.textContent = `${trajectoryPlayer.hashDivergenceCount} DIVERGED`;
-    } else {
-      trajParityBadge.className = 'traj-badge ok';
-      trajParityBadge.textContent = '100% VERIFIED';
-    }
-  }
-
-  // Populate events list
-  if (trajEventsList && data && data.events) {
-    trajEventsList.replaceChildren();
-    if (data.events.length === 0) {
-      const li = document.createElement('li');
-      li.textContent = 'No events recorded yet. Click [⏺ record] to record interactions.';
-      trajEventsList.appendChild(li);
-    } else {
-      data.events.forEach((ev, idx) => {
-        const li = document.createElement('li');
-        const hashHex = `0x${(ev.hash >>> 0).toString(16).padStart(8, '0')}`;
-        const clientHex = ev.clientHash != null ? ` · client=0x${(ev.clientHash >>> 0).toString(16).padStart(8, '0')}` : '';
-        let desc = '';
-        if (ev.type === 'click') desc = `Click (${ev.x}, ${ev.y})`;
-        else if (ev.type === 'key') desc = `Key code=${ev.code} mods=${ev.mods || 0}`;
-        else if (ev.type === 'openApp') desc = `OpenApp slot=${ev.slot}`;
-        else if (ev.type === 'seedMines') desc = `SeedMines seed=${ev.seed} strikes=${ev.maxStrikes}`;
-        else desc = `${ev.type} ${JSON.stringify(ev)}`;
-
-        li.textContent = `[#${idx + 1}] dt=${ev.dt}ms · ${desc} · hash=${hashHex}${clientHex}`;
-        li.dataset.idx = idx;
-        trajEventsList.appendChild(li);
-      });
-    }
-  }
-}
-
-// Player event callbacks
-trajectoryPlayer.onStateChange = (state) => {
-  if (trajRunnerState) trajRunnerState.textContent = state;
-  if (trajStatusBadge) {
-    trajStatusBadge.textContent = state.toUpperCase();
-    if (state === 'playing') {
-      trajStatusBadge.className = 'traj-badge ok';
-    } else if (state === 'paused') {
-      trajStatusBadge.className = 'traj-badge neutral';
-    } else if (state === 'completed') {
-      trajStatusBadge.className = 'traj-badge ok';
-    } else {
-      trajStatusBadge.className = 'traj-badge neutral';
-    }
-  }
-
-  if (trajPlayBtn) trajPlayBtn.disabled = state === 'playing';
-  if (trajPauseBtn) trajPauseBtn.disabled = state !== 'playing';
-  if (trajStepBtn) trajStepBtn.disabled = state === 'playing';
-  if (trajStopBtn) trajStopBtn.disabled = state === 'idle';
-};
-
-trajectoryPlayer.onProgress = ({ index, total, percent, divergences }) => {
-  if (trajTimelineFill) {
-    trajTimelineFill.style.width = `${percent.toFixed(1)}%`;
-  }
-  if (trajProgressPct) {
-    trajProgressPct.textContent = `${Math.round(percent)}%`;
-  }
-  if (trajActionLabel) {
-    trajActionLabel.textContent = `Action ${index}/${total} · ${divergences} divergence(s)`;
-  }
-  if (trajParityBadge) {
-    if (divergences > 0) {
-      trajParityBadge.className = 'traj-badge diverged';
-      trajParityBadge.textContent = `${divergences} DIVERGED`;
-    } else {
-      trajParityBadge.className = 'traj-badge ok';
-      trajParityBadge.textContent = '100% VERIFIED';
-    }
-  }
-
-  // Highlight current event in list
-  if (trajEventsList && trajEventsList.children) {
-    const items = trajEventsList.children;
-    for (let i = 0; i < items.length; i++) {
-      if (i === index - 1) {
-        items[i].classList.add('current');
-        items[i].scrollIntoView({ block: 'nearest' });
-      } else {
-        items[i].classList.remove('current');
-      }
-    }
-  }
-};
-
-trajectoryPlayer.onHashDivergence = ({ index, expectedHex, actualHex }) => {
-  if (trajEventsList && trajEventsList.children[index]) {
-    trajEventsList.children[index].classList.add('diverged');
-  }
-  setStatus(`Trajectory Hash Divergence at event #${index + 1}: expected ${expectedHex}, got ${actualHex}`, false);
-};
-
-trajectoryPlayer.onComplete = ({ divergences, total }) => {
-  setStatus(`Trajectory playback finished: ${total} events replayed with ${divergences} divergences.`, divergences === 0);
-};
-
-// UI Element Event Handlers
-if (recordBtn) {
-  recordBtn.addEventListener('click', () => {
-    if (trajectoryRecorder.isRecording()) {
-      // Stop recording
-      const data = trajectoryRecorder.stop();
-      updateRecordButtonUI(false);
-      lastTrajectoryData = data;
-      trajectoryPlayer.load(data);
-      updateTrajectoryDrawerUI();
-      if (trajectoryDrawer) {
-        openInspectorSection(trajectoryDrawer);
-      }
-      setStatus(`Trajectory recording saved: ${data.events.length} actions captured.`, true);
-    } else {
-      // Start recording active guest
-      const g = guests.find((cand) => cand.id === activeId) || guests[0];
-      if (!g) {
-        setStatus('Cannot start recording: No active guest VM', false);
-        return;
-      }
-      trajectoryRecorder.start(g);
-      updateRecordButtonUI(true);
-      setStatus(`⏺ Recording started on guest ${g.name} (${g.width}×${g.height})`, true);
-    }
-  });
-}
-
-if (trajDrawerBtn && trajectoryDrawer) {
-  trajDrawerBtn.addEventListener('click', () => {
-    if (trajectoryDrawer.hidden) {
-      updateTrajectoryDrawerUI();
-      openInspectorSection(trajectoryDrawer);
-    } else {
-      trajectoryDrawer.hidden = true;
-    }
-  });
-}
-
-if (trajHideBtn && trajectoryDrawer) {
-  trajHideBtn.addEventListener('click', () => {
-    trajectoryDrawer.hidden = true;
-  });
-}
-
-if (trajPlayBtn) {
-  trajPlayBtn.addEventListener('click', () => {
-    if (!lastTrajectoryData) {
-      setStatus('No trajectory loaded to play', false);
-      return;
-    }
-    trajectoryPlayer.play(currentPlaybackSpeed);
-  });
-}
-
-if (trajPauseBtn) {
-  trajPauseBtn.addEventListener('click', () => {
-    trajectoryPlayer.pause();
-  });
-}
-
-if (trajStopBtn) {
-  trajStopBtn.addEventListener('click', () => {
-    trajectoryPlayer.stop();
-  });
-}
-
-if (trajStepBtn) {
-  trajStepBtn.addEventListener('click', () => {
-    if (!lastTrajectoryData) {
-      setStatus('No trajectory loaded to step', false);
-      return;
-    }
-    trajectoryPlayer.stepForward();
-  });
-}
-
-if (trajSpeedGroup) {
-  trajSpeedGroup.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('button[data-speed]');
-    if (!btn) return;
-    const speed = parseFloat(btn.dataset.speed);
-    currentPlaybackSpeed = speed;
-    Array.from(trajSpeedGroup.children).forEach((b) => b.classList.remove('active-speed'));
-    btn.classList.add('active-speed');
-    if (trajectoryPlayer.state === 'playing') {
-      trajectoryPlayer.speed = speed;
-    }
-  });
-}
-
-if (trajModeGroup) {
-  trajModeGroup.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('button[data-mode]');
-    if (!btn) return;
-    const mode = btn.dataset.mode;
-    trajectoryPlayer.setPlaybackMode(mode);
-    Array.from(trajModeGroup.children).forEach((b) => b.classList.remove('active-speed'));
-    btn.classList.add('active-speed');
-    updateTrajectoryDrawerUI();
-  });
-}
-
-trajectoryPlayer.onModeChange = () => {
-  updateTrajectoryDrawerUI();
-};
-
-if (trajSaveBtn) {
-  trajSaveBtn.addEventListener('click', () => {
-    const data = lastTrajectoryData || trajectoryRecorder.exportData();
-    if (!data || !data.events || data.events.length === 0) {
-      setStatus('No trajectory events to save', false);
-      return;
-    }
-    const fname = downloadTrajectoryFile(data);
-    setStatus(`Trajectory saved to ${fname}`, true);
-  });
-}
-
-if (trajLoadBtn && trajFileInput) {
-  trajLoadBtn.addEventListener('click', () => {
-    trajFileInput.click();
-  });
-
-  trajFileInput.addEventListener('change', (ev) => {
-    const file = ev.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target.result;
-        const data = importTrajectoryJson(text);
-        lastTrajectoryData = data;
-        trajectoryPlayer.load(data);
-        updateTrajectoryDrawerUI();
-        setStatus(`Loaded trajectory with ${data.events.length} events from ${file.name}`, true);
-      } catch (err) {
-        console.error('Failed to import trajectory:', err);
-        setStatus(`Error loading trajectory: ${err.message}`, false);
-      }
-    };
-    reader.readAsText(file);
-    trajFileInput.value = '';
-  });
-}
-
-if (trajConvertBtn) {
-  trajConvertBtn.addEventListener('click', () => {
-    const data = lastTrajectoryData || trajectoryRecorder.exportData();
-    if (!data || !data.events || data.events.length === 0) {
-      setStatus('No trajectory events to convert', false);
-      return;
-    }
-    const mission = trajectoryToAutoPilotMission(data);
-    MISSIONS.push(mission);
-
-    // Add option to apMissionSelect
-    const apMissionSelect = document.getElementById('ap-mission-select');
-    if (apMissionSelect) {
-      const opt = document.createElement('option');
-      opt.value = mission.id;
-      opt.textContent = `[Trajectory] ${mission.name}`;
-      opt.selected = true;
-      apMissionSelect.appendChild(opt);
-    }
-
-    // Open Auto Pilot Panel
-    const autoPilotPanel = document.getElementById('autopilot-panel');
-    if (autoPilotPanel) {
-      openInspectorSection(autoPilotPanel);
-    }
-
-    setStatus(`Converted trajectory to Auto Pilot mission "${mission.name}"!`, true);
-  });
-}
+/* Wire Modular Trajectory UI */
+configureTrajectoryUiDeps({
+  trajectoryRecorder,
+  trajectoryPlayer,
+  getActiveGuest: () => guests.find((cand) => cand.id === activeId) || guests[0],
+  getActiveId: () => activeId,
+  getGuests: () => guests,
+  setStatus: (msg, ok) => setStatus(msg, ok),
+  openInspectorSection: (sec) => openInspectorSection(sec),
+});
+const trajectoryUi = initTrajectoryUi();
 
 /* Programmatic Agent / QA Test Harness Surface (`window.__appliance`) */
 window.__appliance = {
@@ -3039,7 +2400,43 @@ function openInspectorSection(sectionEl) {
   }
 }
 
+/* ------------------------------------------------------------------ launchpad & layout controls -- */
+
+let sidebarPinned = true;
+let inspectorPinned = true;
+
+function showLaunchpad() {
+  emptyState.hidden = true;
+  renderLaunchpad(panelsEl);
+}
+
+configureLaunchpadDeps({
+  onLaunchMission: (missionId) => {
+    hideLaunchpad(panelsEl);
+    autoPilotUi.runSelectedMission(missionId).catch((err) => console.error(err));
+  },
+  onLaunchAppliance: (kind, opts = {}) => {
+    hideLaunchpad(panelsEl);
+    if (kind === 'checkers') {
+      launchCheckersInGuest().catch((err) => console.error(err));
+    } else if (kind === 'chess') {
+      launchChessInGuest().catch((err) => console.error(err));
+    } else if (kind === 'mines') {
+      startTwoPlayerMatch().catch((err) => console.error(err));
+    } else {
+      createGuest(opts).catch((err) => console.error(err));
+    }
+  },
+});
+
+if (launchpadNavBtn) {
+  launchpadNavBtn.addEventListener('click', () => {
+    showLaunchpad();
+  });
+}
+
 function initLayoutControls() {
+  // Sidebar toggle
   if (toggleSidebarBtn && sidebarEl) {
     toggleSidebarBtn.addEventListener('click', () => {
       const isCollapsed = sidebarEl.classList.toggle('collapsed');
@@ -3047,10 +2444,45 @@ function initLayoutControls() {
     });
   }
 
+  // Sidebar Peek Tab
+  if (peekTabSidebar && sidebarEl) {
+    peekTabSidebar.addEventListener('click', () => {
+      sidebarEl.classList.remove('collapsed');
+      if (toggleSidebarBtn) toggleSidebarBtn.classList.add('active-toggle');
+    });
+  }
+
+  // Sidebar Pin
+  if (pinSidebarBtn && sidebarEl) {
+    pinSidebarBtn.addEventListener('click', () => {
+      sidebarPinned = !sidebarPinned;
+      pinSidebarBtn.classList.toggle('pinned', sidebarPinned);
+      pinSidebarBtn.textContent = sidebarPinned ? '📌 Pin' : '📍 Unpinned';
+    });
+  }
+
+  // Inspector toggle
   if (toggleInspectorBtn && inspectorPane) {
     toggleInspectorBtn.addEventListener('click', () => {
       const isCollapsed = inspectorPane.classList.toggle('collapsed');
       toggleInspectorBtn.classList.toggle('active-toggle', !isCollapsed);
+    });
+  }
+
+  // Inspector Peek Tab
+  if (peekTabInspector && inspectorPane) {
+    peekTabInspector.addEventListener('click', () => {
+      inspectorPane.classList.remove('collapsed');
+      if (toggleInspectorBtn) toggleInspectorBtn.classList.add('active-toggle');
+    });
+  }
+
+  // Inspector Pin
+  if (pinInspectorBtn && inspectorPane) {
+    pinInspectorBtn.addEventListener('click', () => {
+      inspectorPinned = !inspectorPinned;
+      pinInspectorBtn.classList.toggle('pinned', inspectorPinned);
+      pinInspectorBtn.textContent = inspectorPinned ? '📌 Pin' : '📍 Unpinned';
     });
   }
 
@@ -3068,9 +2500,10 @@ initLayoutControls();
 setStatus('booting Test Appliance Orchestration Console…', true);
 loadRegistry()
   .then(() => {
-    // Check URL parameters for match join: ?match=101&seat=2 and ?fullscreen=1
+    // Check URL parameters for match join: ?match=101&seat=2, ?mission=xxx, and ?fullscreen=1
     const params = new URLSearchParams(window.location.search);
     const matchParam = params.get('match');
+    const missionParam = params.get('mission');
     const seatParam = parseInt(params.get('seat') || '2', 10);
     const fullscreenParam = params.get('fullscreen') === '1' || params.get('fs') === '1';
     const isMobile = window.innerWidth < 800;
@@ -3079,8 +2512,12 @@ loadRegistry()
     if (matchParam) {
       const matchId = parseInt(matchParam, 10);
       initPromise = joinNetworkMatch(matchId, seatParam);
+    } else if (missionParam) {
+      initPromise = autoPilotUi.runSelectedMission(missionParam);
     } else {
-      initPromise = createGuest();
+      // Default landing experience: Launchpad
+      showLaunchpad();
+      initPromise = Promise.resolve();
     }
 
     return initPromise.then(() => {

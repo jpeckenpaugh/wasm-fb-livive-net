@@ -1,0 +1,159 @@
+/* ==========================================================================
+   Edge Peek Drawers: Sidebar & Inspector with Persistent Tabs & Pinning
+   ========================================================================== */
+
+/* Left Sidebar Peek Tab (visible when sidebar is closed/unpinned) */
+.peek-tab-left {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  width: 24px;
+  min-height: 90px;
+  background: #141417ee;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  z-index: 45;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.4);
+  transition: width 0.15s ease, background 0.15s ease, opacity 0.2s ease;
+  user-select: none;
+  padding: 8px 2px;
+}
+
+.peek-tab-left:hover {
+  width: 28px;
+  background: #1f1f25;
+  border-color: var(--accent);
+}
+
+.peek-tab-left .peek-tab-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.peek-tab-left:hover .peek-tab-label {
+  color: var(--text);
+}
+
+/* Right Inspector Peek Tab */
+.peek-tab-right {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 24px;
+  min-height: 90px;
+  background: #141417ee;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  z-index: 45;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.4);
+  transition: width 0.15s ease, background 0.15s ease, opacity 0.2s ease;
+  user-select: none;
+  padding: 8px 2px;
+}
+
+.peek-tab-right:hover {
+  width: 28px;
+  background: #1f1f25;
+  border-color: var(--accent);
+}
+
+.peek-tab-right .peek-tab-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.peek-tab-right:hover .peek-tab-label {
+  color: var(--text);
+}
+
+/* Hide peek tabs when drawer is fully open and pinned or hovering */
+.sidebar:not(.collapsed) ~ .peek-tab-left,
+.sidebar:not(.collapsed) .peek-tab-left {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.inspector-pane:not(.collapsed) ~ .peek-tab-right,
+.inspector-pane:not(.collapsed) .peek-tab-right {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Drawer Pin Toggles */
+.pin-toggle-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--dim);
+  font: 500 11px/1 var(--mono);
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.pin-toggle-btn:hover {
+  background: #ffffff10;
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.pin-toggle-btn.pinned {
+  color: var(--accent);
+  background: #4f46e522;
+  border-color: #8b5cf688;
+}
+
+/* Sidebar Header if needed for pin */
+.sidebar-header {
+  flex: none;
+  height: 38px;
+  padding: 0 12px;
+  background: #1c1c20;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.sidebar-header-title {
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
